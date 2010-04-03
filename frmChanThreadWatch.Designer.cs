@@ -70,6 +70,7 @@ namespace ChanThreadWatch {
 			this.lvThreads.TabIndex = 0;
 			this.lvThreads.UseCompatibleStateImageBehavior = false;
 			this.lvThreads.View = System.Windows.Forms.View.Details;
+			this.lvThreads.KeyDown += new System.Windows.Forms.KeyEventHandler(this.lvThreads_KeyDown);
 			this.lvThreads.MouseDoubleClick += new System.Windows.Forms.MouseEventHandler(this.lvThreads_MouseDoubleClick);
 			this.lvThreads.MouseClick += new System.Windows.Forms.MouseEventHandler(this.lvThreads_MouseClick);
 			// 
@@ -319,7 +320,6 @@ namespace ChanThreadWatch {
 			// 
 			this.Name = "frmChanThreadWatch";
 			this.Text = "Chan Thread Watch";
-
 			this.ClientSize = new System.Drawing.Size(636, 341);
 			this.MinimumSize = new System.Drawing.Size(644, 368);
 			this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;

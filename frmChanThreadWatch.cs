@@ -23,6 +23,8 @@ namespace ChanThreadWatch {
 		// ReleaseDate property and version in AssemblyInfo.cs should be updated for each release.
 
 		// Change log:
+		// 1.2.1 (2009-May-06):
+		//   * Works with HTTPS sites (stupid bug).
 		// 1.2.0 (2009-May-05):
 		//   * Settings are remembered across runs.
 		//   * Thread list is remembered across runs, with a prompt at start before
@@ -61,7 +63,7 @@ namespace ChanThreadWatch {
 
 		private string ReleaseDate {
 			get {
-				return "2009-May-05";
+				return "2009-May-06";
 			}
 		}
 
@@ -163,7 +165,11 @@ namespace ChanThreadWatch {
 			int waitSeconds = Int32.Parse((string)cboCheckEvery.SelectedItem) * 60;
 
 			if (pageURL.Length == 0) return;
-			if (!pageURL.StartsWith("http://")) pageURL = "http://" + pageURL;
+			if (!pageURL.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+				!pageURL.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+			{
+				pageURL = "http://" + pageURL;
+			}
 
 			if (!AddThread(pageURL, pageAuth, imageAuth, waitSeconds, chkOneTime.Checked, null)) {
 				MessageBox.Show("The same thread is already being watched or downloaded.",
@@ -174,24 +180,9 @@ namespace ChanThreadWatch {
 			txtPageURL.Clear();
 			txtPageURL.Focus();
 		}
-		
 
 		private void btnRemoveCompleted_Click(object sender, EventArgs e) {
-			using (SoftLock.Obtain(_watchInfoList)) {
-				int i = 0;
-				while (i < _watchInfoList.Count) {
-					WatchInfo watchInfo = _watchInfoList[i];
-					if (watchInfo.Stop || !watchInfo.WatchThread.IsAlive) {
-						watchInfo.ListIndex = -1;
-						_watchInfoList.RemoveAt(i);
-						lvThreads.Items.RemoveAt(i);
-					}
-					else {
-						watchInfo.ListIndex = i;
-						i++;
-					}
-				}
-			}
+			RemoveThreads(true, false);
 		}
 
 		private void miStop_Click(object sender, EventArgs e) {
@@ -264,6 +255,12 @@ namespace ChanThreadWatch {
 				Version, ReleaseDate), "About", MessageBoxButtons.OK, MessageBoxIcon.Information);
 		}
 
+		private void lvThreads_KeyDown(object sender, KeyEventArgs e) {
+			if (e.KeyCode == Keys.Delete) {
+				RemoveThreads(false, true);
+			}
+		}
+
 		private void lvThreads_MouseClick(object sender, MouseEventArgs e) {
 			if (e.Button == MouseButtons.Right) {
 				if (lvThreads.SelectedItems.Count != 0) {
@@ -331,6 +328,26 @@ namespace ChanThreadWatch {
 
 			watchInfo.WatchThread.Start(watchInfo);
 			return true;
+		}
+
+		private void RemoveThreads(bool removeCompleted, bool removeSelected) {
+			using (SoftLock.Obtain(_watchInfoList)) {
+				int i = 0;
+				while (i < _watchInfoList.Count) {
+					WatchInfo watchInfo = _watchInfoList[i];
+					if ((removeCompleted || (removeSelected && lvThreads.Items[i].Selected)) &&
+						(watchInfo.Stop || !watchInfo.WatchThread.IsAlive))
+					{
+						watchInfo.ListIndex = -1;
+						_watchInfoList.RemoveAt(i);
+						lvThreads.Items.RemoveAt(i);
+					}
+					else {
+						watchInfo.ListIndex = i;
+						i++;
+					}
+				}
+			}
 		}
 
 		private void SetStatus(WatchInfo watchInfo, string status) {
