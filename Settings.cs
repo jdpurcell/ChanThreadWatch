@@ -2,18 +2,13 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using System.Reflection;
 
 namespace ChanThreadWatch {
 	static class Settings {
 		const string _appName = "Chan Thread Watch";
-		const string _fileName = "settings.txt";
 
-		static string _path;
 		static Dictionary<string, string> _settings;
-
-		static Settings() {
-			_path = Path.Combine(GetSettingsDir(), _fileName);
-		}
 
 		public static bool? UseCustomUserAgent {
 			get { return GetBool("UseCustomUserAgent"); }
@@ -55,9 +50,40 @@ namespace ChanThreadWatch {
 			set { SetInt("CheckEvery", value); }
 		}
 
+		public static bool? DownloadFolderIsRelative {
+			get { return GetBool("DownloadFolderIsRelative"); }
+			set { SetBool("DownloadFolderIsRelative", value); }
+		}
+
 		public static string DownloadFolder {
 			get { return Get("DownloadFolder"); }
 			set { Set("DownloadFolder", value); }
+		}
+
+		public static bool? UseExeDirForSettings { get; set; }
+
+		public static string ExeDir {
+			get {
+				return Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+			}
+		}
+
+		public static string AppDataDir {
+			get {
+				return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), _appName);
+			}
+		}
+
+		public static string SettingsFileName {
+			get {
+				return "settings.txt";
+			}
+		}
+
+		public static string ThreadsFileName {
+			get {
+				return "threads.txt";
+			}
 		}
 
 		public static ThreadDoubleClickAction? OnThreadDoubleClick {
@@ -72,14 +98,20 @@ namespace ChanThreadWatch {
 		}
 
 		public static string GetSettingsDir() {
-			string appDataDir = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-			string settingsDir = Path.Combine(appDataDir, _appName);
-
-			if (Directory.Exists(settingsDir) == false) {
-				Directory.CreateDirectory(settingsDir);
+			if (UseExeDirForSettings == null) {
+				UseExeDirForSettings = File.Exists(Path.Combine(ExeDir, SettingsFileName));
 			}
 
-			return settingsDir;
+			if (UseExeDirForSettings == true) {
+				return ExeDir;
+			}
+			else {
+				string dir = AppDataDir;
+				if (!Directory.Exists(dir)) {
+					Directory.CreateDirectory(dir);
+				}
+				return dir;
+			}
 		}
 
 		private static string Get(string name) {
@@ -117,13 +149,15 @@ namespace ChanThreadWatch {
 		}
 
 		public static void Load() {
+			string path = Path.Combine(GetSettingsDir(), SettingsFileName);
+
 			_settings = new Dictionary<string, string>();
 
-			if (!File.Exists(_path)) {
+			if (!File.Exists(path)) {
 				return;
 			}
 
-			using (StreamReader sr = new StreamReader(_path, Encoding.UTF8)) {
+			using (StreamReader sr = new StreamReader(path, Encoding.UTF8)) {
 				string line, name, val;
 				int pos;
 
@@ -142,7 +176,22 @@ namespace ChanThreadWatch {
 		}
 
 		public static void Save() {
-			using (StreamWriter sw = new StreamWriter(_path, false, Encoding.UTF8)) {
+			string path;
+			
+			if (UseExeDirForSettings != true) {
+				foreach (string fileName in new[] { SettingsFileName, ThreadsFileName }) {
+					path = Path.Combine(ExeDir, fileName);
+					if (File.Exists(path)) {
+						try {
+							File.Delete(path);
+						}
+						catch { }
+					}
+				}
+			}
+
+			path = Path.Combine(GetSettingsDir(), SettingsFileName);
+			using (StreamWriter sw = new StreamWriter(path, false, Encoding.UTF8)) {
 				foreach (KeyValuePair<string, string> kvp in _settings) {
 					sw.WriteLine(kvp.Key + "=" + kvp.Value);
 				}

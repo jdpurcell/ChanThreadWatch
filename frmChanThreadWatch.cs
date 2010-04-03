@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Specialized;
+using System.Diagnostics;
 using System.Drawing;
 using System.Globalization;
 using System.IO;
@@ -23,6 +24,13 @@ namespace ChanThreadWatch {
 		// ReleaseDate property and version in AssemblyInfo.cs should be updated for each release.
 
 		// Change log:
+		// 1.2.2 (2009-Aug-22):
+		//   * Download folder can be relative to the executable folder.
+		//   * Settings and thread list can be saved in the executable folder instead of
+		//     the application data folder.
+		//   * Detects image wrapper pages and sends referer for better site
+		//     compatibility.
+		//   * Locking is utilized properly when exiting.
 		// 1.2.1 (2009-May-06):
 		//   * Works with HTTPS sites (stupid bug).
 		// 1.2.0 (2009-May-05):
@@ -54,16 +62,16 @@ namespace ChanThreadWatch {
 		// 1.0.0 (2007-Dec-05):
 		//   * Initial release.
 
-		private string Version {
+		private static string Version {
 			get {
 				Version ver = Assembly.GetExecutingAssembly().GetName().Version;
 				return ver.Major + "." + ver.Minor + "." + ver.Revision;
 			}
 		}
 
-		private string ReleaseDate {
+		private static string ReleaseDate {
 			get {
-				return "2009-May-06";
+				return "2009-Aug-22";
 			}
 		}
 
@@ -88,9 +96,10 @@ namespace ChanThreadWatch {
 				miCheckEvery.MenuItems.Add(menuItem);
 			}
 
-			if ((Settings.DownloadFolder == null) || !Directory.Exists(Settings.DownloadFolder)) {
+			if ((GetDownloadFolder() == null) || !Directory.Exists(GetDownloadFolder())) {
 				Settings.DownloadFolder = Path.Combine(Environment.GetFolderPath(
 					Environment.SpecialFolder.MyDocuments), "Watched Threads");
+				Settings.DownloadFolderIsRelative = false;
 			}
 			if (Settings.OnThreadDoubleClick == null) {
 				Settings.OnThreadDoubleClick = ThreadDoubleClickAction.OpenFolder;
@@ -150,9 +159,21 @@ namespace ChanThreadWatch {
 				}
 			}
 
-			foreach (WatchInfo w in _watchInfoList) {
-				while ((w.WatchThread != null) && w.WatchThread.IsAlive) {
+			while (true) {
+				Thread watchThread = null;
+				using (SoftLock.Obtain(_watchInfoList)) {
+					foreach (WatchInfo w in _watchInfoList) {
+						if ((w.WatchThread != null) && w.WatchThread.IsAlive) {
+							watchThread = w.WatchThread;
+							break;
+						}
+					}
+				}
+				if (watchThread == null) break;
+				while (watchThread.IsAlive) {
 					Thread.Sleep(10);
+					// Don't call DoEvents inside the lock because it could allow another
+					// part of the UI thread to enter the lock as well.
 					Application.DoEvents();
 				}
 			}
@@ -196,7 +217,7 @@ namespace ChanThreadWatch {
 		private void miOpenFolder_Click(object sender, EventArgs e) {
 			foreach (string dir in GetFromSelected(wi => wi.SaveDir)) {
 				try {
-					System.Diagnostics.Process.Start(dir);
+					Process.Start(dir);
 				}
 				catch {}
 			}
@@ -205,7 +226,7 @@ namespace ChanThreadWatch {
 		private void miOpenURL_Click(object sender, EventArgs e) {
 			foreach (string url in GetFromSelected(wi => wi.PageURL)) {
 				try {
-					System.Diagnostics.Process.Start(url);
+					Process.Start(url);
 				}
 				catch {}
 			}
@@ -290,6 +311,14 @@ namespace ChanThreadWatch {
 			txtImageAuth.Enabled = chkImageAuth.Checked;
 		}
 
+		private string GetDownloadFolder() {
+			string path = Settings.DownloadFolder;
+			if (!String.IsNullOrEmpty(path) && (Settings.DownloadFolderIsRelative == true)) {
+				path = Path.GetFullPath(path);
+			}
+			return path;
+		}
+
 		private bool AddThread(string pageURL, string pageAuth, string imageAuth, int waitSeconds, bool oneTime, string saveDir) {
 			WatchInfo watchInfo = new WatchInfo();
 			int listIndex = -1;
@@ -362,7 +391,7 @@ namespace ChanThreadWatch {
 
 		private void SaveThreadList() {
 			using (SoftLock.Obtain(_watchInfoList)) {
-				using (StreamWriter sw = new StreamWriter(Path.Combine(Settings.GetSettingsDir(), "threads.txt"))) {
+				using (StreamWriter sw = new StreamWriter(Path.Combine(Settings.GetSettingsDir(), Settings.ThreadsFileName))) {
 					sw.WriteLine("1"); // File version
 					foreach (WatchInfo w in _watchInfoList) {
 						if ((w.WatchThread != null) && w.WatchThread.IsAlive) {
@@ -380,7 +409,7 @@ namespace ChanThreadWatch {
 
 		private void LoadThreadList() {
 			const int linesPerThread = 6;
-			string path = Path.Combine(Settings.GetSettingsDir(), "threads.txt");
+			string path = Path.Combine(Settings.GetSettingsDir(), Settings.ThreadsFileName);
 			if (!File.Exists(path)) return;
 			string[] lines = File.ReadAllLines(path);
 			if ((lines.Length < 1) || (Int32.Parse(lines[0]) != 1)) return;
@@ -469,9 +498,10 @@ namespace ChanThreadWatch {
 			return Encoding.ASCII.GetString(copy, 0, iDst);
 		}
 
-		private Stream GetToStream(string url, string auth, ref DateTime? cacheTime) {
+		private Stream GetToStream(string url, string auth, string referer, ref DateTime? cacheTime) {
 			HttpWebRequest req = (HttpWebRequest)WebRequest.Create(url);
 			req.UserAgent = (Settings.UseCustomUserAgent == true) ? Settings.CustomUserAgent : ("Chan Thread Watch " + Version);
+			req.Referer = referer;
 			if (cacheTime != null) {
 				req.IfModifiedSince = cacheTime.Value;
 			}
@@ -510,14 +540,14 @@ namespace ChanThreadWatch {
 			return resp.GetResponseStream();
 		}
 
-		private Stream GetToStream(string url, string auth) {
+		private Stream GetToStream(string url, string auth, string referer) {
 			DateTime? cacheTime = null;
-			return GetToStream(url, auth, ref cacheTime);
+			return GetToStream(url, auth, referer, ref cacheTime);
 		}
 
 		private string GetToString(string url, string auth, string path, ref DateTime? cacheTime) {
 			byte[] respBytes;
-			using (Stream respStream = GetToStream(url, auth, ref cacheTime)) {
+			using (Stream respStream = GetToStream(url, auth, null, ref cacheTime)) {
 				if (path != null) {
 					using (FileStream fs = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read)) {
 						respBytes = StreamToBytes(respStream, fs);
@@ -530,8 +560,8 @@ namespace ChanThreadWatch {
 			return BytesToString(respBytes);
 		}
 
-		private void GetToFile(string url, string auth, string path) {
-			using (Stream respStream = GetToStream(url, auth)) {
+		private void GetToFile(string url, string auth, string referer, string path) {
+			using (Stream respStream = GetToStream(url, auth, referer)) {
 				using (FileStream fs = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read)) {
 					while (true) {
 						byte[] data = new byte[8192];
@@ -608,7 +638,9 @@ namespace ChanThreadWatch {
 				saveDir = watchInfo.SaveDir;
 			}
 			if (String.IsNullOrEmpty(saveDir)) {
-				saveDir = Path.Combine(Settings.DownloadFolder, site + "_" + board + "_" + thread);
+				saveDir = Settings.DownloadFolder;
+				if (Settings.DownloadFolderIsRelative == true) saveDir = Path.GetFullPath(saveDir);
+				saveDir = Path.Combine(saveDir, site + "_" + board + "_" + thread);
 				if (!Directory.Exists(saveDir)) {
 					Directory.CreateDirectory(saveDir);
 				}
@@ -655,11 +687,15 @@ namespace ChanThreadWatch {
 					OrderedDictionary imgs = new OrderedDictionary(StringComparer.CurrentCultureIgnoreCase);
 					int i;
 					for (i = 0; i < links.Count; i++) {
-						string link = siteHelper.GetImageLink(links[i]);
+						string originalLink = links[i];
+						string link = siteHelper.GetImageLink(originalLink);
 						if (!String.IsNullOrEmpty(link)) {
 							string imgFilename = URLFilename(link);
 							if (!imgs.Contains(imgFilename)) {
-								imgs.Add(imgFilename, link);
+								LinkInfo linkInfo = new LinkInfo();
+								linkInfo.URL = link;
+								linkInfo.Referer = (link == originalLink) ? pageURL : originalLink;
+								imgs.Add(imgFilename, linkInfo);
 							}
 						}
 					}
@@ -679,7 +715,8 @@ namespace ChanThreadWatch {
 										" (retry " + (numTries - 1).ToString() + ")"));
 								}
 								try {
-									GetToFile((string)imgEntry.Value, imgAuth, savePath);
+									LinkInfo linkInfo = (LinkInfo)imgEntry.Value;
+									GetToFile(linkInfo.URL, imgAuth, linkInfo.Referer, savePath);
 									break;
 								}
 								catch {
@@ -732,6 +769,11 @@ namespace ChanThreadWatch {
 		public long NextCheck;
 	}
 
+	public class LinkInfo {
+		public string URL;
+		public string Referer;
+	}
+
 	public class SiteHelper {
 		public virtual string GetBoardName(string[] urlSplit) {
 			return (urlSplit.Length >= 2) ? urlSplit[1] : String.Empty;
@@ -749,7 +791,11 @@ namespace ChanThreadWatch {
 		}
 
 		public virtual string GetImageLink(string link) {
-			return link.Contains("/src/") ? link : null;
+			if (link.Contains("/src/")) {
+				int pos = Math.Max(link.LastIndexOf("http://"), link.LastIndexOf("https://"));
+				return (pos > 0) ? link.Substring(pos) : link;
+			}
+			return null;
 		}
 	}
 
