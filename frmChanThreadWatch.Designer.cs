@@ -243,8 +243,8 @@ namespace ChanThreadWatch {
 			this.Name = "frmChanThreadWatch";
 			this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
 			this.Text = "Chan Thread Watch";
-			this.FormClosed += new System.Windows.Forms.FormClosedEventHandler(this.frmChanThreadWatch_FormClosed);
 			this.Load += new System.EventHandler(this.frmChanThreadWatch_Load);
+			this.FormClosed += new System.Windows.Forms.FormClosedEventHandler(this.frmChanThreadWatch_FormClosed);
 			this.grpAddThread.ResumeLayout(false);
 			this.grpAddThread.PerformLayout();
 			this.ResumeLayout(false);

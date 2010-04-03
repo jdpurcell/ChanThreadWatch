@@ -18,6 +18,16 @@ namespace ChanThreadWatch {
 		// tries to Invoke, it will never return because Invoke needs to run on the (frozen) UI
 		// thread.  And I don't like the idea of BeginInvoke in this particular situation.
 
+		// About button, UserAgent, and AssemblyInfo.cs should be updated for version bump.
+
+		// Change log:
+		// 1.1.0 (2008-Jan-07):
+		//   * Fixed UI slugishness and freezing caused by accidentally leaving a Sleep
+		//     inside one of the locks for debugging.
+		//   * Supports AnonIB.
+		// 1.0.0 (2007-Dec-05):
+		//   * Initial release.
+
 		public frmChanThreadWatch() {
 			InitializeComponent();
 		}
@@ -145,7 +155,7 @@ namespace ChanThreadWatch {
 		}
 
 		private void btnAbout_Click(object sender, EventArgs e) {
-			MessageBox.Show(String.Format("Chan Thread Watch{0}Version 1.0.0 (2007-Dec-05){0}jart1126@yahoo.com",
+			MessageBox.Show(String.Format("Chan Thread Watch{0}Version 1.1.0 (2008-Jan-07){0}jart1126@yahoo.com",
 				Environment.NewLine), "About", MessageBoxButtons.OK, MessageBoxIcon.Information);
 		}
 
@@ -224,6 +234,7 @@ namespace ChanThreadWatch {
 
 		private Stream GetToStream(string url, string auth, ref DateTime? cacheTime) {
 			HttpWebRequest req = (HttpWebRequest)WebRequest.Create(url);
+			req.UserAgent = "Chan Thread Watch 1.1.0";
 			if (cacheTime != null) {
 				req.IfModifiedSince = (DateTime)cacheTime;
 			}
@@ -309,7 +320,8 @@ namespace ChanThreadWatch {
 		}
 
 		private void ParseURL(string url, out string site, out string board, out string thread) {
-			string[] urlSplit = url.Substring(7).Split(new char[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
+			string[] urlSplit = url.Substring(7).Split(new char[] { '/' },
+				StringSplitOptions.RemoveEmptyEntries);
 			site = String.Empty;
 			board = String.Empty;
 			thread = String.Empty;
@@ -324,9 +336,24 @@ namespace ChanThreadWatch {
 			}
 			if (urlSplit.Length >= 3) {
 				thread = urlSplit[urlSplit.Length - 1];
-				int pos = thread.LastIndexOf('.');
-				if (pos != -1) {
-					thread = thread.Substring(0, pos);
+				if (site == "anonib") {
+					int pos = thread.IndexOf('?');
+					if (pos != -1) {
+						string[] urlVarsSplit = thread.Substring(pos + 1).Split(
+							new char[] { '&' }, StringSplitOptions.RemoveEmptyEntries);
+						foreach (string v in urlVarsSplit) {
+							if (v.StartsWith("t=")) {
+								thread = v.Substring(2);
+								break;
+							}
+						}
+					}
+				}
+				else {
+					int pos = thread.LastIndexOf('.');
+					if (pos != -1) {
+						thread = thread.Substring(0, pos);
+					}
 				}
 			}
 		}
@@ -338,7 +365,7 @@ namespace ChanThreadWatch {
 			string imgAuth = watchInfo.ImageAuth;
 			double waitSeconds = (double)watchInfo.WaitSeconds;
 			string page = null;
-			string saveDir, saveFilename, savePath, site, board, thread;
+			string saveDir, saveFilename, savePath, site, board, thread, linkFilter;
 			int numTries;
 			const int maxTries = 3;
 			DateTime pageGetTime = DateTime.Now;
@@ -346,6 +373,7 @@ namespace ChanThreadWatch {
 			double waitRemain;
 
 			ParseURL(pageURL, out site, out board, out thread);
+			linkFilter = (site == "anonib") ? "/images/" : "/src/";
 			saveDir = Path.Combine(Application.StartupPath, site + "_" + board + "_" + thread);
 			if (!Directory.Exists(saveDir)) {
 				Directory.CreateDirectory(saveDir);
@@ -389,10 +417,8 @@ namespace ChanThreadWatch {
 					List<string> links = GetLinks(page, pageURL);
 					List<string> imgs = new List<string>();
 					foreach (string link in links) {
-						if (link.IndexOf("/src/") != -1) {
-							if (!imgs.Contains(link)) {
-								imgs.Add(link);
-							}
+						if ((link.IndexOf(linkFilter) != -1) && !imgs.Contains(link)) {
+							imgs.Add(link);
 						}
 					}
 					for (int i = 0; i < imgs.Count; i++) {
@@ -431,7 +457,6 @@ namespace ChanThreadWatch {
 								"Stopped, download finished");
 							return;
 						}
-						Thread.Sleep(100);
 						SetStatus(watchInfo, String.Format("Waiting {0:0} seconds", waitRemain));
 					}
 					Thread.Sleep(500);
