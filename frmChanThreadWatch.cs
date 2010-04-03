@@ -9,6 +9,7 @@ using System.IO;
 using System.Net;
 using System.Text.RegularExpressions;
 using System.Threading;
+using System.Globalization;
 
 namespace ChanThreadWatch {
 	public partial class frmChanThreadWatch : Form {
@@ -21,6 +22,9 @@ namespace ChanThreadWatch {
 		// About button, UserAgent, and AssemblyInfo.cs should be updated for version bump.
 
 		// Change log:
+		// 1.1.1 (2008-Jan-16):
+		//   * Workarounds for Mono's form scaling problems and HttpWebResponse 
+		//     LastModified bug.
 		// 1.1.0 (2008-Jan-07):
 		//   * Fixed UI slugishness and freezing caused by accidentally leaving a Sleep
 		//     inside one of the locks for debugging.
@@ -29,7 +33,12 @@ namespace ChanThreadWatch {
 		//   * Initial release.
 
 		public frmChanThreadWatch() {
+			// Mono doesn't disable this automatically
+			AutoScale = false;
+
 			InitializeComponent();
+
+			if (Font.Name != "Tahoma") Font = new Font("Arial", 8.25F);
 		}
 
 		private void frmChanThreadWatch_Load(object sender, EventArgs e) {
@@ -155,7 +164,7 @@ namespace ChanThreadWatch {
 		}
 
 		private void btnAbout_Click(object sender, EventArgs e) {
-			MessageBox.Show(String.Format("Chan Thread Watch{0}Version 1.1.0 (2008-Jan-07){0}jart1126@yahoo.com",
+			MessageBox.Show(String.Format("Chan Thread Watch{0}Version 1.1.1 (2008-Jan-16){0}jart1126@yahoo.com",
 				Environment.NewLine), "About", MessageBoxButtons.OK, MessageBoxIcon.Information);
 		}
 
@@ -234,7 +243,7 @@ namespace ChanThreadWatch {
 
 		private Stream GetToStream(string url, string auth, ref DateTime? cacheTime) {
 			HttpWebRequest req = (HttpWebRequest)WebRequest.Create(url);
-			req.UserAgent = "Chan Thread Watch 1.1.0";
+			req.UserAgent = "Chan Thread Watch 1.1.1";
 			if (cacheTime != null) {
 				req.IfModifiedSince = (DateTime)cacheTime;
 			}
@@ -245,7 +254,18 @@ namespace ChanThreadWatch {
 			HttpWebResponse resp;
 			try {
 				resp = (HttpWebResponse)req.GetResponse();
-				cacheTime = resp.LastModified;
+				cacheTime = null;
+				if (resp.Headers["Last-Modified"] != null) {
+					try {
+						// Parse the time string ourself instead of using .IfModified because
+						// Mono doesn't convert it from GMT to local.
+						cacheTime = DateTime.ParseExact(resp.Headers["Last-Modified"], new string[] {
+							"r", "dddd, dd-MMM-yy HH:mm:ss G\\MT", "ddd MMM d HH:mm:ss yyyy" },
+							CultureInfo.InvariantCulture, DateTimeStyles.AllowWhiteSpaces |
+							DateTimeStyles.AssumeUniversal);
+					}
+					catch { }
+				}
 			}
 			catch (WebException ex) {
 				if (ex.Status == WebExceptionStatus.ProtocolError) {

@@ -228,21 +228,20 @@ namespace ChanThreadWatch {
 			// 
 			// frmChanThreadWatch
 			// 
-			this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
-			this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+			this.Name = "frmChanThreadWatch";
+			this.Text = "Chan Thread Watch";
+			this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle;
+			this.MaximizeBox = false;
 			this.ClientSize = new System.Drawing.Size(636, 341);
+			this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
+			this.Font = new System.Drawing.Font("Tahoma", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
 			this.Controls.Add(this.btnOpenSelectedFolder);
 			this.Controls.Add(this.btnAbout);
 			this.Controls.Add(this.btnRemoveCompleted);
 			this.Controls.Add(this.btnStopSelected);
 			this.Controls.Add(this.grpAddThread);
 			this.Controls.Add(this.lvThreads);
-			this.Font = new System.Drawing.Font("Tahoma", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-			this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle;
-			this.MaximizeBox = false;
-			this.Name = "frmChanThreadWatch";
-			this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
-			this.Text = "Chan Thread Watch";
+			this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
 			this.Load += new System.EventHandler(this.frmChanThreadWatch_Load);
 			this.FormClosed += new System.Windows.Forms.FormClosedEventHandler(this.frmChanThreadWatch_FormClosed);
 			this.grpAddThread.ResumeLayout(false);
