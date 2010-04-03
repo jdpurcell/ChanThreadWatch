@@ -24,6 +24,11 @@ namespace ChanThreadWatch {
 		// ReleaseDate property and version in AssemblyInfo.cs should be updated for each release.
 
 		// Change log:
+		// 1.2.3 (2009-Dec-25):
+		//   * Restores 4chan and AnonIB support.
+		//   * Custom link parsing and other code to allow for automatic downloading of
+		//     multiple page threads (not implemented for any site at this time as I
+		//     didn't find any I wanted to support).
 		// 1.2.2 (2009-Aug-22):
 		//   * Download folder can be relative to the executable folder.
 		//   * Settings and thread list can be saved in the executable folder instead of
@@ -71,7 +76,7 @@ namespace ChanThreadWatch {
 
 		private static string ReleaseDate {
 			get {
-				return "2009-Aug-22";
+				return "2009-Dec-25";
 			}
 		}
 
@@ -480,22 +485,23 @@ namespace ChanThreadWatch {
 		}
 
 		private string BytesToString(byte[] bytes) {
-			byte[] copy = new byte[bytes.Length];
+			char[] src = Encoding.UTF8.GetChars(bytes);
+			char[] dst = new char[src.Length];
 			bool prevWasSpace = false;
 			int iDst = 0;
-			for (int iSrc = 0; iSrc < bytes.Length; iSrc++) {
-				if ((bytes[iSrc] == 32) || (bytes[iSrc] == 9) || (bytes[iSrc] == 13) || (bytes[iSrc] == 10)) {
+			for (int iSrc = 0; iSrc < src.Length; iSrc++) {
+				if (Char.IsWhiteSpace(src[iSrc])) {
 					if (!prevWasSpace) {
-						copy[iDst++] = 32;
+						dst[iDst++] = ' ';
 					}
 					prevWasSpace = true;
 				}
 				else {
-					copy[iDst++] = bytes[iSrc];
+					dst[iDst++] = src[iSrc];
 					prevWasSpace = false;
 				}
 			}
-			return Encoding.ASCII.GetString(copy, 0, iDst);
+			return new string(dst, 0, iDst);
 		}
 
 		private Stream GetToStream(string url, string auth, string referer, ref DateTime? cacheTime) {
@@ -506,8 +512,14 @@ namespace ChanThreadWatch {
 				req.IfModifiedSince = cacheTime.Value;
 			}
 			if (!String.IsNullOrEmpty(auth)) {
-				req.Headers.Add("Authorization", "Basic " +
-					Convert.ToBase64String(Encoding.ASCII.GetBytes(auth)));
+				Encoding encoding;
+				try {
+					encoding = Encoding.GetEncoding("iso-8859-1");
+				}
+				catch {
+					encoding = Encoding.ASCII;
+				}
+				req.Headers.Add("Authorization", "Basic " + Convert.ToBase64String(encoding.GetBytes(auth)));
 			}
 			HttpWebResponse resp;
 			try {
@@ -582,13 +594,135 @@ namespace ChanThreadWatch {
 			}
 		}
 
-		private List<string> GetLinks(string page, string pageURL) {
-			List<string> links = new List<string>();
-			Regex r = new Regex("href\\s*=\\s*(?:(?:\\\"(?<url>[^\\\"]*)\\\")|(?<url>[^\\s]* ))");
-			MatchCollection mc = r.Matches(page);
-			foreach (Match m in mc) {
-				links.Add(AbsoluteURL(pageURL, m.Groups[1].Value));
+		private ElementInfo FindElement(string html, string name, int offset) {
+			int htmlLen = html.Length;
+			ElementInfo elem = new ElementInfo();
+
+			elem.Attributes = new List<KeyValuePair<string, string>>();
+
+			while (offset < htmlLen) {
+				int pos;
+
+				int elementStart = html.IndexOf('<', offset);
+				if (elementStart == -1) break;
+
+				pos = elementStart + 1;
+				if (pos < htmlLen && html[pos] == ' ') pos++;
+				int nameEnd = html.IndexOfAny(new[] { ' ', '>' }, pos);
+				if (nameEnd == -1 || nameEnd - pos != name.Length || String.Compare(html, pos, name, 0, name.Length, StringComparison.OrdinalIgnoreCase) != 0) goto NextElement;
+
+				elem.Offset = elementStart;
+				elem.Name = html.Substring(pos, nameEnd - pos);
+
+				pos = nameEnd;
+				while (pos < htmlLen) {
+					if (html[pos] == ' ') pos++;
+					if (pos < htmlLen && html[pos] == '>') {
+						elem.Length = (pos + 1) - elementStart;
+						return elem;
+					}
+
+					int attrNameEnd = html.IndexOfAny(new[] { ' ', '=', '>' }, pos);
+					if (attrNameEnd == -1) goto NextElement;
+
+					string attrName = html.Substring(pos, attrNameEnd - pos);
+
+					string attrVal = String.Empty;
+					pos = attrNameEnd;
+					if (html[pos] == ' ') pos++;
+					if (pos < htmlLen && html[pos] == '=') {
+						pos++;
+						if (pos < htmlLen && html[pos] == ' ') pos++;
+						int attrValEnd;
+						if (pos < htmlLen && html[pos] == '"') {
+							pos++;
+							attrValEnd = html.IndexOf('"', pos);
+						}
+						else if (pos < htmlLen && html[pos] == '\'') {
+							pos++;
+							attrValEnd = html.IndexOf('\'', pos);
+						}
+						else {
+							attrValEnd = html.IndexOfAny(new[] { ' ', '>' }, pos);
+						}
+						if (attrValEnd == -1) goto NextElement;
+
+						attrVal = html.Substring(pos, attrValEnd - pos);
+
+						pos = attrValEnd;
+						if (html[pos] == '"' || html[pos] == '\'') pos++;
+					}
+					elem.Attributes.Add(new KeyValuePair<string, string>(attrName, attrVal));
+				}
+
+			NextElement:
+				offset = elementStart + 1;
 			}
+
+			return null;
+		}
+
+		private int FindElementClose(string html, string name, int offset) {
+			int htmlLen = html.Length;
+
+			while (offset < htmlLen) {
+				int pos;
+
+				int elementStart = html.IndexOf('<', offset);
+				if (elementStart == -1) break;
+
+				pos = elementStart + 1;
+				if (pos < htmlLen && html[pos] == ' ') pos++;
+				if (pos < htmlLen && html[pos] == '/') pos++;
+				else goto NextElement;
+				if (pos < htmlLen && html[pos] == ' ') pos++;
+				if (htmlLen - pos >= name.Length &&
+					String.Compare(html, pos, name, 0, name.Length, StringComparison.OrdinalIgnoreCase) == 0)
+				{
+					pos += name.Length;
+				}
+				else goto NextElement;
+				if (pos < htmlLen && html[pos] == ' ') pos++;
+				if (pos < htmlLen && html[pos] == '>') pos++;
+				else goto NextElement;
+
+				return elementStart;
+
+			NextElement:
+				offset = elementStart + 1;
+			}
+
+			return -1;
+		}
+
+		private List<LinkInfo> GetLinks(string html, string baseURL) {
+			List<LinkInfo> links = new List<LinkInfo>();
+			ElementInfo elem;
+			int offset = 0;
+
+			while ((elem = FindElement(html, "a", offset)) != null) {
+				offset = elem.Offset + 1;
+
+				int closeOffset = FindElementClose(html, "a", offset);
+				if (closeOffset == -1) break;
+
+				LinkInfo link = new LinkInfo();
+				
+				foreach (var attr in elem.Attributes) {
+					if (attr.Key.Equals("href", StringComparison.OrdinalIgnoreCase)) {
+						link.URL = Uri.UnescapeDataString(AbsoluteURL(baseURL, attr.Value));
+						break;
+					}
+				}
+
+				if (!String.IsNullOrEmpty(link.URL)) {
+					int innerHTMLOffset = elem.Offset + elem.Length;
+					link.InnerHTML = html.Substring(innerHTMLOffset, closeOffset - innerHTMLOffset).Trim();
+
+					links.Add(link);
+				}
+			}
+
 			return links;
 		}
 
@@ -607,10 +741,7 @@ namespace ChanThreadWatch {
 					site = hostSplit[hostSplit.Length - 2];
 				}
 			}
-			switch (site.ToLower()) {
-				case "anonib":
-					siteHelper = new SiteHelperAnonIB();
-					break;
+			switch (site.ToLower(CultureInfo.InvariantCulture)) {
 				default:
 					siteHelper = new SiteHelper();
 					break;
@@ -622,15 +753,15 @@ namespace ChanThreadWatch {
 		private void WatchThread(object p) {
 			WatchInfo watchInfo = (WatchInfo)p;
 			SiteHelper siteHelper;
+			List<PageInfo> pageList = new List<PageInfo>();
 			string pageURL = watchInfo.PageURL;
 			string pageAuth = watchInfo.PageAuth;
 			string imgAuth = watchInfo.ImageAuth;
 			string page = null;
 			string saveDir, saveFilename, savePath, site, board, thread;
+			int pageIndex;
 			int numTries;
 			const int maxTries = 3;
-			DateTime pageGetTime = DateTime.Now;
-			DateTime? pageCacheTime = null;
 			long waitRemain;
 
 			ParseURL(pageURL, out siteHelper, out site, out board, out thread);
@@ -648,58 +779,89 @@ namespace ChanThreadWatch {
 					watchInfo.SaveDir = saveDir;
 				}
 			}
+
+			pageList.Add(new PageInfo { URL = pageURL });
 			
 			while (true) {
-				saveFilename = thread + ".html";
-				savePath = (saveFilename.Length != 0) ? Path.Combine(saveDir, saveFilename) : null;
-				for (numTries = 1; numTries <= maxTries; numTries++) {
-					lock (_watchInfoList) {
-						if (watchInfo.Stop) {
-							SetStatus(watchInfo, "Stopped by user");
+				OrderedDictionary imgs = new OrderedDictionary(StringComparer.OrdinalIgnoreCase);
+
+				pageIndex = 0;
+				do {
+					PageInfo pageInfo = pageList[pageIndex];
+					saveFilename = thread + ((pageIndex == 0) ? String.Empty : ("_" + (pageIndex + 1))) + ".html";
+					savePath = (saveFilename.Length != 0) ? Path.Combine(saveDir, saveFilename) : null;
+					for (numTries = 1; numTries <= maxTries; numTries++) {
+						lock (_watchInfoList) {
+							if (watchInfo.Stop) {
+								SetStatus(watchInfo, "Stopped by user");
+								return;
+							}
+							SetStatus(watchInfo, String.Format("Downloading page{0}{1}",
+								(pageIndex == 0) ? String.Empty : (" " + (pageIndex + 1)),
+								(numTries == 1) ? String.Empty : (" (retry " + (numTries - 1) + ")")));
+						}
+						try {
+							page = GetToString(pageInfo.URL, pageAuth, savePath, ref pageInfo.CacheTime);
+							break;
+						}
+						catch (HTTP404Exception) {
+							lock (_watchInfoList) {
+								SetStatus(watchInfo, "Stopped, page not found");
+							}
 							return;
 						}
-						SetStatus(watchInfo, String.Format("Downloading page{0}", numTries == 1 ?
-							String.Empty : " (retry " + (numTries - 1).ToString() + ")"));
-					}
-					try {
-						page = GetToString(pageURL, pageAuth, savePath, ref pageCacheTime);
-						break;
-					}
-					catch (HTTP404Exception) {
-						lock (_watchInfoList) {
-							SetStatus(watchInfo, "Stopped, page not found");
+						catch (HTTP304Exception) {
+							page = null;
+							break;
 						}
-						return;
+						catch {
+							page = null;
+						}
 					}
-					catch (HTTP304Exception) {
-						page = null;
-						break;
-					}
-					catch {
+					if (page != null) {
+						List<LinkInfo> links = GetLinks(page, pageURL);
+						foreach (LinkInfo link in links) {
+							string imageURL = siteHelper.GetImageURL(link);
+							if (!String.IsNullOrEmpty(imageURL)) {
+								string imgFilename = URLFilename(imageURL);
+								if (!imgs.Contains(imgFilename)) {
+									LinkInfo linkInfo = new LinkInfo();
+									linkInfo.URL = imageURL;
+									linkInfo.Referer = (imageURL == link.URL) ? pageURL : link.URL;
+									linkInfo.InnerHTML = link.InnerHTML;
+									imgs.Add(imgFilename, linkInfo);
+								}
+							}
+						}
+						bool foundNextPage = false;
+						foreach (LinkInfo link in links) {
+							string nextPageURL = siteHelper.GetNextPageURL(link);
+							if (!String.IsNullOrEmpty(nextPageURL)) {
+								PageInfo nextPageInfo = new PageInfo { URL = nextPageURL };
+								if (pageIndex == pageList.Count - 1) {
+									pageList.Add(nextPageInfo);
+								}
+								else if (pageList[pageIndex + 1].URL != nextPageURL) {
+									pageList[pageIndex + 1] = nextPageInfo;
+								}
+								foundNextPage = true;
+								break;
+							}
+						}
+						if (!foundNextPage && pageIndex < pageList.Count - 1) {
+							pageList.RemoveRange(pageIndex + 1, pageList.Count - (pageIndex + 1));
+						}
 						page = null;
 					}
 				}
+				while (++pageIndex < pageList.Count);
+
 				lock (_watchInfoList) {
 					watchInfo.NextCheck = TickCount.Now + (watchInfo.WaitSeconds * 1000);
 				}
-				if (page != null) {
-					List<string> links = GetLinks(page, pageURL);
-					OrderedDictionary imgs = new OrderedDictionary(StringComparer.CurrentCultureIgnoreCase);
-					int i;
-					for (i = 0; i < links.Count; i++) {
-						string originalLink = links[i];
-						string link = siteHelper.GetImageLink(originalLink);
-						if (!String.IsNullOrEmpty(link)) {
-							string imgFilename = URLFilename(link);
-							if (!imgs.Contains(imgFilename)) {
-								LinkInfo linkInfo = new LinkInfo();
-								linkInfo.URL = link;
-								linkInfo.Referer = (link == originalLink) ? pageURL : originalLink;
-								imgs.Add(imgFilename, linkInfo);
-							}
-						}
-					}
-					i = 0;
+
+				if (imgs.Count != 0) {
+					int i = 0;
 					foreach (DictionaryEntry imgEntry in imgs) {
 						saveFilename = (string)imgEntry.Key;
 						savePath = (saveFilename.Length != 0) ? Path.Combine(saveDir, saveFilename) : null;
@@ -725,8 +887,8 @@ namespace ChanThreadWatch {
 						}
 						i++;
 					}
-					page = null;
 				}
+
 				while (true) {
 					lock (_watchInfoList) {
 						waitRemain = watchInfo.NextCheck - TickCount.Now;
@@ -769,60 +931,52 @@ namespace ChanThreadWatch {
 		public long NextCheck;
 	}
 
+	public class ElementInfo {
+		public int Offset;
+		public int Length;
+		public string Name;
+		public List<KeyValuePair<string, string>> Attributes;
+		public string InnerHTML;
+	}
+
+	public class PageInfo {
+		public string URL;
+		public DateTime? CacheTime;
+	}
+
 	public class LinkInfo {
 		public string URL;
 		public string Referer;
+		public string InnerHTML;
 	}
 
 	public class SiteHelper {
 		public virtual string GetBoardName(string[] urlSplit) {
-			return (urlSplit.Length >= 2) ? urlSplit[1] : String.Empty;
+			return (urlSplit.Length > 2) ? urlSplit[1] : String.Empty;
 		}
 
 		public virtual string GetThreadName(string[] urlSplit) {
 			if (urlSplit.Length >= 3) {
 				string page = urlSplit[urlSplit.Length - 1];
 				int pos = page.LastIndexOf('.');
-				if (pos != -1) {
-					return page.Substring(0, pos);
-				}
+				return (pos != -1) ? page.Substring(0, pos) : page;
 			}
 			return String.Empty;
 		}
 
-		public virtual string GetImageLink(string link) {
-			if (link.Contains("/src/")) {
-				int pos = Math.Max(link.LastIndexOf("http://"), link.LastIndexOf("https://"));
-				return (pos > 0) ? link.Substring(pos) : link;
-			}
-			return null;
-		}
-	}
-
-	public class SiteHelperAnonIB : SiteHelper {
-		public override string GetImageLink(string link) {
-			if (link.Contains("/images/")) {
-				int pos = link.IndexOf("=http");
-				return (pos != -1) ? link.Substring(pos + 1) : link;
+		public virtual string GetImageURL(LinkInfo link) {
+			string url = link.URL;
+			if (url.IndexOf("/src/", StringComparison.OrdinalIgnoreCase) != -1) {
+				int pos = Math.Max(
+					url.LastIndexOf("http://", StringComparison.OrdinalIgnoreCase),
+					url.LastIndexOf("https://", StringComparison.OrdinalIgnoreCase));
+				return (pos > 0) ? url.Substring(pos) : url;
 			}
 			return null;
 		}
 
-		public override string GetThreadName(string[] urlSplit) {
-			if (urlSplit.Length >= 3) {
-				string page = urlSplit[urlSplit.Length - 1];
-				int pos = page.IndexOf('?');
-				if (pos != -1) {
-					string[] urlVarsSplit = page.Substring(pos + 1).Split(new char[] { '&' },
-						StringSplitOptions.RemoveEmptyEntries);
-					foreach (string v in urlVarsSplit) {
-						if (v.StartsWith("t=")) {
-							return v.Substring(2);
-						}
-					}
-				}
-			}
-			return String.Empty;
+		public virtual string GetNextPageURL(LinkInfo link) {
+			return null;
 		}
 	}
 
