@@ -20,6 +20,13 @@ namespace ChanThreadWatch {
 		// ReleaseDate property and version in AssemblyInfo.cs should be updated for each release.
 
 		// Change log:
+		// 1.4.2 (2010-Apr-02):
+		//   * Enabled auto-scaling to fix text truncation with larger font sizes.
+		//   * Enter key is a shortcut for "Add Thread".
+		//   * Backs up the page before redownloading in case it 404s in the middle of
+		//     downloading.
+		//   * Fixed non-breaking spaces being converted to spaces when post-processing
+		//     HTML.
 		// 1.4.1 (2010-Jan-01):
 		//   * Workaround for crash in Mono when program update checking is enabled.
 		// 1.4.0 (2010-Jan-01):
@@ -70,7 +77,7 @@ namespace ChanThreadWatch {
 		//   * Workarounds for Mono's form scaling problems and HttpWebResponse
 		//     LastModified bug.
 		// 1.1.0 (2008-Jan-07):
-		//   * Fixed UI slugishness and freezing caused by accidentally leaving a Sleep
+		//   * Fixed UI sluggishness and freezing caused by accidentally leaving a Sleep
 		//     inside one of the locks for debugging.
 		//   * Supports AnonIB.
 		// 1.0.0 (2007-Dec-05):
