@@ -22,6 +22,8 @@ namespace ChanThreadWatch {
 		// About button, UserAgent, and AssemblyInfo.cs should be updated for version bump.
 
 		// Change log:
+		// 1.1.3 (2008-Jul-08):
+		//   * Restores AnonIB support.
 		// 1.1.2 (2008-Jun-29):
 		//   * Ignores duplicate filenames when creating image URL list; fixes incorrect
 		//     image count on 4chan.
@@ -170,7 +172,7 @@ namespace ChanThreadWatch {
 		}
 
 		private void btnAbout_Click(object sender, EventArgs e) {
-			MessageBox.Show(String.Format("Chan Thread Watch{0}Version 1.1.2 (2008-Jun-29){0}jart1126@yahoo.com",
+			MessageBox.Show(String.Format("Chan Thread Watch{0}Version 1.1.3 (2008-Jul-08){0}jart1126@yahoo.com",
 				Environment.NewLine), "About", MessageBoxButtons.OK, MessageBoxIcon.Information);
 		}
 
@@ -249,7 +251,7 @@ namespace ChanThreadWatch {
 
 		private Stream GetToStream(string url, string auth, ref DateTime? cacheTime) {
 			HttpWebRequest req = (HttpWebRequest)WebRequest.Create(url);
-			req.UserAgent = "Chan Thread Watch 1.1.2";
+			req.UserAgent = "Chan Thread Watch 1.1.3";
 			if (cacheTime != null) {
 				req.IfModifiedSince = (DateTime)cacheTime;
 			}
@@ -264,7 +266,7 @@ namespace ChanThreadWatch {
 				if (resp.Headers["Last-Modified"] != null) {
 					try {
 						// Parse the time string ourself instead of using .IfModified because
-						// Mono doesn't convert it from GMT to local.
+						// older versions of Mono don't convert it from GMT to local.
 						cacheTime = DateTime.ParseExact(resp.Headers["Last-Modified"], new string[] {
 							"r", "dddd, dd-MMM-yy HH:mm:ss G\\MT", "ddd MMM d HH:mm:ss yyyy" },
 							CultureInfo.InvariantCulture, DateTimeStyles.AllowWhiteSpaces |
@@ -345,61 +347,44 @@ namespace ChanThreadWatch {
 			return (pos == -1) ? String.Empty : url.Substring(pos + 1);
 		}
 
-		private void ParseURL(string url, out string site, out string board, out string thread) {
+		private void ParseURL(string url, out SiteHelper siteHelper, out string site, out string board, out string thread) {
 			string[] urlSplit = url.Substring(7).Split(new char[] { '/' },
 				StringSplitOptions.RemoveEmptyEntries);
 			site = String.Empty;
-			board = String.Empty;
-			thread = String.Empty;
 			if (urlSplit.Length >= 1) {
 				string[] hostSplit = urlSplit[0].Split('.');
 				if (hostSplit.Length >= 2) {
 					site = hostSplit[hostSplit.Length - 2];
 				}
 			}
-			if (urlSplit.Length >= 2) {
-				board = urlSplit[1];
+			switch (site.ToLower()) {
+				case "anonib":
+					siteHelper = new SiteHelperAnonIB();
+					break;
+				default:
+					siteHelper = new SiteHelper();
+					break;
 			}
-			if (urlSplit.Length >= 3) {
-				thread = urlSplit[urlSplit.Length - 1];
-				if (site == "anonib") {
-					int pos = thread.IndexOf('?');
-					if (pos != -1) {
-						string[] urlVarsSplit = thread.Substring(pos + 1).Split(
-							new char[] { '&' }, StringSplitOptions.RemoveEmptyEntries);
-						foreach (string v in urlVarsSplit) {
-							if (v.StartsWith("t=")) {
-								thread = v.Substring(2);
-								break;
-							}
-						}
-					}
-				}
-				else {
-					int pos = thread.LastIndexOf('.');
-					if (pos != -1) {
-						thread = thread.Substring(0, pos);
-					}
-				}
-			}
+			board = siteHelper.GetBoardName(urlSplit);
+			thread = siteHelper.GetThreadName(urlSplit);
 		}
 
 		private void WatchThread(object p) {
 			WatchInfo watchInfo = (WatchInfo)p;
+			SiteHelper siteHelper;
 			string pageURL = watchInfo.PageURL;
 			string pageAuth = watchInfo.PageAuth;
 			string imgAuth = watchInfo.ImageAuth;
 			double waitSeconds = (double)watchInfo.WaitSeconds;
 			string page = null;
-			string saveDir, saveFilename, savePath, site, board, thread, linkFilter;
+			string saveDir, saveFilename, savePath, site, board, thread;
 			int numTries;
 			const int maxTries = 3;
 			DateTime pageGetTime = DateTime.Now;
 			DateTime? pageCacheTime = null;
 			double waitRemain;
 
-			ParseURL(pageURL, out site, out board, out thread);
-			linkFilter = (site == "anonib") ? "/images/" : "/src/";
+			ParseURL(pageURL, out siteHelper, out site, out board, out thread);
 			saveDir = Path.Combine(Application.StartupPath, site + "_" + board + "_" + thread);
 			if (!Directory.Exists(saveDir)) {
 				Directory.CreateDirectory(saveDir);
@@ -442,15 +427,17 @@ namespace ChanThreadWatch {
 				if (page != null) {
 					List<string> links = GetLinks(page, pageURL);
 					OrderedDictionary imgs = new OrderedDictionary(StringComparer.CurrentCultureIgnoreCase);
-					int i = 0;
-					foreach (string link in links) {
-						if (link.IndexOf(linkFilter) != -1) {
+					int i;
+					for (i = 0; i < links.Count; i++) {
+						string link = siteHelper.GetImageLink(links[i]);
+						if (!String.IsNullOrEmpty(link)) {
 							string imgFilename = URLFilename(link);
 							if (!imgs.Contains(imgFilename)) {
 								imgs.Add(imgFilename, link);
 							}
 						}
 					}
+					i = 0;
 					foreach (DictionaryEntry imgEntry in imgs) {
 						saveFilename = (string)imgEntry.Key;
 						savePath = (saveFilename.Length != 0) ? Path.Combine(saveDir, saveFilename) : null;
@@ -516,6 +503,54 @@ namespace ChanThreadWatch {
 		public int WaitSeconds;
 		public bool OneTime;
 		public string SaveDir;
+	}
+
+	public class SiteHelper {
+		public virtual string GetBoardName(string[] urlSplit) {
+			return (urlSplit.Length >= 2) ? urlSplit[1] : String.Empty;
+		}
+
+		public virtual string GetThreadName(string[] urlSplit) {
+			if (urlSplit.Length >= 3) {
+				string page = urlSplit[urlSplit.Length - 1];
+				int pos = page.LastIndexOf('.');
+				if (pos != -1) {
+					return page.Substring(0, pos);
+				}
+			}
+			return String.Empty;
+		}
+
+		public virtual string GetImageLink(string link) {
+			return link.Contains("/src/") ? link : null;
+		}
+	}
+
+	public class SiteHelperAnonIB : SiteHelper {
+		public override string GetImageLink(string link) {
+			if (link.Contains("/images/")) {
+				int pos = link.IndexOf("=http");
+				return (pos != -1) ? link.Substring(pos + 1) : link;
+			}
+			return null;
+		}
+
+		public override string GetThreadName(string[] urlSplit) {
+			if (urlSplit.Length >= 3) {
+				string page = urlSplit[urlSplit.Length - 1];
+				int pos = page.IndexOf('?');
+				if (pos != -1) {
+					string[] urlVarsSplit = page.Substring(pos + 1).Split(new char[] { '&' },
+						StringSplitOptions.RemoveEmptyEntries);
+					foreach (string v in urlVarsSplit) {
+						if (v.StartsWith("t=")) {
+							return v.Substring(2);
+						}
+					}
+				}
+			}
+			return String.Empty;
+		}
 	}
 
 	public class HTTP404Exception : Exception {
