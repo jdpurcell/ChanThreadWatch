@@ -74,7 +74,7 @@ namespace ChanThreadWatch {
 				attr = General.GetAttribute(elem, "href");
 				if (attr == null || String.IsNullOrEmpty(attr.Value)) continue;
 				url = General.ProperURL(_url, HttpUtility.HtmlDecode(attr.Value));
-				if (url.IndexOf("/src/", StringComparison.OrdinalIgnoreCase) == -1) continue;
+				if (url == null || url.IndexOf("/src/", StringComparison.OrdinalIgnoreCase) == -1) continue;
 
 				int linkEnd = General.FindElementClose(_html, "a", elem.Offset + 1);
 				if (linkEnd == -1) break;
@@ -233,5 +233,4 @@ namespace ChanThreadWatch {
 			return images;
 		}
 	}
-
 }

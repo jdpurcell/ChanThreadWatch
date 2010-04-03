@@ -6,9 +6,8 @@ using System.Windows.Forms;
 namespace ChanThreadWatch {
 	public partial class frmSettings : Form {
 		public frmSettings() {
-			AutoScale = false;
 			InitializeComponent();
-			if (Font.Name != "Tahoma") Font = new Font("Arial", 8.25F);
+			General.SetFontAndScaling(this);
 		}
 
 		private void frmSettings_Load(object sender, EventArgs e) {

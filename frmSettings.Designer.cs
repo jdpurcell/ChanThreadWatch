@@ -200,7 +200,6 @@
 			this.CancelButton = this.btnCancel;
 			this.ClientSize = new System.Drawing.Size(714, 201);
 			this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
-			this.Font = new System.Drawing.Font("Tahoma", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
 			this.Controls.Add(this.chkSaveThumbnails);
 			this.Controls.Add(this.chkCheckForUpdates);
 			this.Controls.Add(this.chkVerifyImageHashes);

@@ -2,7 +2,6 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Drawing;
 using System.IO;
 using System.Text;
 using System.Threading;
@@ -78,12 +77,8 @@ namespace ChanThreadWatch {
 		//   * Initial release.
 
 		public frmChanThreadWatch() {
-			// Older versons of Mono don't disable this automatically
-			AutoScale = false;
-
 			InitializeComponent();
-
-			if (Font.Name != "Tahoma") Font = new Font("Arial", 8.25F);
+			General.SetFontAndScaling(this);
 
 			Settings.Load();
 
@@ -182,6 +177,12 @@ namespace ChanThreadWatch {
 					// part of the UI thread to enter the lock as well.
 					Application.DoEvents();
 				}
+			}
+		}
+
+		private void txtPageURL_KeyDown(object sender, KeyEventArgs e) {
+			if (e.KeyCode == Keys.Enter) {
+				btnAdd_Click(null, null);
 			}
 		}
 
@@ -615,7 +616,7 @@ namespace ChanThreadWatch {
 								(numTries == 1) ? String.Empty : (" (retry " + (numTries - 1) + ")")));
 						}
 						try {
-							page = General.GetToString(pageInfo.URL, pageAuth, savePath, ref pageInfo.CacheTime,
+							page = General.GetToString(pageInfo.URL, pageAuth, savePath, true, ref pageInfo.CacheTime,
 								out pageInfo.Encoding, pageInfo.ReplaceList);
 							pageInfo.IsFresh = true;
 							break;
@@ -851,6 +852,10 @@ namespace ChanThreadWatch {
 						General.AddOtherReplaces(page, pageInfo.ReplaceList);
 						using (StreamWriter sw = new StreamWriter(pageInfo.Path, false, pageInfo.Encoding)) {
 							General.WriteReplacedString(page, pageInfo.ReplaceList, sw);
+						}
+						if (General.FindElementClose(page, "html", 0) != -1 && File.Exists(pageInfo.Path + ".bak")) {
+							try { File.Delete(pageInfo.Path + ".bak"); }
+							catch { }
 						}
 					}
 				}

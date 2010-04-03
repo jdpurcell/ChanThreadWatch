@@ -194,6 +194,7 @@ namespace ChanThreadWatch {
 			this.txtPageURL.Name = "txtPageURL";
 			this.txtPageURL.Size = new System.Drawing.Size(300, 21);
 			this.txtPageURL.TabIndex = 1;
+			this.txtPageURL.KeyDown += new System.Windows.Forms.KeyEventHandler(this.txtPageURL_KeyDown);
 			// 
 			// btnAdd
 			// 
@@ -331,7 +332,6 @@ namespace ChanThreadWatch {
 			this.ClientSize = new System.Drawing.Size(636, 341);
 			this.MinimumSize = new System.Drawing.Size(644, 368);
 			this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
-			this.Font = new System.Drawing.Font("Tahoma", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
 			this.Controls.Add(this.grpDoubleClick);
 			this.Controls.Add(this.btnSettings);
 			this.Controls.Add(this.btnAbout);

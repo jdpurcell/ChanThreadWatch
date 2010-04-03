@@ -1,11 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Globalization;
 using System.IO;
 using System.Net;
 using System.Reflection;
 using System.Text;
-using System.Web;
+using System.Windows.Forms;
 
 namespace ChanThreadWatch {
 	public static class General {
@@ -18,7 +19,7 @@ namespace ChanThreadWatch {
 
 		public static string ReleaseDate {
 			get {
-				return "2010-Jan-01";
+				return "2010-Apr-02";
 			}
 		}
 
@@ -90,7 +91,7 @@ namespace ChanThreadWatch {
 			}
 		}
 
-		public static string GetToString(string url, string auth, string savePath, ref DateTime? cacheTime, out Encoding encoding, List<ReplaceInfo> replaceList) {
+		public static string GetToString(string url, string auth, string savePath, bool saveBackup, ref DateTime? cacheTime, out Encoding encoding, List<ReplaceInfo> replaceList) {
 			Stream rs = null;
 			MemoryStream ms = null;
 			FileStream fs = null;
@@ -99,6 +100,15 @@ namespace ChanThreadWatch {
 				rs = GetResponseStream(url, auth, null, ref cacheTime, out httpCharSet);
 				ms = new MemoryStream();
 				if (savePath != null) {
+					if (saveBackup && File.Exists(savePath)) {
+						string backupPath = savePath + ".bak";
+						if (File.Exists(backupPath)) {
+							try { File.Delete(backupPath); }
+							catch { }
+						}
+						try { File.Move(savePath, backupPath); }
+						catch { }
+					}
 					fs = new FileStream(savePath, FileMode.Create, FileAccess.Write, FileShare.Read);
 				}
 				CopyStream(rs, ms, fs);
@@ -116,7 +126,7 @@ namespace ChanThreadWatch {
 		public static string GetToString(string url) {
 			DateTime? cacheTime = null;
 			Encoding encoding;
-			return GetToString(url, null, null, ref cacheTime, out encoding, null);
+			return GetToString(url, null, null, false, ref cacheTime, out encoding, null);
 		}
 
 		public static byte[] GetToFile(string url, string auth, string referer, string path, HashType hashType) {
@@ -147,14 +157,15 @@ namespace ChanThreadWatch {
 			char[] src = encoding.GetChars(bytes, preambleLen, bytes.Length - preambleLen);
 			char[] dst = new char[src.Length];
 			int iDst = 0;
-			bool prevWasSpace = false;
-			int prevNewLine = 0;
+			bool inWhiteSpace = false;
+			bool inNewLine = false;
 			for (int iSrc = 0; iSrc < src.Length; iSrc++) {
-				if (Char.IsWhiteSpace(src[iSrc])) {
-					if (!prevWasSpace) {
+				if (src[iSrc] == ' ' || src[iSrc] == '\r' || src[iSrc] == '\n' || src[iSrc] == '\t' || src[iSrc] == '\f') {
+					if (!inWhiteSpace) {
 						dst[iDst++] = ' ';
 					}
-					if (((src[iSrc] == '\r') || (src[iSrc] == '\n')) && (iDst != prevNewLine) && (replaceList != null)) {
+					inWhiteSpace = true;
+					if ((src[iSrc] == '\r' || src[iSrc] == '\n') && !inNewLine && replaceList != null) {
 						replaceList.Add(
 							new ReplaceInfo {
 								Offset = iDst - 1,
@@ -162,13 +173,13 @@ namespace ChanThreadWatch {
 								Value = Environment.NewLine,
 								Type = ReplaceType.NewLine
 							});
-						prevNewLine = iDst;
+						inNewLine = true;
 					}
-					prevWasSpace = true;
 				}
 				else if (src[iSrc] != 0) {
 					dst[iDst++] = src[iSrc];
-					prevWasSpace = false;
+					inWhiteSpace = false;
+					inNewLine = false;
 				}
 			}
 			return new string(dst, 0, iDst);
@@ -523,6 +534,15 @@ namespace ChanThreadWatch {
 				}
 			}
 			return new string(dst, 0, iDst);
+		}
+
+		public static void SetFontAndScaling(Form form) {
+			form.SuspendLayout();
+			form.Font = new Font("Tahoma", 8.25F);
+			if (form.Font.Name != "Tahoma") form.Font = new Font("Arial", 8.25F);
+			form.AutoScaleMode = AutoScaleMode.Font;
+			form.AutoScaleDimensions = new SizeF(6F, 13F);
+			form.ResumeLayout(false);
 		}
 	}
 }
