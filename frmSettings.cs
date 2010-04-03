@@ -16,6 +16,9 @@ namespace ChanThreadWatch {
 			chkRelativePath.Checked = Settings.DownloadFolderIsRelative ?? false;
 			chkCustomUserAgent.Checked = Settings.UseCustomUserAgent ?? false;
 			txtCustomUserAgent.Text = Settings.CustomUserAgent ?? String.Empty;
+			chkCheckForUpdates.Checked = Settings.CheckForUpdates ?? false;
+			chkUseOriginalFilenames.Checked = Settings.UseOriginalFilenames ?? false;
+			chkVerifyImageHashes.Checked = Settings.VerifyImageHashes ?? true;
 			if (Settings.UseExeDirForSettings == true) {
 				rbSettingsInExeFolder.Checked = true;
 			}
@@ -44,6 +47,9 @@ namespace ChanThreadWatch {
 				Settings.DownloadFolderIsRelative = chkRelativePath.Checked;
 				Settings.UseCustomUserAgent = chkCustomUserAgent.Checked;
 				Settings.CustomUserAgent = txtCustomUserAgent.Text;
+				Settings.CheckForUpdates = chkCheckForUpdates.Checked;
+				Settings.UseOriginalFilenames = chkUseOriginalFilenames.Checked;
+				Settings.VerifyImageHashes = chkVerifyImageHashes.Checked;
 				Settings.UseExeDirForSettings = rbSettingsInExeFolder.Checked;
 
 				DialogResult = DialogResult.OK;

@@ -1,8 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
-using System.Text;
 using System.Reflection;
+using System.Text;
 
 namespace ChanThreadWatch {
 	static class Settings {
@@ -58,6 +59,26 @@ namespace ChanThreadWatch {
 		public static string DownloadFolder {
 			get { return Get("DownloadFolder"); }
 			set { Set("DownloadFolder", value); }
+		}
+
+		public static bool? UseOriginalFilenames {
+			get { return GetBool("UseOriginalFilenames"); }
+			set { SetBool("UseOriginalFilenames", value); }
+		}
+
+		public static bool? VerifyImageHashes {
+			get { return GetBool("VerifyImageHashes"); }
+			set { SetBool("VerifyImageHashes", value); }
+		}
+
+		public static bool? CheckForUpdates {
+			get { return GetBool("CheckForUpdates"); }
+			set { SetBool("CheckForUpdates", value); }
+		}
+
+		public static DateTime? LastUpdateCheck {
+			get { return GetDate("LastUpdateCheck"); }
+			set { SetDate("LastUpdateCheck", value); }
 		}
 
 		public static bool? UseExeDirForSettings { get; set; }
@@ -131,6 +152,13 @@ namespace ChanThreadWatch {
 			return Int32.TryParse(value, out x) ? x : (int?)null;
 		}
 
+		private static DateTime? GetDate(string name) {
+			string value = Get(name);
+			DateTime x;
+			return DateTime.TryParseExact(value, "yyyyMMdd", CultureInfo.InvariantCulture,
+				DateTimeStyles.None, out x) ? x : (DateTime?)null;
+		}
+
 		private static void Set(string name, string value) {
 			if (value == null) {
 				_settings.Remove(name);
@@ -146,6 +174,10 @@ namespace ChanThreadWatch {
 
 		private static void SetInt(string name, int? value) {
 			Set(name, value.HasValue ? value.Value.ToString() : null);
+		}
+
+		private static void SetDate(string name, DateTime? value) {
+			Set(name, value.HasValue ? value.Value.ToString("yyyyMMdd") : null);
 		}
 
 		public static void Load() {

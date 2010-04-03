@@ -34,6 +34,9 @@
 			this.lblSettingsLocation = new System.Windows.Forms.Label();
 			this.rbSettingsInAppDataFolder = new System.Windows.Forms.RadioButton();
 			this.rbSettingsInExeFolder = new System.Windows.Forms.RadioButton();
+			this.chkUseOriginalFilenames = new System.Windows.Forms.CheckBox();
+			this.chkVerifyImageHashes = new System.Windows.Forms.CheckBox();
+			this.chkCheckForUpdates = new System.Windows.Forms.CheckBox();
 			this.SuspendLayout();
 			// 
 			// txtDownloadFolder
@@ -48,9 +51,9 @@
 			this.lblDownloadFolder.AutoSize = true;
 			this.lblDownloadFolder.Location = new System.Drawing.Point(8, 12);
 			this.lblDownloadFolder.Name = "lblDownloadFolder";
-			this.lblDownloadFolder.Size = new System.Drawing.Size(91, 13);
+			this.lblDownloadFolder.Size = new System.Drawing.Size(89, 13);
 			this.lblDownloadFolder.TabIndex = 0;
-			this.lblDownloadFolder.Text = "Download Folder:";
+			this.lblDownloadFolder.Text = "Download folder:";
 			// 
 			// btnBrowse
 			// 
@@ -64,10 +67,10 @@
 			// 
 			// btnOK
 			// 
-			this.btnOK.Location = new System.Drawing.Point(568, 72);
+			this.btnOK.Location = new System.Drawing.Point(568, 144);
 			this.btnOK.Name = "btnOK";
 			this.btnOK.Size = new System.Drawing.Size(60, 23);
-			this.btnOK.TabIndex = 9;
+			this.btnOK.TabIndex = 12;
 			this.btnOK.Text = "OK";
 			this.btnOK.UseVisualStyleBackColor = true;
 			this.btnOK.Click += new System.EventHandler(this.btnOK_Click);
@@ -75,10 +78,10 @@
 			// btnCancel
 			// 
 			this.btnCancel.DialogResult = System.Windows.Forms.DialogResult.Cancel;
-			this.btnCancel.Location = new System.Drawing.Point(636, 72);
+			this.btnCancel.Location = new System.Drawing.Point(636, 144);
 			this.btnCancel.Name = "btnCancel";
 			this.btnCancel.Size = new System.Drawing.Size(68, 23);
-			this.btnCancel.TabIndex = 10;
+			this.btnCancel.TabIndex = 13;
 			this.btnCancel.Text = "Cancel";
 			this.btnCancel.UseVisualStyleBackColor = true;
 			// 
@@ -87,9 +90,9 @@
 			this.chkCustomUserAgent.AutoSize = true;
 			this.chkCustomUserAgent.Location = new System.Drawing.Point(10, 42);
 			this.chkCustomUserAgent.Name = "chkCustomUserAgent";
-			this.chkCustomUserAgent.Size = new System.Drawing.Size(123, 17);
+			this.chkCustomUserAgent.Size = new System.Drawing.Size(121, 17);
 			this.chkCustomUserAgent.TabIndex = 4;
-			this.chkCustomUserAgent.Text = "Custom User Agent:";
+			this.chkCustomUserAgent.Text = "Custom user agent:";
 			this.chkCustomUserAgent.UseVisualStyleBackColor = true;
 			this.chkCustomUserAgent.CheckedChanged += new System.EventHandler(this.chkCustomUserAgent_CheckedChanged);
 			// 
@@ -108,40 +111,70 @@
 			this.chkRelativePath.Name = "chkRelativePath";
 			this.chkRelativePath.Size = new System.Drawing.Size(90, 17);
 			this.chkRelativePath.TabIndex = 3;
-			this.chkRelativePath.Text = "Relative Path";
+			this.chkRelativePath.Text = "Relative path";
 			this.chkRelativePath.UseVisualStyleBackColor = true;
 			this.chkRelativePath.CheckedChanged += new System.EventHandler(this.chkRelativePath_CheckedChanged);
 			// 
 			// lblSettingsLocation
 			// 
 			this.lblSettingsLocation.AutoSize = true;
-			this.lblSettingsLocation.Location = new System.Drawing.Point(8, 80);
+			this.lblSettingsLocation.Location = new System.Drawing.Point(8, 152);
 			this.lblSettingsLocation.Name = "lblSettingsLocation";
-			this.lblSettingsLocation.Size = new System.Drawing.Size(90, 13);
-			this.lblSettingsLocation.TabIndex = 6;
-			this.lblSettingsLocation.Text = "Save Settings In:";
+			this.lblSettingsLocation.Size = new System.Drawing.Size(87, 13);
+			this.lblSettingsLocation.TabIndex = 9;
+			this.lblSettingsLocation.Text = "Save settings in:";
 			// 
 			// rbSettingsInAppDataFolder
 			// 
 			this.rbSettingsInAppDataFolder.AutoSize = true;
-			this.rbSettingsInAppDataFolder.Location = new System.Drawing.Point(108, 78);
+			this.rbSettingsInAppDataFolder.Location = new System.Drawing.Point(108, 150);
 			this.rbSettingsInAppDataFolder.Name = "rbSettingsInAppDataFolder";
-			this.rbSettingsInAppDataFolder.Size = new System.Drawing.Size(136, 17);
-			this.rbSettingsInAppDataFolder.TabIndex = 7;
+			this.rbSettingsInAppDataFolder.Size = new System.Drawing.Size(134, 17);
+			this.rbSettingsInAppDataFolder.TabIndex = 10;
 			this.rbSettingsInAppDataFolder.TabStop = true;
-			this.rbSettingsInAppDataFolder.Text = "Application Data Folder";
+			this.rbSettingsInAppDataFolder.Text = "Application Data folder";
 			this.rbSettingsInAppDataFolder.UseVisualStyleBackColor = true;
 			// 
 			// rbSettingsInExeFolder
 			// 
 			this.rbSettingsInExeFolder.AutoSize = true;
-			this.rbSettingsInExeFolder.Location = new System.Drawing.Point(252, 78);
+			this.rbSettingsInExeFolder.Location = new System.Drawing.Point(252, 150);
 			this.rbSettingsInExeFolder.Name = "rbSettingsInExeFolder";
-			this.rbSettingsInExeFolder.Size = new System.Drawing.Size(111, 17);
-			this.rbSettingsInExeFolder.TabIndex = 8;
+			this.rbSettingsInExeFolder.Size = new System.Drawing.Size(109, 17);
+			this.rbSettingsInExeFolder.TabIndex = 11;
 			this.rbSettingsInExeFolder.TabStop = true;
-			this.rbSettingsInExeFolder.Text = "Executable Folder";
+			this.rbSettingsInExeFolder.Text = "Executable folder";
 			this.rbSettingsInExeFolder.UseVisualStyleBackColor = true;
+			// 
+			// chkUseOriginalFilenames
+			// 
+			this.chkUseOriginalFilenames.AutoSize = true;
+			this.chkUseOriginalFilenames.Location = new System.Drawing.Point(10, 96);
+			this.chkUseOriginalFilenames.Name = "chkUseOriginalFilenames";
+			this.chkUseOriginalFilenames.Size = new System.Drawing.Size(282, 17);
+			this.chkUseOriginalFilenames.TabIndex = 7;
+			this.chkUseOriginalFilenames.Text = "Use original filenames (only supported for some sites)";
+			this.chkUseOriginalFilenames.UseVisualStyleBackColor = true;
+			// 
+			// chkVerifyImageHashes
+			// 
+			this.chkVerifyImageHashes.AutoSize = true;
+			this.chkVerifyImageHashes.Location = new System.Drawing.Point(10, 120);
+			this.chkVerifyImageHashes.Name = "chkVerifyImageHashes";
+			this.chkVerifyImageHashes.Size = new System.Drawing.Size(275, 17);
+			this.chkVerifyImageHashes.TabIndex = 8;
+			this.chkVerifyImageHashes.Text = "Verify image hashes (only supported for some sites)";
+			this.chkVerifyImageHashes.UseVisualStyleBackColor = true;
+			// 
+			// chkCheckForUpdates
+			// 
+			this.chkCheckForUpdates.AutoSize = true;
+			this.chkCheckForUpdates.Location = new System.Drawing.Point(10, 72);
+			this.chkCheckForUpdates.Name = "chkCheckForUpdates";
+			this.chkCheckForUpdates.Size = new System.Drawing.Size(364, 17);
+			this.chkCheckForUpdates.TabIndex = 6;
+			this.chkCheckForUpdates.Text = "Automatically check for and notify of updated versions of this program";
+			this.chkCheckForUpdates.UseVisualStyleBackColor = true;
 			// 
 			// frmSettings
 			// 
@@ -154,9 +187,12 @@
 			this.ShowInTaskbar = false;
 			this.AcceptButton = this.btnOK;
 			this.CancelButton = this.btnCancel;
-			this.ClientSize = new System.Drawing.Size(714, 105);
+			this.ClientSize = new System.Drawing.Size(714, 177);
 			this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
 			this.Font = new System.Drawing.Font("Tahoma", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+			this.Controls.Add(this.chkCheckForUpdates);
+			this.Controls.Add(this.chkVerifyImageHashes);
+			this.Controls.Add(this.chkUseOriginalFilenames);
 			this.Controls.Add(this.rbSettingsInExeFolder);
 			this.Controls.Add(this.rbSettingsInAppDataFolder);
 			this.Controls.Add(this.lblSettingsLocation);
@@ -188,5 +224,8 @@
 		private System.Windows.Forms.Label lblSettingsLocation;
 		private System.Windows.Forms.RadioButton rbSettingsInAppDataFolder;
 		private System.Windows.Forms.RadioButton rbSettingsInExeFolder;
+		private System.Windows.Forms.CheckBox chkUseOriginalFilenames;
+		private System.Windows.Forms.CheckBox chkVerifyImageHashes;
+		private System.Windows.Forms.CheckBox chkCheckForUpdates;
 	}
 }

@@ -1,21 +1,17 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Collections.Specialized;
 using System.Diagnostics;
 using System.Drawing;
-using System.Globalization;
 using System.IO;
-using System.Net;
-using System.Reflection;
 using System.Text;
-using System.Text.RegularExpressions;
 using System.Threading;
 using System.Windows.Forms;
 
 namespace ChanThreadWatch {
 	public partial class frmChanThreadWatch : Form {
 		private List<WatchInfo> _watchInfoList = new List<WatchInfo>();
+		private object _promptSync = new object();
 
 		// Can't lock or Join in the UI thread because if it gets stuck waiting and a worker thread
 		// tries to Invoke, it will never return because Invoke needs to run on the (frozen) UI
@@ -24,6 +20,11 @@ namespace ChanThreadWatch {
 		// ReleaseDate property and version in AssemblyInfo.cs should be updated for each release.
 
 		// Change log:
+		// 1.3.0 (2009-Dec-28):
+		//   * Option to verify hash of downloaded images (currently 4chan only).
+		//   * Option to save images with original filenames (currently 4chan only).
+		//   * Option to automatically check for program updates (disabled by default).
+		//   * Various fixes related to URL parsing, file error handling, etc.
 		// 1.2.3 (2009-Dec-25):
 		//   * Restores 4chan and AnonIB support.
 		//   * Custom link parsing and other code to allow for automatic downloading of
@@ -67,19 +68,6 @@ namespace ChanThreadWatch {
 		// 1.0.0 (2007-Dec-05):
 		//   * Initial release.
 
-		private static string Version {
-			get {
-				Version ver = Assembly.GetExecutingAssembly().GetName().Version;
-				return ver.Major + "." + ver.Minor + "." + ver.Revision;
-			}
-		}
-
-		private static string ReleaseDate {
-			get {
-				return "2009-Dec-25";
-			}
-		}
-
 		public frmChanThreadWatch() {
 			// Older versons of Mono don't disable this automatically
 			AutoScale = false;
@@ -117,6 +105,10 @@ namespace ChanThreadWatch {
 			chkOneTime.Checked = Settings.OneTimeDownload ?? false;
 			cboCheckEvery.SelectedItem = (Settings.CheckEvery ?? 3).ToString();
 			OnThreadDoubleClick = Settings.OnThreadDoubleClick.Value;
+
+			if ((Settings.CheckForUpdates == true) && (Settings.LastUpdateCheck ?? DateTime.MinValue) < DateTime.Now.Date) {
+				CheckForUpdates();
+			}
 		}
 
 		private ThreadDoubleClickAction OnThreadDoubleClick {
@@ -195,6 +187,11 @@ namespace ChanThreadWatch {
 				!pageURL.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
 			{
 				pageURL = "http://" + pageURL;
+			}
+			pageURL = General.ProperURL(pageURL);
+			if (pageURL == null) {
+				MessageBox.Show("The specified URL is invalid.", "Invalid URL", MessageBoxButtons.OK, MessageBoxIcon.Error);
+				return;
 			}
 
 			if (!AddThread(pageURL, pageAuth, imageAuth, waitSeconds, chkOneTime.Checked, null)) {
@@ -277,8 +274,9 @@ namespace ChanThreadWatch {
 		}
 
 		private void btnAbout_Click(object sender, EventArgs e) {
-			MessageBox.Show(String.Format("Chan Thread Watch{0}Version {1} ({2}){0}jart1126@yahoo.com", Environment.NewLine,
-				Version, ReleaseDate), "About", MessageBoxButtons.OK, MessageBoxIcon.Information);
+			MessageBox.Show(String.Format("Chan Thread Watch{0}Version {1} ({2}){0}jart1126@yahoo.com{0}{3}",
+				Environment.NewLine, General.Version, General.ReleaseDate, General.ProgramURL), "About",
+				MessageBoxButtons.OK, MessageBoxIcon.Information);
 		}
 
 		private void lvThreads_KeyDown(object sender, KeyEventArgs e) {
@@ -325,18 +323,20 @@ namespace ChanThreadWatch {
 		}
 
 		private bool AddThread(string pageURL, string pageAuth, string imageAuth, int waitSeconds, bool oneTime, string saveDir) {
+			const int liDuplicate = -2;
+			const int liNotFound = -1;
 			WatchInfo watchInfo = new WatchInfo();
-			int listIndex = -1;
+			int listIndex = liNotFound;
 
 			using (SoftLock.Obtain(_watchInfoList)) {
 				foreach (WatchInfo w in _watchInfoList) {
-					if (String.Compare(w.PageURL, pageURL, true) == 0) {
-						listIndex = ((w.WatchThread != null) && w.WatchThread.IsAlive) ? -2 : w.ListIndex;
+					if (String.Equals(w.PageURL, pageURL, StringComparison.OrdinalIgnoreCase)) {
+						listIndex = ((w.WatchThread != null) && w.WatchThread.IsAlive) ? liDuplicate : w.ListIndex;
 						break;
 					}
 				}
-				if (listIndex != -2) {
-					if (listIndex == -1) {
+				if (listIndex != liDuplicate) {
+					if (listIndex == liNotFound) {
 						lvThreads.Items.Add(new ListViewItem(pageURL)).SubItems.Add(String.Empty);
 						_watchInfoList.Add(watchInfo);
 						listIndex = _watchInfoList.Count - 1;
@@ -358,7 +358,7 @@ namespace ChanThreadWatch {
 				}
 			}
 
-			if (listIndex == -2) return false;
+			if (listIndex == liDuplicate) return false;
 
 			watchInfo.WatchThread.Start(watchInfo);
 			return true;
@@ -419,10 +419,12 @@ namespace ChanThreadWatch {
 			string[] lines = File.ReadAllLines(path);
 			if ((lines.Length < 1) || (Int32.Parse(lines[0]) != 1)) return;
 			if (lines.Length < (1 + linesPerThread)) return;
-			if (MessageBox.Show("Would you like to reload the list of active threads from the last run?",
-				"Reload Threads", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.No)
-			{
-				return;
+			using (SoftLock.Obtain(_promptSync)) {
+				if (MessageBox.Show("Would you like to reload the list of active threads from the last run?",
+					"Reload Threads", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.No)
+				{
+					return;
+				}
 			}
 			int i = 1;
 			while (i <= lines.Length - linesPerThread) {
@@ -433,6 +435,55 @@ namespace ChanThreadWatch {
 				bool oneTime = lines[i++] == "1";
 				string saveDir = lines[i++];
 				AddThread(pageURL, pageAuth, imageAuth, waitSeconds, oneTime, saveDir);
+			}
+		}
+
+		private void CheckForUpdates() {
+			Thread thread = new Thread(CheckForUpdateThread);
+			thread.IsBackground = true;
+			thread.Start();
+		}
+
+		private void CheckForUpdateThread() {
+			string html;
+			try {
+				html = General.GetToString(General.ProgramURL);
+			}
+			catch {
+				return;
+			}
+			Settings.LastUpdateCheck = DateTime.Now.Date;
+			string openTag = "[LatestVersion]";
+			string closeTag = "[/LatestVersion]";
+			int start = html.IndexOf(openTag, StringComparison.OrdinalIgnoreCase);
+			if (start == -1) return;
+			start += openTag.Length;
+			int end = html.IndexOf(closeTag, start, StringComparison.OrdinalIgnoreCase);
+			if (end == -1) return;
+			string[] current = General.Version.Split('.');
+			string[] latest = html.Substring(start, end - start).Split('.');
+			if (latest.Length != current.Length) return;
+			int c, l;
+			for (int i = 0; i < current.Length; i++) {
+				if (!Int32.TryParse(current[i], out c)) return;
+				if (!Int32.TryParse(latest[i], out l)) return;
+				if (c > l) return;
+				if (c < l) {
+					// Prevent the update check from running again until next week
+					Settings.LastUpdateCheck = DateTime.Now.Date.AddDays(6);
+
+					lock (_promptSync) {
+						BeginInvoke((MethodInvoker)delegate() {
+							if (IsDisposed) return;
+							if (MessageBox.Show("A newer version of Chan Thread Watch is available.  Would you like to open the Chan Thread Watch website?",
+								"Newer Version Found", MessageBoxButtons.YesNo, MessageBoxIcon.Information) == DialogResult.Yes)
+							{
+								Process.Start(General.ProgramURL);
+							}
+						});
+					}
+					return;
+				}
 			}
 		}
 
@@ -449,311 +500,11 @@ namespace ChanThreadWatch {
 			return values;
 		}
 
-		private byte[] StreamToBytes(Stream stream, FileStream fs) {
-			List<ByteBuff> buffList = new List<ByteBuff>();
-			while (true) {
-				byte[] data = new byte[8192];
-				int dataLen = stream.Read(data, 0, data.Length);
-				if (dataLen == 0) break;
-				buffList.Add(new ByteBuff(data, dataLen));
-				if (fs != null) {
-					fs.Write(data, 0, dataLen);
-				}
-			}
-			return ByteBuffListToBytes(buffList);
-		}
-
-		private byte[] ByteBuffListToBytes(List<ByteBuff> list) {
-			int totalLen = 0;
-			int offset = 0;
-			byte[] ret;
-
-			for (int i = 0; i < list.Count; i++) {
-				totalLen += list[i].Length;
-			}
-
-			ret = new byte[totalLen];
-
-			for (int i = 0; i < list.Count; i++) {
-				byte[] data = list[i].Data;
-				int len = list[i].Length;
-				Buffer.BlockCopy(data, 0, ret, offset, len);
-				offset += len;
-			}
-			
-			return ret;
-		}
-
-		private string BytesToString(byte[] bytes) {
-			char[] src = Encoding.UTF8.GetChars(bytes);
-			char[] dst = new char[src.Length];
-			bool prevWasSpace = false;
-			int iDst = 0;
-			for (int iSrc = 0; iSrc < src.Length; iSrc++) {
-				if (Char.IsWhiteSpace(src[iSrc])) {
-					if (!prevWasSpace) {
-						dst[iDst++] = ' ';
-					}
-					prevWasSpace = true;
-				}
-				else {
-					dst[iDst++] = src[iSrc];
-					prevWasSpace = false;
-				}
-			}
-			return new string(dst, 0, iDst);
-		}
-
-		private Stream GetToStream(string url, string auth, string referer, ref DateTime? cacheTime) {
-			HttpWebRequest req = (HttpWebRequest)WebRequest.Create(url);
-			req.UserAgent = (Settings.UseCustomUserAgent == true) ? Settings.CustomUserAgent : ("Chan Thread Watch " + Version);
-			req.Referer = referer;
-			if (cacheTime != null) {
-				req.IfModifiedSince = cacheTime.Value;
-			}
-			if (!String.IsNullOrEmpty(auth)) {
-				Encoding encoding;
-				try {
-					encoding = Encoding.GetEncoding("iso-8859-1");
-				}
-				catch {
-					encoding = Encoding.ASCII;
-				}
-				req.Headers.Add("Authorization", "Basic " + Convert.ToBase64String(encoding.GetBytes(auth)));
-			}
-			HttpWebResponse resp;
-			try {
-				resp = (HttpWebResponse)req.GetResponse();
-				cacheTime = null;
-				if (resp.Headers["Last-Modified"] != null) {
-					try {
-						// Parse the time string ourself instead of using .LastModified because
-						// older versions of Mono don't convert it from GMT to local.
-						cacheTime = DateTime.ParseExact(resp.Headers["Last-Modified"], new string[] {
-							"r", "dddd, dd-MMM-yy HH:mm:ss G\\MT", "ddd MMM d HH:mm:ss yyyy" },
-							CultureInfo.InvariantCulture, DateTimeStyles.AllowWhiteSpaces |
-							DateTimeStyles.AssumeUniversal);
-					}
-					catch { }
-				}
-			}
-			catch (WebException ex) {
-				if (ex.Status == WebExceptionStatus.ProtocolError) {
-					HttpStatusCode code = ((HttpWebResponse)ex.Response).StatusCode;
-					if (code == HttpStatusCode.NotFound) {
-						throw new HTTP404Exception();
-					}
-					else if (code == HttpStatusCode.NotModified) {
-						throw new HTTP304Exception();
-					}
-				}
-				throw;
-			}
-			return resp.GetResponseStream();
-		}
-
-		private Stream GetToStream(string url, string auth, string referer) {
-			DateTime? cacheTime = null;
-			return GetToStream(url, auth, referer, ref cacheTime);
-		}
-
-		private string GetToString(string url, string auth, string path, ref DateTime? cacheTime) {
-			byte[] respBytes;
-			using (Stream respStream = GetToStream(url, auth, null, ref cacheTime)) {
-				if (path != null) {
-					using (FileStream fs = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read)) {
-						respBytes = StreamToBytes(respStream, fs);
-					}
-				}
-				else {
-					respBytes = StreamToBytes(respStream, null);
-				}
-			}
-			return BytesToString(respBytes);
-		}
-
-		private void GetToFile(string url, string auth, string referer, string path) {
-			using (Stream respStream = GetToStream(url, auth, referer)) {
-				using (FileStream fs = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read)) {
-					while (true) {
-						byte[] data = new byte[8192];
-						int dataLen = respStream.Read(data, 0, data.Length);
-						if (dataLen == 0) break;
-						fs.Write(data, 0, dataLen);
-					}
-				}
-			}
-		}
-
-		private string AbsoluteURL(string pageURL, string linkURL) {
-			try {
-				return new Uri(new Uri(pageURL), linkURL).AbsoluteUri;
-			}
-			catch {
-				return linkURL;
-			}
-		}
-
-		private ElementInfo FindElement(string html, string name, int offset) {
-			int htmlLen = html.Length;
-			ElementInfo elem = new ElementInfo();
-
-			elem.Attributes = new List<KeyValuePair<string, string>>();
-
-			while (offset < htmlLen) {
-				int pos;
-
-				int elementStart = html.IndexOf('<', offset);
-				if (elementStart == -1) break;
-
-				pos = elementStart + 1;
-				if (pos < htmlLen && html[pos] == ' ') pos++;
-				int nameEnd = html.IndexOfAny(new[] { ' ', '>' }, pos);
-				if (nameEnd == -1 || nameEnd - pos != name.Length || String.Compare(html, pos, name, 0, name.Length, StringComparison.OrdinalIgnoreCase) != 0) goto NextElement;
-
-				elem.Offset = elementStart;
-				elem.Name = html.Substring(pos, nameEnd - pos);
-
-				pos = nameEnd;
-				while (pos < htmlLen) {
-					if (html[pos] == ' ') pos++;
-					if (pos < htmlLen && html[pos] == '>') {
-						elem.Length = (pos + 1) - elementStart;
-						return elem;
-					}
-
-					int attrNameEnd = html.IndexOfAny(new[] { ' ', '=', '>' }, pos);
-					if (attrNameEnd == -1) goto NextElement;
-
-					string attrName = html.Substring(pos, attrNameEnd - pos);
-
-					string attrVal = String.Empty;
-					pos = attrNameEnd;
-					if (html[pos] == ' ') pos++;
-					if (pos < htmlLen && html[pos] == '=') {
-						pos++;
-						if (pos < htmlLen && html[pos] == ' ') pos++;
-						int attrValEnd;
-						if (pos < htmlLen && html[pos] == '"') {
-							pos++;
-							attrValEnd = html.IndexOf('"', pos);
-						}
-						else if (pos < htmlLen && html[pos] == '\'') {
-							pos++;
-							attrValEnd = html.IndexOf('\'', pos);
-						}
-						else {
-							attrValEnd = html.IndexOfAny(new[] { ' ', '>' }, pos);
-						}
-						if (attrValEnd == -1) goto NextElement;
-
-						attrVal = html.Substring(pos, attrValEnd - pos);
-
-						pos = attrValEnd;
-						if (html[pos] == '"' || html[pos] == '\'') pos++;
-					}
-					elem.Attributes.Add(new KeyValuePair<string, string>(attrName, attrVal));
-				}
-
-			NextElement:
-				offset = elementStart + 1;
-			}
-
-			return null;
-		}
-
-		private int FindElementClose(string html, string name, int offset) {
-			int htmlLen = html.Length;
-
-			while (offset < htmlLen) {
-				int pos;
-
-				int elementStart = html.IndexOf('<', offset);
-				if (elementStart == -1) break;
-
-				pos = elementStart + 1;
-				if (pos < htmlLen && html[pos] == ' ') pos++;
-				if (pos < htmlLen && html[pos] == '/') pos++;
-				else goto NextElement;
-				if (pos < htmlLen && html[pos] == ' ') pos++;
-				if (htmlLen - pos >= name.Length &&
-					String.Compare(html, pos, name, 0, name.Length, StringComparison.OrdinalIgnoreCase) == 0)
-				{
-					pos += name.Length;
-				}
-				else goto NextElement;
-				if (pos < htmlLen && html[pos] == ' ') pos++;
-				if (pos < htmlLen && html[pos] == '>') pos++;
-				else goto NextElement;
-
-				return elementStart;
-
-			NextElement:
-				offset = elementStart + 1;
-			}
-
-			return -1;
-		}
-
-		private List<LinkInfo> GetLinks(string html, string baseURL) {
-			List<LinkInfo> links = new List<LinkInfo>();
-			ElementInfo elem;
-			int offset = 0;
-
-			while ((elem = FindElement(html, "a", offset)) != null) {
-				offset = elem.Offset + 1;
-
-				int closeOffset = FindElementClose(html, "a", offset);
-				if (closeOffset == -1) break;
-
-				LinkInfo link = new LinkInfo();
-				
-				foreach (var attr in elem.Attributes) {
-					if (attr.Key.Equals("href", StringComparison.OrdinalIgnoreCase)) {
-						link.URL = Uri.UnescapeDataString(AbsoluteURL(baseURL, attr.Value));
-						break;
-					}
-				}
-
-				if (!String.IsNullOrEmpty(link.URL)) {
-					int innerHTMLOffset = elem.Offset + elem.Length;
-					link.InnerHTML = html.Substring(innerHTMLOffset, closeOffset - innerHTMLOffset).Trim();
-
-					links.Add(link);
-				}
-			}
-
-			return links;
-		}
-
-		private string URLFilename(string url) {
-			int pos = url.LastIndexOf("/");
-			return (pos == -1) ? String.Empty : url.Substring(pos + 1);
-		}
-
-		private void ParseURL(string url, out SiteHelper siteHelper, out string site, out string board, out string thread) {
-			string[] urlSplit = url.Substring(7).Split(new char[] { '/' },
-				StringSplitOptions.RemoveEmptyEntries);
-			site = String.Empty;
-			if (urlSplit.Length >= 1) {
-				string[] hostSplit = urlSplit[0].Split('.');
-				if (hostSplit.Length >= 2) {
-					site = hostSplit[hostSplit.Length - 2];
-				}
-			}
-			switch (site.ToLower(CultureInfo.InvariantCulture)) {
-				default:
-					siteHelper = new SiteHelper();
-					break;
-			}
-			board = siteHelper.GetBoardName(urlSplit);
-			thread = siteHelper.GetThreadName(urlSplit);
-		}
-
 		private void WatchThread(object p) {
 			WatchInfo watchInfo = (WatchInfo)p;
 			SiteHelper siteHelper;
 			List<PageInfo> pageList = new List<PageInfo>();
+			var completedImages = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 			string pageURL = watchInfo.PageURL;
 			string pageAuth = watchInfo.PageAuth;
 			string imgAuth = watchInfo.ImageAuth;
@@ -764,16 +515,28 @@ namespace ChanThreadWatch {
 			const int maxTries = 3;
 			long waitRemain;
 
-			ParseURL(pageURL, out siteHelper, out site, out board, out thread);
+			siteHelper = SiteHelper.GetInstance(pageURL);
+			siteHelper.SetURL(pageURL);
+			site = siteHelper.GetSiteName();
+			board = siteHelper.GetBoardName();
+			thread = siteHelper.GetThreadName();
 			lock (_watchInfoList) {
 				saveDir = watchInfo.SaveDir;
 			}
 			if (String.IsNullOrEmpty(saveDir)) {
 				saveDir = Settings.DownloadFolder;
 				if (Settings.DownloadFolderIsRelative == true) saveDir = Path.GetFullPath(saveDir);
-				saveDir = Path.Combine(saveDir, site + "_" + board + "_" + thread);
+				saveDir = Path.Combine(saveDir, General.CleanFilename(site + "_" + board + "_" + thread));
 				if (!Directory.Exists(saveDir)) {
-					Directory.CreateDirectory(saveDir);
+					try {
+						Directory.CreateDirectory(saveDir);
+					}
+					catch {
+						lock (_watchInfoList) {
+							SetStatus(watchInfo, "Stopped, unable to create folder");
+							return;
+						}
+					}
 				}
 				lock (_watchInfoList) {
 					watchInfo.SaveDir = saveDir;
@@ -783,12 +546,12 @@ namespace ChanThreadWatch {
 			pageList.Add(new PageInfo { URL = pageURL });
 			
 			while (true) {
-				OrderedDictionary imgs = new OrderedDictionary(StringComparer.OrdinalIgnoreCase);
+				Queue<ImageInfo> pendingImages = new Queue<ImageInfo>();
 
 				pageIndex = 0;
 				do {
 					PageInfo pageInfo = pageList[pageIndex];
-					saveFilename = thread + ((pageIndex == 0) ? String.Empty : ("_" + (pageIndex + 1))) + ".html";
+					saveFilename = General.CleanFilename(thread) + ((pageIndex == 0) ? String.Empty : ("_" + (pageIndex + 1))) + ".html";
 					savePath = (saveFilename.Length != 0) ? Path.Combine(saveDir, saveFilename) : null;
 					for (numTries = 1; numTries <= maxTries; numTries++) {
 						lock (_watchInfoList) {
@@ -801,7 +564,7 @@ namespace ChanThreadWatch {
 								(numTries == 1) ? String.Empty : (" (retry " + (numTries - 1) + ")")));
 						}
 						try {
-							page = GetToString(pageInfo.URL, pageAuth, savePath, ref pageInfo.CacheTime);
+							page = General.GetToString(pageInfo.URL, pageAuth, savePath, ref pageInfo.CacheTime);
 							break;
 						}
 						catch (HTTP404Exception) {
@@ -814,43 +577,60 @@ namespace ChanThreadWatch {
 							page = null;
 							break;
 						}
-						catch {
+						catch (Exception ex) {
+							if ((ex is IOException) || (ex is UnauthorizedAccessException)) {
+								lock (_watchInfoList) {
+									SetStatus(watchInfo, "Stopped, unable to write file");
+									return;
+								}
+							}
 							page = null;
 						}
 					}
 					if (page != null) {
-						List<LinkInfo> links = GetLinks(page, pageURL);
-						foreach (LinkInfo link in links) {
-							string imageURL = siteHelper.GetImageURL(link);
-							if (!String.IsNullOrEmpty(imageURL)) {
-								string imgFilename = URLFilename(imageURL);
-								if (!imgs.Contains(imgFilename)) {
-									LinkInfo linkInfo = new LinkInfo();
-									linkInfo.URL = imageURL;
-									linkInfo.Referer = (imageURL == link.URL) ? pageURL : link.URL;
-									linkInfo.InnerHTML = link.InnerHTML;
-									imgs.Add(imgFilename, linkInfo);
+						siteHelper.SetHTML(page);
+
+						List<ImageInfo> images = siteHelper.GetImages();
+						if (completedImages.Count == 0) {
+							var completedImageDiskNames = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+							foreach (ImageInfo image in images) {
+								for (int iName = 0; iName < 2; iName++) {
+									int iSuffix = 1;
+									string filename;
+									do {
+										filename = ((iName == 0) ? image.FileName : image.OriginalFileName) +
+											((iSuffix == 1) ? String.Empty : ("_" + iSuffix)) + image.Extension;
+										iSuffix++;
+									}
+									while (completedImageDiskNames.ContainsKey(filename));
+									if (File.Exists(Path.Combine(saveDir, filename))) {
+										completedImageDiskNames[filename] = 0;
+										completedImages[image.FileName] = 0;
+										break;
+									}
 								}
 							}
 						}
-						bool foundNextPage = false;
-						foreach (LinkInfo link in links) {
-							string nextPageURL = siteHelper.GetNextPageURL(link);
-							if (!String.IsNullOrEmpty(nextPageURL)) {
-								PageInfo nextPageInfo = new PageInfo { URL = nextPageURL };
-								if (pageIndex == pageList.Count - 1) {
-									pageList.Add(nextPageInfo);
-								}
-								else if (pageList[pageIndex + 1].URL != nextPageURL) {
-									pageList[pageIndex + 1] = nextPageInfo;
-								}
-								foundNextPage = true;
-								break;
+						foreach (ImageInfo image in images) {
+							if (!completedImages.ContainsKey(image.FileName)) {
+								pendingImages.Enqueue(image);
 							}
 						}
-						if (!foundNextPage && pageIndex < pageList.Count - 1) {
+
+						string nextPageURL = siteHelper.GetNextPageURL();
+						if (!String.IsNullOrEmpty(nextPageURL)) {
+							PageInfo nextPageInfo = new PageInfo { URL = nextPageURL };
+							if (pageIndex == pageList.Count - 1) {
+								pageList.Add(nextPageInfo);
+							}
+							else if (pageList[pageIndex + 1].URL != nextPageURL) {
+								pageList[pageIndex + 1] = nextPageInfo;
+							}
+						}
+						else if (pageIndex < pageList.Count - 1) {
 							pageList.RemoveRange(pageIndex + 1, pageList.Count - (pageIndex + 1));
 						}
+
 						page = null;
 					}
 				}
@@ -860,32 +640,67 @@ namespace ChanThreadWatch {
 					watchInfo.NextCheck = TickCount.Now + (watchInfo.WaitSeconds * 1000);
 				}
 
-				if (imgs.Count != 0) {
-					int i = 0;
-					foreach (DictionaryEntry imgEntry in imgs) {
-						saveFilename = (string)imgEntry.Key;
-						savePath = (saveFilename.Length != 0) ? Path.Combine(saveDir, saveFilename) : null;
-						if ((savePath != null) && !File.Exists(savePath)) {
-							for (numTries = 1; numTries <= maxTries; numTries++) {
+				int totalImageCount = completedImages.Count + pendingImages.Count;
+				while (pendingImages.Count != 0) {
+					ImageInfo image = pendingImages.Dequeue();
+					int iSuffix = 1;
+
+					if ((Settings.UseOriginalFilenames == true) && !String.IsNullOrEmpty(image.OriginalFileName)) {
+						saveFilename = General.CleanFilename(image.OriginalFileName);
+					}
+					else if (!String.IsNullOrEmpty(image.FileName)) {
+						saveFilename = General.CleanFilename(image.FileName);
+					}
+					else {
+						continue;
+					}
+
+					do {
+						savePath = Path.Combine(saveDir, saveFilename + ((iSuffix == 1) ?
+							String.Empty : ("_" + iSuffix)) + image.Extension) ;
+						iSuffix++;
+					}
+					while (File.Exists(savePath));
+
+					bool downloadCompleted = false;
+					byte[] prevHash = null;
+					for (numTries = 1; numTries <= maxTries; numTries++) {
+						lock (_watchInfoList) {
+							if (watchInfo.Stop) {
+								SetStatus(watchInfo, "Stopped by user");
+								return;
+							}
+							SetStatus(watchInfo, String.Format("Downloading image {0} of {1}{2}",
+								totalImageCount - pendingImages.Count, totalImageCount,
+								(numTries == 1) ? String.Empty : (" (retry " + (numTries - 1) + ")")));
+						}
+						try {
+							HashType hashType = (Settings.VerifyImageHashes != false) ? image.HashType : HashType.None;
+							byte[] hash = General.GetToFile(image.URL, imgAuth, image.Referer, savePath, hashType);
+							if (hashType != HashType.None && !General.ArraysAreEqual(hash, image.Hash) &&
+								(prevHash == null || !General.ArraysAreEqual(hash, prevHash)))
+							{
+								prevHash = hash;
+								throw new Exception("Hash of downloaded file is incorrect.");
+							}
+							downloadCompleted = true;
+							break;
+						}
+						catch (Exception ex) {
+							if (ex is PathTooLongException) {
+								downloadCompleted = true;
+								break;
+							}
+							if ((ex is IOException) || (ex is UnauthorizedAccessException)) {
 								lock (_watchInfoList) {
-									if (watchInfo.Stop) {
-										SetStatus(watchInfo, "Stopped by user");
-										return;
-									}
-									SetStatus(watchInfo, String.Format("Downloading image {0} " + 
-										"of {1}{2}", i + 1, imgs.Count, numTries == 1 ? String.Empty :
-										" (retry " + (numTries - 1).ToString() + ")"));
-								}
-								try {
-									LinkInfo linkInfo = (LinkInfo)imgEntry.Value;
-									GetToFile(linkInfo.URL, imgAuth, linkInfo.Referer, savePath);
-									break;
-								}
-								catch {
+									SetStatus(watchInfo, "Stopped, unable to write file");
+									return;
 								}
 							}
 						}
-						i++;
+					}
+					if (downloadCompleted) {
+						completedImages[image.FileName] = 0;
 					}
 				}
 
@@ -906,137 +721,5 @@ namespace ChanThreadWatch {
 				}
 			}
 		}
-	}
-
-	public class ByteBuff {
-		public byte[] Data;
-		public int Length;
-
-		public ByteBuff(byte[] data, int len) {
-			Data = data;
-			Length = len;
-		}
-	}
-
-	public class WatchInfo {
-		public int ListIndex;
-		public bool Stop;
-		public Thread WatchThread;
-		public string PageURL;
-		public string PageAuth;
-		public string ImageAuth;
-		public int WaitSeconds;
-		public bool OneTime;
-		public string SaveDir;
-		public long NextCheck;
-	}
-
-	public class ElementInfo {
-		public int Offset;
-		public int Length;
-		public string Name;
-		public List<KeyValuePair<string, string>> Attributes;
-		public string InnerHTML;
-	}
-
-	public class PageInfo {
-		public string URL;
-		public DateTime? CacheTime;
-	}
-
-	public class LinkInfo {
-		public string URL;
-		public string Referer;
-		public string InnerHTML;
-	}
-
-	public class SiteHelper {
-		public virtual string GetBoardName(string[] urlSplit) {
-			return (urlSplit.Length > 2) ? urlSplit[1] : String.Empty;
-		}
-
-		public virtual string GetThreadName(string[] urlSplit) {
-			if (urlSplit.Length >= 3) {
-				string page = urlSplit[urlSplit.Length - 1];
-				int pos = page.LastIndexOf('.');
-				return (pos != -1) ? page.Substring(0, pos) : page;
-			}
-			return String.Empty;
-		}
-
-		public virtual string GetImageURL(LinkInfo link) {
-			string url = link.URL;
-			if (url.IndexOf("/src/", StringComparison.OrdinalIgnoreCase) != -1) {
-				int pos = Math.Max(
-					url.LastIndexOf("http://", StringComparison.OrdinalIgnoreCase),
-					url.LastIndexOf("https://", StringComparison.OrdinalIgnoreCase));
-				return (pos > 0) ? url.Substring(pos) : url;
-			}
-			return null;
-		}
-
-		public virtual string GetNextPageURL(LinkInfo link) {
-			return null;
-		}
-	}
-
-	public class HTTP404Exception : Exception {
-		public HTTP404Exception() {
-		}
-	}
-
-	public class HTTP304Exception : Exception {
-		public HTTP304Exception() {
-		}
-	}
-
-	public class SoftLock : IDisposable {
-		private object _obj;
-
-		public SoftLock(object obj) {
-			_obj = obj;
-			while (!Monitor.TryEnter(_obj, 10)) Application.DoEvents();
-		}
-
-		public static SoftLock Obtain(object obj) {
-			return new SoftLock(obj);
-		}
-
-		public void Dispose() {
-			Dispose(true);
-		}
-
-		private void Dispose(bool disposing) {
-			if (_obj != null) {
-				Monitor.Exit(_obj);
-				_obj = null;
-			}
-		}
-	}
-
-	public static class TickCount {
-		static object _synchObj = new object();
-		static int _lastTickCount = Environment.TickCount;
-		static long _correction;
-
-		public static long Now {
-			get {
-				lock (_synchObj) {
-					int tickCount = Environment.TickCount;
-					if ((tickCount < 0) && (_lastTickCount >= 0)) {
-						_correction += 0x100000000L;
-					}
-					_lastTickCount = tickCount;
-					return tickCount + _correction;
-				}
-			}
-		}
-	}
-
-	public delegate string WatchInfoSelector(WatchInfo watchInfo);
-
-	public enum ThreadDoubleClickAction {
-		OpenFolder = 1,
-		OpenURL = 2
 	}
 }
