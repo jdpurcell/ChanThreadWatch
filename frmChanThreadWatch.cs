@@ -21,6 +21,7 @@ namespace ChanThreadWatch {
 
 		// Change log:
 		// 1.4.2 (2010-Apr-02):
+		//   * Fixed crash with non-4chan threads containing mailto links.
 		//   * Enabled auto-scaling to fix text truncation with larger font sizes.
 		//   * Enter key is a shortcut for "Add Thread".
 		//   * Backs up the page before redownloading in case it 404s in the middle of
