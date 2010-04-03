@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Security.Cryptography;
+using System.Text;
 using System.Threading;
 using System.Windows.Forms;
 
@@ -23,13 +24,32 @@ namespace ChanThreadWatch {
 		public int Offset;
 		public int Length;
 		public string Name;
-		public List<KeyValuePair<string, string>> Attributes;
+		public List<AttributeInfo> Attributes;
 		public string InnerHTML;
+	}
+
+	public class AttributeInfo {
+		public string Name;
+		public string Value;
+		public int Offset;
+		public int Length;
+	}
+
+	public class ReplaceInfo {
+		public int Offset;
+		public int Length;
+		public string Value;
+		public ReplaceType Type;
+		public string Tag;
 	}
 
 	public class PageInfo {
 		public string URL;
 		public DateTime? CacheTime;
+		public bool IsFresh;
+		public string Path;
+		public Encoding Encoding;
+		public List<ReplaceInfo> ReplaceList;
 	}
 
 	public class ImageInfo {
@@ -41,13 +61,24 @@ namespace ChanThreadWatch {
 
 		public string FileName {
 			get {
-				return Path.GetFileNameWithoutExtension(General.URLFilename(URL));
+				return Path.GetFileNameWithoutExtension(General.CleanFilename(General.URLFilename(URL)));
 			}
 		}
 
 		public string Extension {
 			get {
-				return Path.GetExtension(General.URLFilename(URL));
+				return Path.GetExtension(General.CleanFilename(General.URLFilename(URL)));
+			}
+		}
+	}
+
+	public class ThumbnailInfo {
+		public string URL { get; set; }
+		public string Referer { get; set; }
+
+		public string FileNameWithExt {
+			get {
+				return General.CleanFilename(General.URLFilename(URL));
 			}
 		}
 	}
@@ -182,5 +213,13 @@ namespace ChanThreadWatch {
 	public enum HashType {
 		None = 0,
 		MD5 = 1
+	}
+
+	public enum ReplaceType {
+		Other = 0,
+		NewLine = 1,
+		ImageLinkHref = 2,
+		ImageSrc = 3,
+		MetaContentType = 4
 	}
 }

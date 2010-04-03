@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Reflection;
+using System.Web;
 
 namespace ChanThreadWatch {
 	public class SiteHelper {
@@ -45,7 +46,7 @@ namespace ChanThreadWatch {
 			string[] urlSplit = SplitURL();
 			return (urlSplit.Length > 2) ? urlSplit[1] : String.Empty;
 		}
-			
+
 		public virtual string GetThreadName() {
 			string[] urlSplit = SplitURL();
 			if (urlSplit.Length >= 3) {
@@ -59,24 +60,29 @@ namespace ChanThreadWatch {
 			return String.Empty;
 		}
 
-		public virtual List<ImageInfo> GetImages() {
+		public virtual List<ImageInfo> GetImages(List<ReplaceInfo> replaceList, List<ThumbnailInfo> thumbnailList) {
 			var filenames = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 			List<ImageInfo> images = new List<ImageInfo>();
 			ElementInfo elem;
 			int offset = 0;
-			string value;
+			AttributeInfo attr;
+			string url;
 			int pos;
 
 			while ((elem = General.FindElement(_html, "a", offset)) != null) {
 				offset = elem.Offset + 1;
-				value = General.GetAttributeValue(elem, "href");
-				if (String.IsNullOrEmpty(value) || value.IndexOf("/src/", StringComparison.OrdinalIgnoreCase) == -1) {
-					continue;
-				}
+				attr = General.GetAttribute(elem, "href");
+				if (attr == null || String.IsNullOrEmpty(attr.Value)) continue;
+				url = General.ProperURL(_url, HttpUtility.HtmlDecode(attr.Value));
+				if (url.IndexOf("/src/", StringComparison.OrdinalIgnoreCase) == -1) continue;
+
+				int linkEnd = General.FindElementClose(_html, "a", elem.Offset + 1);
+				if (linkEnd == -1) break;
 
 				ImageInfo image = new ImageInfo();
+				ThumbnailInfo thumb = null;
 
-				image.URL = General.ProperURL(_url, value);
+				image.URL = url;
 				if (image.URL == null) continue;
 				pos = Math.Max(
 					image.URL.LastIndexOf("http://", StringComparison.OrdinalIgnoreCase),
@@ -88,10 +94,45 @@ namespace ChanThreadWatch {
 					image.Referer = image.URL;
 					image.URL = image.URL.Substring(pos);
 				}
-				if (filenames.ContainsKey(image.FileName)) continue;
+				if (replaceList != null) {
+					replaceList.Add(
+						new ReplaceInfo {
+							Offset = attr.Offset,
+							Length = attr.Length,
+							Type = ReplaceType.ImageLinkHref,
+							Tag = image.FileName
+						});
+				}
 
-				images.Add(image);
-				filenames.Add(image.FileName, 0);
+				elem = General.FindElement(_html, "img", elem.Offset + 1, linkEnd);
+				if (elem != null) {
+					attr = General.GetAttribute(elem, "src");
+					if (attr != null && !String.IsNullOrEmpty(attr.Value)) {
+						url = General.ProperURL(_url, HttpUtility.HtmlDecode(attr.Value));
+						if (url != null) {
+							thumb = new ThumbnailInfo();
+							thumb.URL = url;
+							thumb.Referer = _url;
+							if (replaceList != null) {
+								replaceList.Add(
+									new ReplaceInfo {
+										Offset = attr.Offset,
+										Length = attr.Length,
+										Type = ReplaceType.ImageSrc,
+										Tag = thumb.FileNameWithExt
+									});
+							}
+						}
+					}
+				}
+
+				if (!filenames.ContainsKey(image.FileName)) {
+					images.Add(image);
+					filenames.Add(image.FileName, 0);
+				}
+				if (thumb != null) {
+					thumbnailList.Add(thumb);
+				}
 			}
 
 			return images;
@@ -103,9 +144,10 @@ namespace ChanThreadWatch {
 	}
 
 	public class SiteHelper_4chan_org : SiteHelper {
-		public override List<ImageInfo> GetImages() {
+		public override List<ImageInfo> GetImages(List<ReplaceInfo> replaceList, List<ThumbnailInfo> thumbnailList) {
 			List<ImageInfo> images = new List<ImageInfo>();
 			ElementInfo elem;
+			AttributeInfo attr;
 			int offset = 0;
 			string value;
 
@@ -117,29 +159,65 @@ namespace ChanThreadWatch {
 				}
 
 				int postEnd = General.FindElementClose(_html, "blockquote", elem.Offset + 1);
-				if (postEnd == -1) {
-					break;
-				}
+				if (postEnd == -1) break;
 				offset = postEnd + 1;
 
 				ImageInfo image = new ImageInfo();
+				ThumbnailInfo thumb = new ThumbnailInfo();
 
 				elem = General.FindElement(_html, "a", elem.Offset + 1, postEnd);
 				if (elem == null) continue;
-				value = General.GetAttributeValue(elem, "href");
-				if (String.IsNullOrEmpty(value)) continue;
-				image.URL = General.ProperURL(_url, value);
+				attr = General.GetAttribute(elem, "href");
+				if (attr == null || String.IsNullOrEmpty(attr.Value)) continue;
+				image.URL = General.ProperURL(_url, HttpUtility.HtmlDecode(attr.Value));
 				if (image.URL == null) continue;
 				image.Referer = _url;
+				if (replaceList != null) {
+					replaceList.Add(
+						new ReplaceInfo {
+							Offset = attr.Offset,
+							Length = attr.Length,
+							Type = ReplaceType.ImageLinkHref,
+							Tag = image.FileName
+						});
+				}
 
 				elem = General.FindElement(_html, "span", elem.Offset + 1, postEnd);
 				if (elem == null) continue;
 				value = General.GetAttributeValue(elem, "title");
 				if (String.IsNullOrEmpty(value)) continue;
-				image.OriginalFileName = Path.GetFileNameWithoutExtension(value);
+				image.OriginalFileName = Path.GetFileNameWithoutExtension(General.CleanFilename(HttpUtility.HtmlDecode(value)));
+
+				elem = General.FindElement(_html, "a", elem.Offset + 1, postEnd);
+				if (elem == null) continue;
+				attr = General.GetAttribute(elem, "href");
+				if (attr == null || String.IsNullOrEmpty(attr.Value)) continue;
+				if (replaceList != null) {
+					replaceList.Add(
+						new ReplaceInfo {
+							Offset = attr.Offset,
+							Length = attr.Length,
+							Type = ReplaceType.ImageLinkHref,
+							Tag = image.FileName
+						});
+				}
 
 				elem = General.FindElement(_html, "img", elem.Offset + 1, postEnd);
 				if (elem == null) continue;
+				attr = General.GetAttribute(elem, "src");
+				if (attr == null || String.IsNullOrEmpty(attr.Value)) continue;
+				thumb.URL = General.ProperURL(_url, HttpUtility.HtmlDecode(attr.Value));
+				if (thumb.URL == null) continue;
+				thumb.Referer = _url;
+				if (replaceList != null) {
+					replaceList.Add(
+						new ReplaceInfo {
+							Offset = attr.Offset,
+							Length = attr.Length,
+							Type = ReplaceType.ImageSrc,
+							Tag = thumb.FileNameWithExt
+						});
+				}
 				value = General.GetAttributeValue(elem, "md5");
 				if (String.IsNullOrEmpty(value)) continue;
 				try {
@@ -149,6 +227,7 @@ namespace ChanThreadWatch {
 				image.HashType = HashType.MD5;
 
 				images.Add(image);
+				thumbnailList.Add(thumb);
 			}
 
 			return images;

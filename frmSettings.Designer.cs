@@ -37,6 +37,7 @@
 			this.chkUseOriginalFilenames = new System.Windows.Forms.CheckBox();
 			this.chkVerifyImageHashes = new System.Windows.Forms.CheckBox();
 			this.chkCheckForUpdates = new System.Windows.Forms.CheckBox();
+			this.chkSaveThumbnails = new System.Windows.Forms.CheckBox();
 			this.SuspendLayout();
 			// 
 			// txtDownloadFolder
@@ -67,10 +68,10 @@
 			// 
 			// btnOK
 			// 
-			this.btnOK.Location = new System.Drawing.Point(568, 144);
+			this.btnOK.Location = new System.Drawing.Point(568, 168);
 			this.btnOK.Name = "btnOK";
 			this.btnOK.Size = new System.Drawing.Size(60, 23);
-			this.btnOK.TabIndex = 12;
+			this.btnOK.TabIndex = 13;
 			this.btnOK.Text = "OK";
 			this.btnOK.UseVisualStyleBackColor = true;
 			this.btnOK.Click += new System.EventHandler(this.btnOK_Click);
@@ -78,10 +79,10 @@
 			// btnCancel
 			// 
 			this.btnCancel.DialogResult = System.Windows.Forms.DialogResult.Cancel;
-			this.btnCancel.Location = new System.Drawing.Point(636, 144);
+			this.btnCancel.Location = new System.Drawing.Point(636, 168);
 			this.btnCancel.Name = "btnCancel";
 			this.btnCancel.Size = new System.Drawing.Size(68, 23);
-			this.btnCancel.TabIndex = 13;
+			this.btnCancel.TabIndex = 14;
 			this.btnCancel.Text = "Cancel";
 			this.btnCancel.UseVisualStyleBackColor = true;
 			// 
@@ -118,30 +119,30 @@
 			// lblSettingsLocation
 			// 
 			this.lblSettingsLocation.AutoSize = true;
-			this.lblSettingsLocation.Location = new System.Drawing.Point(8, 152);
+			this.lblSettingsLocation.Location = new System.Drawing.Point(8, 176);
 			this.lblSettingsLocation.Name = "lblSettingsLocation";
 			this.lblSettingsLocation.Size = new System.Drawing.Size(87, 13);
-			this.lblSettingsLocation.TabIndex = 9;
+			this.lblSettingsLocation.TabIndex = 10;
 			this.lblSettingsLocation.Text = "Save settings in:";
 			// 
 			// rbSettingsInAppDataFolder
 			// 
 			this.rbSettingsInAppDataFolder.AutoSize = true;
-			this.rbSettingsInAppDataFolder.Location = new System.Drawing.Point(108, 150);
+			this.rbSettingsInAppDataFolder.Location = new System.Drawing.Point(108, 174);
 			this.rbSettingsInAppDataFolder.Name = "rbSettingsInAppDataFolder";
-			this.rbSettingsInAppDataFolder.Size = new System.Drawing.Size(134, 17);
-			this.rbSettingsInAppDataFolder.TabIndex = 10;
+			this.rbSettingsInAppDataFolder.Size = new System.Drawing.Size(133, 17);
+			this.rbSettingsInAppDataFolder.TabIndex = 11;
 			this.rbSettingsInAppDataFolder.TabStop = true;
-			this.rbSettingsInAppDataFolder.Text = "Application Data folder";
+			this.rbSettingsInAppDataFolder.Text = "Application data folder";
 			this.rbSettingsInAppDataFolder.UseVisualStyleBackColor = true;
 			// 
 			// rbSettingsInExeFolder
 			// 
 			this.rbSettingsInExeFolder.AutoSize = true;
-			this.rbSettingsInExeFolder.Location = new System.Drawing.Point(252, 150);
+			this.rbSettingsInExeFolder.Location = new System.Drawing.Point(252, 174);
 			this.rbSettingsInExeFolder.Name = "rbSettingsInExeFolder";
 			this.rbSettingsInExeFolder.Size = new System.Drawing.Size(109, 17);
-			this.rbSettingsInExeFolder.TabIndex = 11;
+			this.rbSettingsInExeFolder.TabIndex = 12;
 			this.rbSettingsInExeFolder.TabStop = true;
 			this.rbSettingsInExeFolder.Text = "Executable folder";
 			this.rbSettingsInExeFolder.UseVisualStyleBackColor = true;
@@ -169,12 +170,22 @@
 			// chkCheckForUpdates
 			// 
 			this.chkCheckForUpdates.AutoSize = true;
-			this.chkCheckForUpdates.Location = new System.Drawing.Point(10, 72);
+			this.chkCheckForUpdates.Location = new System.Drawing.Point(10, 144);
 			this.chkCheckForUpdates.Name = "chkCheckForUpdates";
 			this.chkCheckForUpdates.Size = new System.Drawing.Size(364, 17);
-			this.chkCheckForUpdates.TabIndex = 6;
+			this.chkCheckForUpdates.TabIndex = 9;
 			this.chkCheckForUpdates.Text = "Automatically check for and notify of updated versions of this program";
 			this.chkCheckForUpdates.UseVisualStyleBackColor = true;
+			// 
+			// chkSaveThumbnails
+			// 
+			this.chkSaveThumbnails.AutoSize = true;
+			this.chkSaveThumbnails.Location = new System.Drawing.Point(10, 72);
+			this.chkSaveThumbnails.Name = "chkSaveThumbnails";
+			this.chkSaveThumbnails.Size = new System.Drawing.Size(219, 17);
+			this.chkSaveThumbnails.TabIndex = 6;
+			this.chkSaveThumbnails.Text = "Save thumbnails and post-process HTML";
+			this.chkSaveThumbnails.UseVisualStyleBackColor = true;
 			// 
 			// frmSettings
 			// 
@@ -187,9 +198,10 @@
 			this.ShowInTaskbar = false;
 			this.AcceptButton = this.btnOK;
 			this.CancelButton = this.btnCancel;
-			this.ClientSize = new System.Drawing.Size(714, 177);
+			this.ClientSize = new System.Drawing.Size(714, 201);
 			this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
 			this.Font = new System.Drawing.Font("Tahoma", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+			this.Controls.Add(this.chkSaveThumbnails);
 			this.Controls.Add(this.chkCheckForUpdates);
 			this.Controls.Add(this.chkVerifyImageHashes);
 			this.Controls.Add(this.chkUseOriginalFilenames);
@@ -227,5 +239,6 @@
 		private System.Windows.Forms.CheckBox chkUseOriginalFilenames;
 		private System.Windows.Forms.CheckBox chkVerifyImageHashes;
 		private System.Windows.Forms.CheckBox chkCheckForUpdates;
+		private System.Windows.Forms.CheckBox chkSaveThumbnails;
 	}
 }

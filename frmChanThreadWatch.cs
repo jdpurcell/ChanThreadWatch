@@ -6,6 +6,7 @@ using System.Drawing;
 using System.IO;
 using System.Text;
 using System.Threading;
+using System.Web;
 using System.Windows.Forms;
 
 namespace ChanThreadWatch {
@@ -20,6 +21,12 @@ namespace ChanThreadWatch {
 		// ReleaseDate property and version in AssemblyInfo.cs should be updated for each release.
 
 		// Change log:
+		// 1.4.0 (2010-Jan-01):
+		//   * Option to download thumbnails and post-process HTML to create a mostly-
+		//     working thread backup (no external CSS, no embedded images other than
+		//     thumbnails, etc).
+		//   * Fixed handling of special characters in filenames.
+		//   * Ability to restart stopped threads in the context menu.
 		// 1.3.0 (2009-Dec-28):
 		//   * Option to verify hash of downloaded images (currently 4chan only).
 		//   * Option to save images with original filenames (currently 4chan only).
@@ -59,7 +66,7 @@ namespace ChanThreadWatch {
 		//   * Doesn't convert page URL to lowercase; fixes 404 problem when page URL
 		//     contains uppercase characters.
 		// 1.1.1 (2008-Jan-16):
-		//   * Workarounds for Mono's form scaling problems and HttpWebResponse 
+		//   * Workarounds for Mono's form scaling problems and HttpWebResponse
 		//     LastModified bug.
 		// 1.1.0 (2008-Jan-07):
 		//   * Fixed UI slugishness and freezing caused by accidentally leaving a Sleep
@@ -188,7 +195,7 @@ namespace ChanThreadWatch {
 			{
 				pageURL = "http://" + pageURL;
 			}
-			pageURL = General.ProperURL(pageURL);
+			pageURL = General.ProperURL(HttpUtility.HtmlDecode(pageURL));
 			if (pageURL == null) {
 				MessageBox.Show("The specified URL is invalid.", "Invalid URL", MessageBoxButtons.OK, MessageBoxIcon.Error);
 				return;
@@ -212,6 +219,17 @@ namespace ChanThreadWatch {
 			using (SoftLock.Obtain(_watchInfoList)) {
 				foreach (ListViewItem item in lvThreads.SelectedItems) {
 					_watchInfoList[item.Index].Stop = true;
+				}
+			}
+		}
+
+		private void miStart_Click(object sender, EventArgs e) {
+			using (SoftLock.Obtain(_watchInfoList)) {
+				foreach (ListViewItem item in lvThreads.SelectedItems) {
+					WatchInfo wi = _watchInfoList[item.Index];
+					if ((wi.WatchThread == null) || !wi.WatchThread.IsAlive) {
+						AddThread(wi.PageURL, wi.PageAuth, wi.ImageAuth, wi.WaitSeconds, wi.OneTime, wi.SaveDir);
+					}
 				}
 			}
 		}
@@ -244,15 +262,14 @@ namespace ChanThreadWatch {
 			Clipboard.SetText(sb.ToString());
 		}
 
-		
 		private void miCheckNow_Click(object sender, EventArgs e) {
 			using (SoftLock.Obtain(_watchInfoList)) {
 				foreach (ListViewItem item in lvThreads.SelectedItems) {
 					_watchInfoList[item.Index].NextCheck = TickCount.Now;
 				}
 			}
-		}	
-	
+		}
+
 		private void miCheckEvery_Click(object sender, EventArgs e) {
 			MenuItem menuItem = sender as MenuItem;
 			if (menuItem != null) {
@@ -288,6 +305,20 @@ namespace ChanThreadWatch {
 		private void lvThreads_MouseClick(object sender, MouseEventArgs e) {
 			if (e.Button == MouseButtons.Right) {
 				if (lvThreads.SelectedItems.Count != 0) {
+					bool anyRunning = false;
+					bool anyStopped = false;
+					using (SoftLock.Obtain(_watchInfoList)) {
+						foreach (ListViewItem item in lvThreads.SelectedItems) {
+							WatchInfo wi = _watchInfoList[item.Index];
+							bool isRunning = (wi.WatchThread != null) && wi.WatchThread.IsAlive;
+							anyRunning |= isRunning;
+							anyStopped |= !isRunning;
+						}
+					}
+					miStop.Visible = anyRunning;
+					miStart.Visible = anyStopped;
+					miCheckNow.Visible = anyRunning;
+					miCheckEvery.Visible = anyRunning;
 					cmThreads.Show(lvThreads, e.Location);
 				}
 			}
@@ -460,30 +491,43 @@ namespace ChanThreadWatch {
 			start += openTag.Length;
 			int end = html.IndexOf(closeTag, start, StringComparison.OrdinalIgnoreCase);
 			if (end == -1) return;
-			string[] current = General.Version.Split('.');
-			string[] latest = html.Substring(start, end - start).Split('.');
-			if (latest.Length != current.Length) return;
-			int c, l;
-			for (int i = 0; i < current.Length; i++) {
-				if (!Int32.TryParse(current[i], out c)) return;
-				if (!Int32.TryParse(latest[i], out l)) return;
-				if (c > l) return;
-				if (c < l) {
-					// Prevent the update check from running again until next week
-					Settings.LastUpdateCheck = DateTime.Now.Date.AddDays(6);
-
-					lock (_promptSync) {
-						BeginInvoke((MethodInvoker)delegate() {
-							if (IsDisposed) return;
-							if (MessageBox.Show("A newer version of Chan Thread Watch is available.  Would you like to open the Chan Thread Watch website?",
-								"Newer Version Found", MessageBoxButtons.YesNo, MessageBoxIcon.Information) == DialogResult.Yes)
-							{
-								Process.Start(General.ProgramURL);
-							}
-						});
-					}
-					return;
+			string latestStr = html.Substring(start, end - start).Trim();
+			int latest = ParseVersionNumber(latestStr);
+			if (latest == -1) return;
+			int current = -1;
+			if (!String.IsNullOrEmpty(Settings.LatestUpdateVersion)) {
+				current = ParseVersionNumber(Settings.LatestUpdateVersion);
+			}
+			if (current == -1) {
+				current = ParseVersionNumber(General.Version);
+			}
+			if (latest > current) {
+				lock (_promptSync) {
+					if (IsDisposed) return;
+					Settings.LatestUpdateVersion = latestStr;
+					Invoke((MethodInvoker)delegate() {
+						if (MessageBox.Show("A newer version of Chan Thread Watch is available.  Would you like to open the Chan Thread Watch website?",
+							"Newer Version Found", MessageBoxButtons.YesNo, MessageBoxIcon.Information) == DialogResult.Yes)
+						{
+							Process.Start(General.ProgramURL);
+						}
+					});
 				}
+			}
+		}
+
+		private int ParseVersionNumber(string str) {
+			string[] split = str.Split('.');
+			int num = 0;
+			try {
+				if (split.Length >= 1) num |= (Int32.Parse(split[0]) & 0x7F) << 24;
+				if (split.Length >= 2) num |= (Int32.Parse(split[1]) & 0xFF) << 16;
+				if (split.Length >= 3) num |= (Int32.Parse(split[2]) & 0xFF) <<  8;
+				if (split.Length >= 4) num |= (Int32.Parse(split[3]) & 0xFF);
+				return num;
+			}
+			catch {
+				return -1;
 			}
 		}
 
@@ -504,12 +548,13 @@ namespace ChanThreadWatch {
 			WatchInfo watchInfo = (WatchInfo)p;
 			SiteHelper siteHelper;
 			List<PageInfo> pageList = new List<PageInfo>();
-			var completedImages = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+			var completedImages = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+			var completedThumbs = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 			string pageURL = watchInfo.PageURL;
 			string pageAuth = watchInfo.PageAuth;
 			string imgAuth = watchInfo.ImageAuth;
 			string page = null;
-			string saveDir, saveFilename, savePath, site, board, thread;
+			string saveDir, saveFilename, savePath, saveThumbsDir, site, board, thread;
 			int pageIndex;
 			int numTries;
 			const int maxTries = 3;
@@ -528,9 +573,7 @@ namespace ChanThreadWatch {
 				if (Settings.DownloadFolderIsRelative == true) saveDir = Path.GetFullPath(saveDir);
 				saveDir = Path.Combine(saveDir, General.CleanFilename(site + "_" + board + "_" + thread));
 				if (!Directory.Exists(saveDir)) {
-					try {
-						Directory.CreateDirectory(saveDir);
-					}
+					try { Directory.CreateDirectory(saveDir); }
 					catch {
 						lock (_watchInfoList) {
 							SetStatus(watchInfo, "Stopped, unable to create folder");
@@ -542,17 +585,23 @@ namespace ChanThreadWatch {
 					watchInfo.SaveDir = saveDir;
 				}
 			}
+			saveThumbsDir = Path.Combine(saveDir, "thumbs");
 
 			pageList.Add(new PageInfo { URL = pageURL });
-			
+
 			while (true) {
 				Queue<ImageInfo> pendingImages = new Queue<ImageInfo>();
+				Queue<ThumbnailInfo> pendingThumbs = new Queue<ThumbnailInfo>();
 
 				pageIndex = 0;
 				do {
-					PageInfo pageInfo = pageList[pageIndex];
 					saveFilename = General.CleanFilename(thread) + ((pageIndex == 0) ? String.Empty : ("_" + (pageIndex + 1))) + ".html";
-					savePath = (saveFilename.Length != 0) ? Path.Combine(saveDir, saveFilename) : null;
+					savePath = Path.Combine(saveDir, saveFilename);
+
+					PageInfo pageInfo = pageList[pageIndex];
+					pageInfo.IsFresh = false;
+					pageInfo.Path = savePath;
+					pageInfo.ReplaceList = (Settings.SaveThumbnails == true) ? new List<ReplaceInfo>() : null;
 					for (numTries = 1; numTries <= maxTries; numTries++) {
 						lock (_watchInfoList) {
 							if (watchInfo.Stop) {
@@ -564,7 +613,9 @@ namespace ChanThreadWatch {
 								(numTries == 1) ? String.Empty : (" (retry " + (numTries - 1) + ")")));
 						}
 						try {
-							page = General.GetToString(pageInfo.URL, pageAuth, savePath, ref pageInfo.CacheTime);
+							page = General.GetToString(pageInfo.URL, pageAuth, savePath, ref pageInfo.CacheTime,
+								out pageInfo.Encoding, pageInfo.ReplaceList);
+							pageInfo.IsFresh = true;
 							break;
 						}
 						catch (HTTP404Exception) {
@@ -578,7 +629,7 @@ namespace ChanThreadWatch {
 							break;
 						}
 						catch (Exception ex) {
-							if ((ex is IOException) || (ex is UnauthorizedAccessException)) {
+							if ((ex is DirectoryNotFoundException) || (ex is PathTooLongException) || (ex is UnauthorizedAccessException)) {
 								lock (_watchInfoList) {
 									SetStatus(watchInfo, "Stopped, unable to write file");
 									return;
@@ -587,10 +638,12 @@ namespace ChanThreadWatch {
 							page = null;
 						}
 					}
+
 					if (page != null) {
 						siteHelper.SetHTML(page);
 
-						List<ImageInfo> images = siteHelper.GetImages();
+						List<ThumbnailInfo> thumbs = new List<ThumbnailInfo>();
+						List<ImageInfo> images = siteHelper.GetImages(pageInfo.ReplaceList, thumbs);
 						if (completedImages.Count == 0) {
 							var completedImageDiskNames = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 							foreach (ImageInfo image in images) {
@@ -605,15 +658,25 @@ namespace ChanThreadWatch {
 									while (completedImageDiskNames.ContainsKey(filename));
 									if (File.Exists(Path.Combine(saveDir, filename))) {
 										completedImageDiskNames[filename] = 0;
-										completedImages[image.FileName] = 0;
+										completedImages[image.FileName] = filename;
 										break;
 									}
+								}
+							}
+							foreach (ThumbnailInfo thumb in thumbs) {
+								if (File.Exists(Path.Combine(saveThumbsDir, thumb.FileNameWithExt))) {
+									completedThumbs[thumb.FileNameWithExt] = 0;
 								}
 							}
 						}
 						foreach (ImageInfo image in images) {
 							if (!completedImages.ContainsKey(image.FileName)) {
 								pendingImages.Enqueue(image);
+							}
+						}
+						foreach (ThumbnailInfo thumb in thumbs) {
+							if (!completedThumbs.ContainsKey(thumb.FileNameWithExt)) {
+								pendingThumbs.Enqueue(thumb);
 							}
 						}
 
@@ -643,18 +706,20 @@ namespace ChanThreadWatch {
 				int totalImageCount = completedImages.Count + pendingImages.Count;
 				while (pendingImages.Count != 0) {
 					ImageInfo image = pendingImages.Dequeue();
-					int iSuffix = 1;
+					bool pathTooLong = false;
 
-					if ((Settings.UseOriginalFilenames == true) && !String.IsNullOrEmpty(image.OriginalFileName)) {
-						saveFilename = General.CleanFilename(image.OriginalFileName);
+				MakeImagePath:
+					if ((Settings.UseOriginalFilenames == true) && !String.IsNullOrEmpty(image.OriginalFileName) && !pathTooLong) {
+						saveFilename = image.OriginalFileName;
 					}
 					else if (!String.IsNullOrEmpty(image.FileName)) {
-						saveFilename = General.CleanFilename(image.FileName);
+						saveFilename = image.FileName;
 					}
 					else {
 						continue;
 					}
 
+					int iSuffix = 1;
 					do {
 						savePath = Path.Combine(saveDir, saveFilename + ((iSuffix == 1) ?
 							String.Empty : ("_" + iSuffix)) + image.Extension) ;
@@ -686,12 +751,21 @@ namespace ChanThreadWatch {
 							downloadCompleted = true;
 							break;
 						}
+						catch (HTTP404Exception) {
+							break;
+						}
 						catch (Exception ex) {
 							if (ex is PathTooLongException) {
-								downloadCompleted = true;
-								break;
+								if (!pathTooLong) {
+									pathTooLong = true;
+									goto MakeImagePath;
+								}
+								else {
+									downloadCompleted = true;
+									break;
+								}
 							}
-							if ((ex is IOException) || (ex is UnauthorizedAccessException)) {
+							if ((ex is DirectoryNotFoundException) || (ex is UnauthorizedAccessException)) {
 								lock (_watchInfoList) {
 									SetStatus(watchInfo, "Stopped, unable to write file");
 									return;
@@ -700,7 +774,82 @@ namespace ChanThreadWatch {
 						}
 					}
 					if (downloadCompleted) {
-						completedImages[image.FileName] = 0;
+						completedImages[image.FileName] = Path.GetFileName(savePath);
+					}
+				}
+
+				if (Settings.SaveThumbnails == true) {
+					if ((pendingThumbs.Count != 0) && !Directory.Exists(saveThumbsDir)) {
+						try { Directory.CreateDirectory(saveThumbsDir); }
+						catch {
+							lock (_watchInfoList) {
+								SetStatus(watchInfo, "Stopped, unable to create folder");
+								return;
+							}
+						}
+					}
+
+					int totalThumbCount = completedThumbs.Count + pendingThumbs.Count;
+					while (pendingThumbs.Count != 0) {
+						ThumbnailInfo thumb = pendingThumbs.Dequeue();
+
+						savePath = Path.Combine(saveThumbsDir, thumb.FileNameWithExt);
+
+						bool downloadCompleted = false;
+						for (numTries = 1; numTries <= maxTries; numTries++) {
+							lock (_watchInfoList) {
+								if (watchInfo.Stop) {
+									SetStatus(watchInfo, "Stopped by user");
+									return;
+								}
+								SetStatus(watchInfo, String.Format("Downloading thumbnail {0} of {1}{2}",
+									totalThumbCount - pendingThumbs.Count, totalThumbCount,
+									(numTries == 1) ? String.Empty : (" (retry " + (numTries - 1) + ")")));
+							}
+							try {
+								General.GetToFile(thumb.URL, pageAuth, thumb.Referer, savePath, HashType.None);
+								downloadCompleted = true;
+								break;
+							}
+							catch (HTTP404Exception) {
+								break;
+							}
+							catch (Exception ex) {
+								if (ex is PathTooLongException) {
+									downloadCompleted = true;
+									break;
+								}
+								if ((ex is DirectoryNotFoundException) || (ex is UnauthorizedAccessException)) {
+									lock (_watchInfoList) {
+										SetStatus(watchInfo, "Stopped, unable to write file");
+										return;
+									}
+								}
+							}
+						}
+						if (downloadCompleted) {
+							completedThumbs[thumb.FileNameWithExt] = 0;
+						}
+					}
+
+					foreach (PageInfo pageInfo in pageList) {
+						if (!pageInfo.IsFresh) continue;
+						page = General.BytesToString(File.ReadAllBytes(pageInfo.Path), pageInfo.Encoding);
+						for (int i = 0; i < pageInfo.ReplaceList.Count; i++) {
+							ReplaceInfo replace = pageInfo.ReplaceList[i];
+							if ((replace.Type == ReplaceType.ImageLinkHref) &&
+								completedImages.TryGetValue(replace.Tag, out saveFilename))
+							{
+								replace.Value = "href=\"" + HttpUtility.HtmlAttributeEncode(saveFilename) + "\"";
+							}
+							if (replace.Type == ReplaceType.ImageSrc) {
+								replace.Value = "src=\"thumbs/" + HttpUtility.HtmlAttributeEncode(replace.Tag) + "\"";
+							}
+						}
+						General.AddOtherReplaces(page, pageInfo.ReplaceList);
+						using (StreamWriter sw = new StreamWriter(pageInfo.Path, false, pageInfo.Encoding)) {
+							General.WriteReplacedString(page, pageInfo.ReplaceList, sw);
+						}
 					}
 				}
 

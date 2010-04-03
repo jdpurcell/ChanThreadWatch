@@ -44,6 +44,7 @@ namespace ChanThreadWatch {
 			this.miOpenFolder = new System.Windows.Forms.MenuItem();
 			this.miOpenURL = new System.Windows.Forms.MenuItem();
 			this.miStop = new System.Windows.Forms.MenuItem();
+			this.miStart = new System.Windows.Forms.MenuItem();
 			this.miCopyURL = new System.Windows.Forms.MenuItem();
 			this.miCheckNow = new System.Windows.Forms.MenuItem();
 			this.miCheckEvery = new System.Windows.Forms.MenuItem();
@@ -70,9 +71,9 @@ namespace ChanThreadWatch {
 			this.lvThreads.TabIndex = 0;
 			this.lvThreads.UseCompatibleStateImageBehavior = false;
 			this.lvThreads.View = System.Windows.Forms.View.Details;
-			this.lvThreads.KeyDown += new System.Windows.Forms.KeyEventHandler(this.lvThreads_KeyDown);
 			this.lvThreads.MouseDoubleClick += new System.Windows.Forms.MouseEventHandler(this.lvThreads_MouseDoubleClick);
 			this.lvThreads.MouseClick += new System.Windows.Forms.MouseEventHandler(this.lvThreads_MouseClick);
+			this.lvThreads.KeyDown += new System.Windows.Forms.KeyEventHandler(this.lvThreads_KeyDown);
 			// 
 			// chURL
 			// 
@@ -243,6 +244,7 @@ namespace ChanThreadWatch {
             this.miOpenFolder,
             this.miOpenURL,
             this.miStop,
+            this.miStart,
             this.miCopyURL,
             this.miCheckNow,
             this.miCheckEvery});
@@ -265,21 +267,27 @@ namespace ChanThreadWatch {
 			this.miStop.Text = "Stop";
 			this.miStop.Click += new System.EventHandler(this.miStop_Click);
 			// 
+			// miStart
+			// 
+			this.miStart.Index = 3;
+			this.miStart.Text = "Start";
+			this.miStart.Click += new System.EventHandler(this.miStart_Click);
+			// 
 			// miCopyURL
 			// 
-			this.miCopyURL.Index = 3;
+			this.miCopyURL.Index = 4;
 			this.miCopyURL.Text = "Copy URL";
 			this.miCopyURL.Click += new System.EventHandler(this.miCopyURL_Click);
 			// 
 			// miCheckNow
 			// 
-			this.miCheckNow.Index = 4;
+			this.miCheckNow.Index = 5;
 			this.miCheckNow.Text = "Check Now";
 			this.miCheckNow.Click += new System.EventHandler(this.miCheckNow_Click);
 			// 
 			// miCheckEvery
 			// 
-			this.miCheckEvery.Index = 5;
+			this.miCheckEvery.Index = 6;
 			this.miCheckEvery.Text = "Check Every";
 			// 
 			// grpDoubleClick
@@ -370,6 +378,7 @@ namespace ChanThreadWatch {
 		private System.Windows.Forms.GroupBox grpDoubleClick;
 		private System.Windows.Forms.RadioButton rbOpenURL;
 		private System.Windows.Forms.RadioButton rbOpenFolder;
+		private System.Windows.Forms.MenuItem miStart;
 	}
 }
 

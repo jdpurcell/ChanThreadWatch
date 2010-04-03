@@ -40,7 +40,7 @@ namespace ChanThreadWatch {
 			get { return Get("ImageAuth"); }
 			set { Set("ImageAuth", value); }
 		}
-		
+
 		public static bool? OneTimeDownload {
 			get { return GetBool("OneTimeDownload"); }
 			set { SetBool("OneTimeDownload", value); }
@@ -61,6 +61,11 @@ namespace ChanThreadWatch {
 			set { Set("DownloadFolder", value); }
 		}
 
+		public static bool? SaveThumbnails {
+			get { return GetBool("SaveThumbnails"); }
+			set { SetBool("SaveThumbnails", value); }
+		}
+
 		public static bool? UseOriginalFilenames {
 			get { return GetBool("UseOriginalFilenames"); }
 			set { SetBool("UseOriginalFilenames", value); }
@@ -79,6 +84,11 @@ namespace ChanThreadWatch {
 		public static DateTime? LastUpdateCheck {
 			get { return GetDate("LastUpdateCheck"); }
 			set { SetDate("LastUpdateCheck", value); }
+		}
+
+		public static string LatestUpdateVersion {
+			get { return Get("LatestUpdateVersion"); }
+			set { Set("LatestUpdateVersion", value); }
 		}
 
 		public static bool? UseExeDirForSettings { get; set; }
@@ -136,8 +146,10 @@ namespace ChanThreadWatch {
 		}
 
 		private static string Get(string name) {
-			string value;
-			return _settings.TryGetValue(name, out value) ? value : null;
+			lock (_settings) {
+				string value;
+				return _settings.TryGetValue(name, out value) ? value : null;
+			}
 		}
 
 		private static bool? GetBool(string name) {
@@ -160,11 +172,13 @@ namespace ChanThreadWatch {
 		}
 
 		private static void Set(string name, string value) {
-			if (value == null) {
-				_settings.Remove(name);
-			}
-			else {
-				_settings[name] = value;
+			lock (_settings) {
+				if (value == null) {
+					_settings.Remove(name);
+				}
+				else {
+					_settings[name] = value;
+				}
 			}
 		}
 
@@ -209,7 +223,7 @@ namespace ChanThreadWatch {
 
 		public static void Save() {
 			string path;
-			
+
 			if (UseExeDirForSettings != true) {
 				foreach (string fileName in new[] { SettingsFileName, ThreadsFileName }) {
 					path = Path.Combine(ExeDir, fileName);
@@ -224,8 +238,10 @@ namespace ChanThreadWatch {
 
 			path = Path.Combine(GetSettingsDir(), SettingsFileName);
 			using (StreamWriter sw = new StreamWriter(path, false, Encoding.UTF8)) {
-				foreach (KeyValuePair<string, string> kvp in _settings) {
-					sw.WriteLine(kvp.Key + "=" + kvp.Value);
+				lock (_settings) {
+					foreach (KeyValuePair<string, string> kvp in _settings) {
+						sw.WriteLine(kvp.Key + "=" + kvp.Value);
+					}
 				}
 			}
 		}
