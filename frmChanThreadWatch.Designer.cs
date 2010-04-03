@@ -37,15 +37,28 @@ namespace ChanThreadWatch {
 			this.lblURL = new System.Windows.Forms.Label();
 			this.txtPageURL = new System.Windows.Forms.TextBox();
 			this.btnAdd = new System.Windows.Forms.Button();
-			this.btnStopSelected = new System.Windows.Forms.Button();
 			this.btnRemoveCompleted = new System.Windows.Forms.Button();
 			this.btnAbout = new System.Windows.Forms.Button();
-			this.btnOpenSelectedFolder = new System.Windows.Forms.Button();
+			this.btnSettings = new System.Windows.Forms.Button();
+			this.cmThreads = new System.Windows.Forms.ContextMenu();
+			this.miOpenFolder = new System.Windows.Forms.MenuItem();
+			this.miOpenURL = new System.Windows.Forms.MenuItem();
+			this.miStop = new System.Windows.Forms.MenuItem();
+			this.miCopyURL = new System.Windows.Forms.MenuItem();
+			this.miCheckNow = new System.Windows.Forms.MenuItem();
+			this.miCheckEvery = new System.Windows.Forms.MenuItem();
+			this.grpDoubleClick = new System.Windows.Forms.GroupBox();
+			this.rbOpenURL = new System.Windows.Forms.RadioButton();
+			this.rbOpenFolder = new System.Windows.Forms.RadioButton();
 			this.grpAddThread.SuspendLayout();
+			this.grpDoubleClick.SuspendLayout();
 			this.SuspendLayout();
 			// 
 			// lvThreads
 			// 
+			this.lvThreads.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom)
+						| System.Windows.Forms.AnchorStyles.Left)
+						| System.Windows.Forms.AnchorStyles.Right)));
 			this.lvThreads.Columns.AddRange(new System.Windows.Forms.ColumnHeader[] {
             this.chURL,
             this.chStatus});
@@ -57,6 +70,8 @@ namespace ChanThreadWatch {
 			this.lvThreads.TabIndex = 0;
 			this.lvThreads.UseCompatibleStateImageBehavior = false;
 			this.lvThreads.View = System.Windows.Forms.View.Details;
+			this.lvThreads.MouseDoubleClick += new System.Windows.Forms.MouseEventHandler(this.lvThreads_MouseDoubleClick);
+			this.lvThreads.MouseClick += new System.Windows.Forms.MouseEventHandler(this.lvThreads_MouseClick);
 			// 
 			// chURL
 			// 
@@ -70,6 +85,7 @@ namespace ChanThreadWatch {
 			// 
 			// grpAddThread
 			// 
+			this.grpAddThread.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
 			this.grpAddThread.Controls.Add(this.lblCheckEvery);
 			this.grpAddThread.Controls.Add(this.cboCheckEvery);
 			this.grpAddThread.Controls.Add(this.txtImageAuth);
@@ -90,7 +106,7 @@ namespace ChanThreadWatch {
 			// lblCheckEvery
 			// 
 			this.lblCheckEvery.AutoSize = true;
-			this.lblCheckEvery.Location = new System.Drawing.Point(12, 128);
+			this.lblCheckEvery.Location = new System.Drawing.Point(10, 128);
 			this.lblCheckEvery.Name = "lblCheckEvery";
 			this.lblCheckEvery.Size = new System.Drawing.Size(119, 13);
 			this.lblCheckEvery.TabIndex = 7;
@@ -105,7 +121,8 @@ namespace ChanThreadWatch {
             "2",
             "3",
             "5",
-            "10"});
+            "10",
+            "60"});
 			this.cboCheckEvery.Location = new System.Drawing.Point(140, 124);
 			this.cboCheckEvery.Name = "cboCheckEvery";
 			this.cboCheckEvery.Size = new System.Drawing.Size(52, 21);
@@ -186,19 +203,10 @@ namespace ChanThreadWatch {
 			this.btnAdd.UseVisualStyleBackColor = true;
 			this.btnAdd.Click += new System.EventHandler(this.btnAdd_Click);
 			// 
-			// btnStopSelected
-			// 
-			this.btnStopSelected.Location = new System.Drawing.Point(536, 180);
-			this.btnStopSelected.Name = "btnStopSelected";
-			this.btnStopSelected.Size = new System.Drawing.Size(92, 23);
-			this.btnStopSelected.TabIndex = 2;
-			this.btnStopSelected.Text = "Stop Selected";
-			this.btnStopSelected.UseVisualStyleBackColor = true;
-			this.btnStopSelected.Click += new System.EventHandler(this.btnStopSelected_Click);
-			// 
 			// btnRemoveCompleted
 			// 
-			this.btnRemoveCompleted.Location = new System.Drawing.Point(508, 212);
+			this.btnRemoveCompleted.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
+			this.btnRemoveCompleted.Location = new System.Drawing.Point(508, 180);
 			this.btnRemoveCompleted.Name = "btnRemoveCompleted";
 			this.btnRemoveCompleted.Size = new System.Drawing.Size(120, 23);
 			this.btnRemoveCompleted.TabIndex = 3;
@@ -208,6 +216,7 @@ namespace ChanThreadWatch {
 			// 
 			// btnAbout
 			// 
+			this.btnAbout.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
 			this.btnAbout.Location = new System.Drawing.Point(568, 310);
 			this.btnAbout.Name = "btnAbout";
 			this.btnAbout.Size = new System.Drawing.Size(60, 23);
@@ -216,36 +225,118 @@ namespace ChanThreadWatch {
 			this.btnAbout.UseVisualStyleBackColor = true;
 			this.btnAbout.Click += new System.EventHandler(this.btnAbout_Click);
 			// 
-			// btnOpenSelectedFolder
+			// btnSettings
 			// 
-			this.btnOpenSelectedFolder.Location = new System.Drawing.Point(496, 244);
-			this.btnOpenSelectedFolder.Name = "btnOpenSelectedFolder";
-			this.btnOpenSelectedFolder.Size = new System.Drawing.Size(132, 23);
-			this.btnOpenSelectedFolder.TabIndex = 4;
-			this.btnOpenSelectedFolder.Text = "Open Selected Folder";
-			this.btnOpenSelectedFolder.UseVisualStyleBackColor = true;
-			this.btnOpenSelectedFolder.Click += new System.EventHandler(this.btnOpenSelectedFolder_Click);
+			this.btnSettings.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
+			this.btnSettings.Location = new System.Drawing.Point(492, 310);
+			this.btnSettings.Name = "btnSettings";
+			this.btnSettings.Size = new System.Drawing.Size(67, 23);
+			this.btnSettings.TabIndex = 4;
+			this.btnSettings.Text = "Settings";
+			this.btnSettings.UseVisualStyleBackColor = true;
+			this.btnSettings.Click += new System.EventHandler(this.btnSettings_Click);
+			// 
+			// cmThreads
+			// 
+			this.cmThreads.MenuItems.AddRange(new System.Windows.Forms.MenuItem[] {
+            this.miOpenFolder,
+            this.miOpenURL,
+            this.miStop,
+            this.miCopyURL,
+            this.miCheckNow,
+            this.miCheckEvery});
+			// 
+			// miOpenFolder
+			// 
+			this.miOpenFolder.Index = 0;
+			this.miOpenFolder.Text = "Open Folder";
+			this.miOpenFolder.Click += new System.EventHandler(this.miOpenFolder_Click);
+			// 
+			// miOpenURL
+			// 
+			this.miOpenURL.Index = 1;
+			this.miOpenURL.Text = "Open URL";
+			this.miOpenURL.Click += new System.EventHandler(this.miOpenURL_Click);
+			// 
+			// miStop
+			// 
+			this.miStop.Index = 2;
+			this.miStop.Text = "Stop";
+			this.miStop.Click += new System.EventHandler(this.miStop_Click);
+			// 
+			// miCopyURL
+			// 
+			this.miCopyURL.Index = 3;
+			this.miCopyURL.Text = "Copy URL";
+			this.miCopyURL.Click += new System.EventHandler(this.miCopyURL_Click);
+			// 
+			// miCheckNow
+			// 
+			this.miCheckNow.Index = 4;
+			this.miCheckNow.Text = "Check Now";
+			this.miCheckNow.Click += new System.EventHandler(this.miCheckNow_Click);
+			// 
+			// miCheckEvery
+			// 
+			this.miCheckEvery.Index = 5;
+			this.miCheckEvery.Text = "Check Every";
+			// 
+			// grpDoubleClick
+			// 
+			this.grpDoubleClick.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+			this.grpDoubleClick.Controls.Add(this.rbOpenURL);
+			this.grpDoubleClick.Controls.Add(this.rbOpenFolder);
+			this.grpDoubleClick.Location = new System.Drawing.Point(376, 176);
+			this.grpDoubleClick.Name = "grpDoubleClick";
+			this.grpDoubleClick.Size = new System.Drawing.Size(108, 64);
+			this.grpDoubleClick.TabIndex = 2;
+			this.grpDoubleClick.TabStop = false;
+			this.grpDoubleClick.Text = "On Double Click";
+			// 
+			// rbOpenURL
+			// 
+			this.rbOpenURL.AutoSize = true;
+			this.rbOpenURL.Location = new System.Drawing.Point(12, 38);
+			this.rbOpenURL.Name = "rbOpenURL";
+			this.rbOpenURL.Size = new System.Drawing.Size(73, 17);
+			this.rbOpenURL.TabIndex = 1;
+			this.rbOpenURL.TabStop = true;
+			this.rbOpenURL.Text = "Open URL";
+			this.rbOpenURL.UseVisualStyleBackColor = true;
+			// 
+			// rbOpenFolder
+			// 
+			this.rbOpenFolder.AutoSize = true;
+			this.rbOpenFolder.Location = new System.Drawing.Point(12, 18);
+			this.rbOpenFolder.Name = "rbOpenFolder";
+			this.rbOpenFolder.Size = new System.Drawing.Size(84, 17);
+			this.rbOpenFolder.TabIndex = 0;
+			this.rbOpenFolder.TabStop = true;
+			this.rbOpenFolder.Text = "Open Folder";
+			this.rbOpenFolder.UseVisualStyleBackColor = true;
 			// 
 			// frmChanThreadWatch
 			// 
 			this.Name = "frmChanThreadWatch";
 			this.Text = "Chan Thread Watch";
-			this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle;
-			this.MaximizeBox = false;
+
 			this.ClientSize = new System.Drawing.Size(636, 341);
+			this.MinimumSize = new System.Drawing.Size(644, 368);
 			this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
 			this.Font = new System.Drawing.Font("Tahoma", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-			this.Controls.Add(this.btnOpenSelectedFolder);
+			this.Controls.Add(this.grpDoubleClick);
+			this.Controls.Add(this.btnSettings);
 			this.Controls.Add(this.btnAbout);
 			this.Controls.Add(this.btnRemoveCompleted);
-			this.Controls.Add(this.btnStopSelected);
 			this.Controls.Add(this.grpAddThread);
 			this.Controls.Add(this.lvThreads);
 			this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
-			this.Load += new System.EventHandler(this.frmChanThreadWatch_Load);
+			this.Shown += new System.EventHandler(this.frmChanThreadWatch_Shown);
 			this.FormClosed += new System.Windows.Forms.FormClosedEventHandler(this.frmChanThreadWatch_FormClosed);
 			this.grpAddThread.ResumeLayout(false);
 			this.grpAddThread.PerformLayout();
+			this.grpDoubleClick.ResumeLayout(false);
+			this.grpDoubleClick.PerformLayout();
 			this.ResumeLayout(false);
 
 		}
@@ -260,7 +351,6 @@ namespace ChanThreadWatch {
 		private System.Windows.Forms.Label lblURL;
 		private System.Windows.Forms.TextBox txtPageURL;
 		private System.Windows.Forms.Button btnAdd;
-		private System.Windows.Forms.Button btnStopSelected;
 		private System.Windows.Forms.Button btnRemoveCompleted;
 		private System.Windows.Forms.Button btnAbout;
 		private System.Windows.Forms.TextBox txtPageAuth;
@@ -269,7 +359,17 @@ namespace ChanThreadWatch {
 		private System.Windows.Forms.ComboBox cboCheckEvery;
 		private System.Windows.Forms.TextBox txtImageAuth;
 		private System.Windows.Forms.Label lblCheckEvery;
-		private System.Windows.Forms.Button btnOpenSelectedFolder;
+		private System.Windows.Forms.Button btnSettings;
+		private System.Windows.Forms.ContextMenu cmThreads;
+		private System.Windows.Forms.MenuItem miOpenFolder;
+		private System.Windows.Forms.MenuItem miOpenURL;
+		private System.Windows.Forms.MenuItem miCheckNow;
+		private System.Windows.Forms.MenuItem miStop;
+		private System.Windows.Forms.MenuItem miCopyURL;
+		private System.Windows.Forms.MenuItem miCheckEvery;
+		private System.Windows.Forms.GroupBox grpDoubleClick;
+		private System.Windows.Forms.RadioButton rbOpenURL;
+		private System.Windows.Forms.RadioButton rbOpenFolder;
 	}
 }
 

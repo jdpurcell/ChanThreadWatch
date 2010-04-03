@@ -3,13 +3,14 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Drawing;
-using System.Text;
-using System.Windows.Forms;
+using System.Globalization;
 using System.IO;
 using System.Net;
+using System.Reflection;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
-using System.Globalization;
+using System.Windows.Forms;
 
 namespace ChanThreadWatch {
 	public partial class frmChanThreadWatch : Form {
@@ -19,9 +20,21 @@ namespace ChanThreadWatch {
 		// tries to Invoke, it will never return because Invoke needs to run on the (frozen) UI
 		// thread.  And I don't like the idea of BeginInvoke in this particular situation.
 
-		// About button, UserAgent, and AssemblyInfo.cs should be updated for version bump.
+		// ReleaseDate property and version in AssemblyInfo.cs should be updated for each release.
 
 		// Change log:
+		// 1.2.0 (2009-May-05):
+		//   * Settings are remembered across runs.
+		//   * Thread list is remembered across runs, with a prompt at start before
+		//     reloading.
+		//   * Main window is resizable.
+		//   * Download location is configurable. Default download location is now in My
+		//     Documents for limited user account compatibility.
+		//   * User Agent is configurable.
+		//   * Added context menu for the thread list. Moved Stop and Open Folder buttons
+		//     there and added new features: Open URL, Copy URL, Check Now, Check Every X
+		//     Minutes.
+		//   * Double-clicking a thread can open its folder or URL (configurable).
 		// 1.1.3 (2008-Jul-08):
 		//   * Restores AnonIB support.
 		// 1.1.2 (2008-Jun-29):
@@ -39,6 +52,19 @@ namespace ChanThreadWatch {
 		// 1.0.0 (2007-Dec-05):
 		//   * Initial release.
 
+		private string Version {
+			get {
+				Version ver = Assembly.GetExecutingAssembly().GetName().Version;
+				return ver.Major + "." + ver.Minor + "." + ver.Revision;
+			}
+		}
+
+		private string ReleaseDate {
+			get {
+				return "2009-May-05";
+			}
+		}
+
 		public frmChanThreadWatch() {
 			// Older versons of Mono don't disable this automatically
 			AutoScale = false;
@@ -46,18 +72,82 @@ namespace ChanThreadWatch {
 			InitializeComponent();
 
 			if (Font.Name != "Tahoma") Font = new Font("Arial", 8.25F);
+
+			Settings.Load();
+
+			for (int i = 0; i < cboCheckEvery.Items.Count; i++) {
+				int minutes = Int32.Parse((string)cboCheckEvery.Items[i]);
+				MenuItem menuItem = new MenuItem();
+				menuItem.Name = "miCheckEvery_" + minutes;
+				menuItem.Index = i;
+				menuItem.Tag = minutes;
+				menuItem.Text = minutes + " Minute" + ((minutes != 1) ? "s" : String.Empty);
+				menuItem.Click += new EventHandler(miCheckEvery_Click);
+				miCheckEvery.MenuItems.Add(menuItem);
+			}
+
+			if ((Settings.DownloadFolder == null) || !Directory.Exists(Settings.DownloadFolder)) {
+				Settings.DownloadFolder = Path.Combine(Environment.GetFolderPath(
+					Environment.SpecialFolder.MyDocuments), "Watched Threads");
+			}
+			if (Settings.OnThreadDoubleClick == null) {
+				Settings.OnThreadDoubleClick = ThreadDoubleClickAction.OpenFolder;
+			}
+
+			chkPageAuth.Checked = Settings.UsePageAuth ?? false;
+			txtPageAuth.Text = Settings.PageAuth ?? String.Empty;
+			chkImageAuth.Checked = Settings.UseImageAuth ?? false;
+			txtImageAuth.Text = Settings.ImageAuth ?? String.Empty;
+			chkOneTime.Checked = Settings.OneTimeDownload ?? false;
+			cboCheckEvery.SelectedItem = (Settings.CheckEvery ?? 3).ToString();
+			OnThreadDoubleClick = Settings.OnThreadDoubleClick.Value;
 		}
 
-		private void frmChanThreadWatch_Load(object sender, EventArgs e) {
-			cboCheckEvery.SelectedItem = "3";
+		private ThreadDoubleClickAction OnThreadDoubleClick {
+			get {
+				if (rbOpenURL.Checked)
+					return ThreadDoubleClickAction.OpenURL;
+				else
+					return ThreadDoubleClickAction.OpenFolder;
+			}
+			set {
+				if (value == ThreadDoubleClickAction.OpenURL)
+					rbOpenURL.Checked = true;
+				else
+					rbOpenFolder.Checked = true;
+			}
+		}
+
+		private void frmChanThreadWatch_Shown(object sender, EventArgs e) {
+			try {
+				LoadThreadList();
+			}
+			catch { }
 		}
 
 		private void frmChanThreadWatch_FormClosed(object sender, FormClosedEventArgs e) {
-			while (!Monitor.TryEnter(_watchInfoList, 10)) Application.DoEvents();
-			foreach (WatchInfo w in _watchInfoList) {
-				w.Stop = true;
+			Settings.UsePageAuth = chkPageAuth.Checked;
+			Settings.PageAuth = txtPageAuth.Text;
+			Settings.UseImageAuth = chkImageAuth.Checked;
+			Settings.ImageAuth = txtImageAuth.Text;
+			Settings.OneTimeDownload = chkOneTime.Checked;
+			Settings.CheckEvery = Int32.Parse((string)cboCheckEvery.SelectedItem);
+			Settings.OnThreadDoubleClick = OnThreadDoubleClick;
+			try {
+				Settings.Save();
 			}
-			Monitor.Exit(_watchInfoList);
+			catch { }
+
+			using (SoftLock.Obtain(_watchInfoList)) {
+				try {
+					SaveThreadList();
+				}
+				catch { }
+				foreach (WatchInfo w in _watchInfoList) {
+					w.Stop = true;
+				}
+			}
+
 			foreach (WatchInfo w in _watchInfoList) {
 				while ((w.WatchThread != null) && w.WatchThread.IsAlive) {
 					Thread.Sleep(10);
@@ -67,15 +157,147 @@ namespace ChanThreadWatch {
 		}
 
 		private void btnAdd_Click(object sender, EventArgs e) {
-			WatchInfo watchInfo = new WatchInfo();
 			string pageURL = txtPageURL.Text.Trim();
-			int listIndex = -1;
+			string pageAuth = (chkPageAuth.Checked && (txtPageAuth.Text.IndexOf(':') != -1)) ? txtPageAuth.Text : String.Empty;
+			string imageAuth = (chkImageAuth.Checked && (txtImageAuth.Text.IndexOf(':') != -1)) ? txtImageAuth.Text : String.Empty;
+			int waitSeconds = Int32.Parse((string)cboCheckEvery.SelectedItem) * 60;
 
 			if (pageURL.Length == 0) return;
 			if (!pageURL.StartsWith("http://")) pageURL = "http://" + pageURL;
 
-			while (!Monitor.TryEnter(_watchInfoList, 10)) Application.DoEvents();
-			try {
+			if (!AddThread(pageURL, pageAuth, imageAuth, waitSeconds, chkOneTime.Checked, null)) {
+				MessageBox.Show("The same thread is already being watched or downloaded.",
+					"Duplicate Thread", MessageBoxButtons.OK, MessageBoxIcon.Error);
+				return;
+			}
+
+			txtPageURL.Clear();
+			txtPageURL.Focus();
+		}
+		
+
+		private void btnRemoveCompleted_Click(object sender, EventArgs e) {
+			using (SoftLock.Obtain(_watchInfoList)) {
+				int i = 0;
+				while (i < _watchInfoList.Count) {
+					WatchInfo watchInfo = _watchInfoList[i];
+					if (watchInfo.Stop || !watchInfo.WatchThread.IsAlive) {
+						watchInfo.ListIndex = -1;
+						_watchInfoList.RemoveAt(i);
+						lvThreads.Items.RemoveAt(i);
+					}
+					else {
+						watchInfo.ListIndex = i;
+						i++;
+					}
+				}
+			}
+		}
+
+		private void miStop_Click(object sender, EventArgs e) {
+			using (SoftLock.Obtain(_watchInfoList)) {
+				foreach (ListViewItem item in lvThreads.SelectedItems) {
+					_watchInfoList[item.Index].Stop = true;
+				}
+			}
+		}
+
+		private void miOpenFolder_Click(object sender, EventArgs e) {
+			foreach (string dir in GetFromSelected(wi => wi.SaveDir)) {
+				try {
+					System.Diagnostics.Process.Start(dir);
+				}
+				catch {}
+			}
+		}
+
+		private void miOpenURL_Click(object sender, EventArgs e) {
+			foreach (string url in GetFromSelected(wi => wi.PageURL)) {
+				try {
+					System.Diagnostics.Process.Start(url);
+				}
+				catch {}
+			}
+		}
+
+		private void miCopyURL_Click(object sender, EventArgs e) {
+			StringBuilder sb = new StringBuilder();
+			foreach (string url in GetFromSelected(wi => wi.PageURL)) {
+				if (sb.Length != 0) sb.Append(Environment.NewLine);
+				sb.Append(url);
+			}
+			Clipboard.Clear();
+			Clipboard.SetText(sb.ToString());
+		}
+
+		
+		private void miCheckNow_Click(object sender, EventArgs e) {
+			using (SoftLock.Obtain(_watchInfoList)) {
+				foreach (ListViewItem item in lvThreads.SelectedItems) {
+					_watchInfoList[item.Index].NextCheck = TickCount.Now;
+				}
+			}
+		}	
+	
+		private void miCheckEvery_Click(object sender, EventArgs e) {
+			MenuItem menuItem = sender as MenuItem;
+			if (menuItem != null) {
+				int waitSeconds = Convert.ToInt32(menuItem.Tag) * 60;
+				using (SoftLock.Obtain(_watchInfoList)) {
+					foreach (ListViewItem item in lvThreads.SelectedItems) {
+						WatchInfo wi = _watchInfoList[item.Index];
+						wi.NextCheck += (waitSeconds - wi.WaitSeconds) * 1000;
+						wi.WaitSeconds = waitSeconds;
+					}
+				}
+			}
+		}
+
+		private void btnSettings_Click(object sender, EventArgs e) {
+			using (frmSettings settingsForm = new frmSettings()) {
+				settingsForm.ShowDialog();
+			}
+		}
+
+		private void btnAbout_Click(object sender, EventArgs e) {
+			MessageBox.Show(String.Format("Chan Thread Watch{0}Version {1} ({2}){0}jart1126@yahoo.com", Environment.NewLine,
+				Version, ReleaseDate), "About", MessageBoxButtons.OK, MessageBoxIcon.Information);
+		}
+
+		private void lvThreads_MouseClick(object sender, MouseEventArgs e) {
+			if (e.Button == MouseButtons.Right) {
+				if (lvThreads.SelectedItems.Count != 0) {
+					cmThreads.Show(lvThreads, e.Location);
+				}
+			}
+		}
+
+		private void lvThreads_MouseDoubleClick(object sender, MouseEventArgs e) {
+			if (OnThreadDoubleClick == ThreadDoubleClickAction.OpenFolder) {
+				miOpenFolder_Click(sender, e);
+			}
+			else {
+				miOpenURL_Click(sender, e);
+			}
+		}
+
+		private void chkOneTime_CheckedChanged(object sender, EventArgs e) {
+			cboCheckEvery.Enabled = !chkOneTime.Checked;
+		}
+
+		private void chkPageAuth_CheckedChanged(object sender, EventArgs e) {
+			txtPageAuth.Enabled = chkPageAuth.Checked;
+		}
+
+		private void chkImageAuth_CheckedChanged(object sender, EventArgs e) {
+			txtImageAuth.Enabled = chkImageAuth.Checked;
+		}
+
+		private bool AddThread(string pageURL, string pageAuth, string imageAuth, int waitSeconds, bool oneTime, string saveDir) {
+			WatchInfo watchInfo = new WatchInfo();
+			int listIndex = -1;
+
+			using (SoftLock.Obtain(_watchInfoList)) {
 				foreach (WatchInfo w in _watchInfoList) {
 					if (String.Compare(w.PageURL, pageURL, true) == 0) {
 						listIndex = ((w.WatchThread != null) && w.WatchThread.IsAlive) ? -2 : w.ListIndex;
@@ -94,105 +316,86 @@ namespace ChanThreadWatch {
 						lvThreads.Items[listIndex].Text = pageURL;
 					}
 					watchInfo.PageURL = pageURL;
-					watchInfo.PageAuth = (chkPageAuth.Checked && (txtPageAuth.Text.IndexOf(':') != -1)) ?
-						txtPageAuth.Text : String.Empty;
-					watchInfo.ImageAuth = (chkImageAuth.Checked && (txtImageAuth.Text.IndexOf(':') != -1)) ?
-						txtImageAuth.Text : String.Empty;
-					watchInfo.WaitSeconds = Int32.Parse((string)cboCheckEvery.SelectedItem) * 60;
-					watchInfo.OneTime = chkOneTime.Checked;
+					watchInfo.PageAuth = pageAuth;
+					watchInfo.ImageAuth = imageAuth;
+					watchInfo.WaitSeconds = waitSeconds;
+					watchInfo.OneTime = oneTime;
+					watchInfo.SaveDir = saveDir;
+					watchInfo.NextCheck = TickCount.Now;
 					watchInfo.ListIndex = listIndex;
 					watchInfo.WatchThread = new Thread(WatchThread);
 				}
 			}
-			finally {
-				Monitor.Exit(_watchInfoList);
-			}
 
-			if (listIndex == -2) {
-				MessageBox.Show("The same thread is already being watched or downloaded.",
-					"Duplicate Thread", MessageBoxButtons.OK, MessageBoxIcon.Error);
-				return;
-			}
+			if (listIndex == -2) return false;
 
 			watchInfo.WatchThread.Start(watchInfo);
-			txtPageURL.Clear();
-			txtPageURL.Focus();
-		}
-		
-		private void btnStopSelected_Click(object sender, EventArgs e) {
-			while (!Monitor.TryEnter(_watchInfoList, 10)) Application.DoEvents();
-			try {
-				foreach (ListViewItem item in lvThreads.SelectedItems) {
-					_watchInfoList[item.Index].Stop = true;
-				}
-			}
-			finally {
-				Monitor.Exit(_watchInfoList);
-			}
-		}
-
-		private void btnRemoveCompleted_Click(object sender, EventArgs e) {
-			while (!Monitor.TryEnter(_watchInfoList, 10)) Application.DoEvents();
-			try {
-				int i = 0;
-				while (i < _watchInfoList.Count) {
-					WatchInfo watchInfo = _watchInfoList[i];
-					if (watchInfo.Stop || !watchInfo.WatchThread.IsAlive) {
-						watchInfo.ListIndex = -1;
-						_watchInfoList.RemoveAt(i);
-						lvThreads.Items.RemoveAt(i);
-					}
-					else {
-						watchInfo.ListIndex = i;
-						i++;
-					}
-				}
-			}
-			finally {
-				Monitor.Exit(_watchInfoList);
-			}
-		}
-
-		private void btnOpenSelectedFolder_Click(object sender, EventArgs e) {
-			while (!Monitor.TryEnter(_watchInfoList, 10)) Application.DoEvents();
-			try {
-				foreach (ListViewItem item in lvThreads.SelectedItems) {
-					string saveDir = _watchInfoList[item.Index].SaveDir;
-					if (!String.IsNullOrEmpty(saveDir)) {
-						try {
-							System.Diagnostics.Process.Start(saveDir);
-						}
-						catch {}
-					}
-				}
-			}
-			finally {
-				Monitor.Exit(_watchInfoList);
-			}
-		}
-
-		private void btnAbout_Click(object sender, EventArgs e) {
-			MessageBox.Show(String.Format("Chan Thread Watch{0}Version 1.1.3 (2008-Jul-08){0}jart1126@yahoo.com",
-				Environment.NewLine), "About", MessageBoxButtons.OK, MessageBoxIcon.Information);
-		}
-
-		private void chkOneTime_CheckedChanged(object sender, EventArgs e) {
-			cboCheckEvery.Enabled = !chkOneTime.Checked;
-		}
-
-		private void chkPageAuth_CheckedChanged(object sender, EventArgs e) {
-			txtPageAuth.Enabled = chkPageAuth.Checked;
-		}
-
-		private void chkImageAuth_CheckedChanged(object sender, EventArgs e) {
-			txtImageAuth.Enabled = chkImageAuth.Checked;
+			return true;
 		}
 
 		private void SetStatus(WatchInfo watchInfo, string status) {
 			if (watchInfo.ListIndex == -1) return;
 			Invoke((MethodInvoker)delegate() {
-				lvThreads.Items[watchInfo.ListIndex].SubItems[1].Text = status;
+				var item = lvThreads.Items[watchInfo.ListIndex].SubItems[1];
+				if (item.Text != status) {
+					item.Text = status;
+				}
 			});
+		}
+
+		private void SaveThreadList() {
+			using (SoftLock.Obtain(_watchInfoList)) {
+				using (StreamWriter sw = new StreamWriter(Path.Combine(Settings.GetSettingsDir(), "threads.txt"))) {
+					sw.WriteLine("1"); // File version
+					foreach (WatchInfo w in _watchInfoList) {
+						if ((w.WatchThread != null) && w.WatchThread.IsAlive) {
+							sw.WriteLine(w.PageURL);
+							sw.WriteLine(w.PageAuth);
+							sw.WriteLine(w.ImageAuth);
+							sw.WriteLine(w.WaitSeconds.ToString());
+							sw.WriteLine(w.OneTime ? "1" : "0");
+							sw.WriteLine(w.SaveDir);
+						}
+					}
+				}
+			}
+		}
+
+		private void LoadThreadList() {
+			const int linesPerThread = 6;
+			string path = Path.Combine(Settings.GetSettingsDir(), "threads.txt");
+			if (!File.Exists(path)) return;
+			string[] lines = File.ReadAllLines(path);
+			if ((lines.Length < 1) || (Int32.Parse(lines[0]) != 1)) return;
+			if (lines.Length < (1 + linesPerThread)) return;
+			if (MessageBox.Show("Would you like to reload the list of active threads from the last run?",
+				"Reload Threads", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.No)
+			{
+				return;
+			}
+			int i = 1;
+			while (i <= lines.Length - linesPerThread) {
+				string pageURL = lines[i++];
+				string pageAuth = lines[i++];
+				string imageAuth = lines[i++];
+				int waitSeconds = Math.Max(Int32.Parse(lines[i++]), 60);
+				bool oneTime = lines[i++] == "1";
+				string saveDir = lines[i++];
+				AddThread(pageURL, pageAuth, imageAuth, waitSeconds, oneTime, saveDir);
+			}
+		}
+
+		private List<string> GetFromSelected(WatchInfoSelector selector) {
+			List<string> values = new List<string>();
+			using (SoftLock.Obtain(_watchInfoList)) {
+				foreach (ListViewItem item in lvThreads.SelectedItems) {
+					string value = selector(_watchInfoList[item.Index]);
+					if (!String.IsNullOrEmpty(value)) {
+						values.Add(value);
+					}
+				}
+			}
+			return values;
 		}
 
 		private byte[] StreamToBytes(Stream stream, FileStream fs) {
@@ -251,9 +454,9 @@ namespace ChanThreadWatch {
 
 		private Stream GetToStream(string url, string auth, ref DateTime? cacheTime) {
 			HttpWebRequest req = (HttpWebRequest)WebRequest.Create(url);
-			req.UserAgent = "Chan Thread Watch 1.1.3";
+			req.UserAgent = (Settings.UseCustomUserAgent == true) ? Settings.CustomUserAgent : ("Chan Thread Watch " + Version);
 			if (cacheTime != null) {
-				req.IfModifiedSince = (DateTime)cacheTime;
+				req.IfModifiedSince = cacheTime.Value;
 			}
 			if (!String.IsNullOrEmpty(auth)) {
 				req.Headers.Add("Authorization", "Basic " +
@@ -265,7 +468,7 @@ namespace ChanThreadWatch {
 				cacheTime = null;
 				if (resp.Headers["Last-Modified"] != null) {
 					try {
-						// Parse the time string ourself instead of using .IfModified because
+						// Parse the time string ourself instead of using .LastModified because
 						// older versions of Mono don't convert it from GMT to local.
 						cacheTime = DateTime.ParseExact(resp.Headers["Last-Modified"], new string[] {
 							"r", "dddd, dd-MMM-yy HH:mm:ss G\\MT", "ddd MMM d HH:mm:ss yyyy" },
@@ -375,22 +578,26 @@ namespace ChanThreadWatch {
 			string pageURL = watchInfo.PageURL;
 			string pageAuth = watchInfo.PageAuth;
 			string imgAuth = watchInfo.ImageAuth;
-			double waitSeconds = (double)watchInfo.WaitSeconds;
 			string page = null;
 			string saveDir, saveFilename, savePath, site, board, thread;
 			int numTries;
 			const int maxTries = 3;
 			DateTime pageGetTime = DateTime.Now;
 			DateTime? pageCacheTime = null;
-			double waitRemain;
+			long waitRemain;
 
 			ParseURL(pageURL, out siteHelper, out site, out board, out thread);
-			saveDir = Path.Combine(Application.StartupPath, site + "_" + board + "_" + thread);
-			if (!Directory.Exists(saveDir)) {
-				Directory.CreateDirectory(saveDir);
-			}
 			lock (_watchInfoList) {
-				watchInfo.SaveDir = saveDir;
+				saveDir = watchInfo.SaveDir;
+			}
+			if (String.IsNullOrEmpty(saveDir)) {
+				saveDir = Path.Combine(Settings.DownloadFolder, site + "_" + board + "_" + thread);
+				if (!Directory.Exists(saveDir)) {
+					Directory.CreateDirectory(saveDir);
+				}
+				lock (_watchInfoList) {
+					watchInfo.SaveDir = saveDir;
+				}
 			}
 			
 			while (true) {
@@ -423,7 +630,9 @@ namespace ChanThreadWatch {
 						page = null;
 					}
 				}
-				pageGetTime = DateTime.Now;
+				lock (_watchInfoList) {
+					watchInfo.NextCheck = TickCount.Now + (watchInfo.WaitSeconds * 1000);
+				}
 				if (page != null) {
 					List<string> links = GetLinks(page, pageURL);
 					OrderedDictionary imgs = new OrderedDictionary(StringComparer.CurrentCultureIgnoreCase);
@@ -465,19 +674,19 @@ namespace ChanThreadWatch {
 					page = null;
 				}
 				while (true) {
-					waitRemain = waitSeconds - ((TimeSpan)(DateTime.Now - pageGetTime)).TotalSeconds;
-					if (waitRemain <= 0.0) {
-						break;
-					}
 					lock (_watchInfoList) {
+						waitRemain = watchInfo.NextCheck - TickCount.Now;
+						if (waitRemain <= 0) {
+							break;
+						}
 						if (watchInfo.Stop || watchInfo.OneTime) {
 							SetStatus(watchInfo, watchInfo.Stop ? "Stopped by user" :
 								"Stopped, download finished");
 							return;
 						}
-						SetStatus(watchInfo, String.Format("Waiting {0:0} seconds", waitRemain));
+						SetStatus(watchInfo, String.Format("Waiting {0:0} seconds", Math.Ceiling(waitRemain / 1000.0)));
 					}
-					Thread.Sleep(500);
+					Thread.Sleep(200);
 				}
 			}
 		}
@@ -503,6 +712,7 @@ namespace ChanThreadWatch {
 		public int WaitSeconds;
 		public bool OneTime;
 		public string SaveDir;
+		public long NextCheck;
 	}
 
 	public class SiteHelper {
@@ -561,5 +771,55 @@ namespace ChanThreadWatch {
 	public class HTTP304Exception : Exception {
 		public HTTP304Exception() {
 		}
+	}
+
+	public class SoftLock : IDisposable {
+		private object _obj;
+
+		public SoftLock(object obj) {
+			_obj = obj;
+			while (!Monitor.TryEnter(_obj, 10)) Application.DoEvents();
+		}
+
+		public static SoftLock Obtain(object obj) {
+			return new SoftLock(obj);
+		}
+
+		public void Dispose() {
+			Dispose(true);
+		}
+
+		private void Dispose(bool disposing) {
+			if (_obj != null) {
+				Monitor.Exit(_obj);
+				_obj = null;
+			}
+		}
+	}
+
+	public static class TickCount {
+		static object _synchObj = new object();
+		static int _lastTickCount = Environment.TickCount;
+		static long _correction;
+
+		public static long Now {
+			get {
+				lock (_synchObj) {
+					int tickCount = Environment.TickCount;
+					if ((tickCount < 0) && (_lastTickCount >= 0)) {
+						_correction += 0x100000000L;
+					}
+					_lastTickCount = tickCount;
+					return tickCount + _correction;
+				}
+			}
+		}
+	}
+
+	public delegate string WatchInfoSelector(WatchInfo watchInfo);
+
+	public enum ThreadDoubleClickAction {
+		OpenFolder = 1,
+		OpenURL = 2
 	}
 }
