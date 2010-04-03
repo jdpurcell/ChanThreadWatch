@@ -290,14 +290,6 @@ namespace ChanThreadWatch {
 			if (bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF) {
 				return 3;
 			}
-			if (bytes.Length >= 2 && bytes[0] == 0xFE && bytes[1] == 0xFF) {
-				isBigEndian = true;
-				return 2;
-			}
-			if (bytes.Length >= 2 && bytes[0] == 0xFF && bytes[1] == 0xFE) {
-				isBigEndian = false;
-				return 2;
-			}
 			if (bytes.Length >= 4 && bytes[0] == 0x00 && bytes[1] == 0x00 && bytes[2] == 0xFE && bytes[3] == 0xFF) {
 				isBigEndian = true;
 				return 4;
@@ -305,6 +297,14 @@ namespace ChanThreadWatch {
 			if (bytes.Length >= 4 && bytes[0] == 0xFF && bytes[1] == 0xFE && bytes[2] == 0x00 && bytes[3] == 0x00) {
 				isBigEndian = false;
 				return 4;
+			}
+			if (bytes.Length >= 2 && bytes[0] == 0xFE && bytes[1] == 0xFF) {
+				isBigEndian = true;
+				return 2;
+			}
+			if (bytes.Length >= 2 && bytes[0] == 0xFF && bytes[1] == 0xFE) {
+				isBigEndian = false;
+				return 2;
 			}
 			return 0;
 		}
@@ -506,15 +506,12 @@ namespace ChanThreadWatch {
 			return (pos == -1) ? String.Empty : url.Substring(pos + 1);
 		}
 
-		public static string CleanFilename(string filename) {
-			char[] src = filename.ToCharArray();
+		public static string CleanFilename(string src) {
 			char[] dst = new char[src.Length];
 			char[] inv = Path.GetInvalidFileNameChars();
-			int iSrc = 0;
 			int iDst = 0;
-
-			while (iSrc < src.Length) {
-				char c = src[iSrc++];
+			for (int iSrc = 0; iSrc < src.Length; iSrc++) {
+				char c = src[iSrc];
 				for (int j = 0; j < inv.Length; j++) {
 					if (c == inv[j]) {
 						c = (char)0;
@@ -525,7 +522,6 @@ namespace ChanThreadWatch {
 					dst[iDst++] = c;
 				}
 			}
-
 			return new string(dst, 0, iDst);
 		}
 	}

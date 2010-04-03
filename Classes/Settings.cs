@@ -160,12 +160,14 @@ namespace ChanThreadWatch {
 
 		private static int? GetInt(string name) {
 			string value = Get(name);
+			if (value == null) return null;
 			int x;
 			return Int32.TryParse(value, out x) ? x : (int?)null;
 		}
 
 		private static DateTime? GetDate(string name) {
 			string value = Get(name);
+			if (value == null) return null;
 			DateTime x;
 			return DateTime.TryParseExact(value, "yyyyMMdd", CultureInfo.InvariantCulture,
 				DateTimeStyles.None, out x) ? x : (DateTime?)null;

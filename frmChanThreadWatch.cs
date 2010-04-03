@@ -21,6 +21,8 @@ namespace ChanThreadWatch {
 		// ReleaseDate property and version in AssemblyInfo.cs should be updated for each release.
 
 		// Change log:
+		// 1.4.1 (2010-Jan-01):
+		//   * Workaround for crash in Mono when program update checking is enabled.
 		// 1.4.0 (2010-Jan-01):
 		//   * Option to download thumbnails and post-process HTML to create a mostly-
 		//     working thread backup (no external CSS, no embedded images other than
