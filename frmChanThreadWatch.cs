@@ -1,7 +1,7 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
+using System.Collections.Specialized;
 using System.Drawing;
 using System.Text;
 using System.Windows.Forms;
@@ -22,6 +22,11 @@ namespace ChanThreadWatch {
 		// About button, UserAgent, and AssemblyInfo.cs should be updated for version bump.
 
 		// Change log:
+		// 1.1.2 (2008-Jun-29):
+		//   * Ignores duplicate filenames when creating image URL list; fixes incorrect
+		//     image count on 4chan.
+		//   * Doesn't convert page URL to lowercase; fixes 404 problem when page URL
+		//     contains uppercase characters.
 		// 1.1.1 (2008-Jan-16):
 		//   * Workarounds for Mono's form scaling problems and HttpWebResponse 
 		//     LastModified bug.
@@ -33,7 +38,7 @@ namespace ChanThreadWatch {
 		//   * Initial release.
 
 		public frmChanThreadWatch() {
-			// Mono doesn't disable this automatically
+			// Older versons of Mono don't disable this automatically
 			AutoScale = false;
 
 			InitializeComponent();
@@ -61,7 +66,7 @@ namespace ChanThreadWatch {
 
 		private void btnAdd_Click(object sender, EventArgs e) {
 			WatchInfo watchInfo = new WatchInfo();
-			string pageURL = txtPageURL.Text.Trim().ToLower();
+			string pageURL = txtPageURL.Text.Trim();
 			int listIndex = -1;
 
 			if (pageURL.Length == 0) return;
@@ -70,7 +75,7 @@ namespace ChanThreadWatch {
 			while (!Monitor.TryEnter(_watchInfoList, 10)) Application.DoEvents();
 			try {
 				foreach (WatchInfo w in _watchInfoList) {
-					if (w.PageURL == pageURL) {
+					if (String.Compare(w.PageURL, pageURL, true) == 0) {
 						listIndex = ((w.WatchThread != null) && w.WatchThread.IsAlive) ? -2 : w.ListIndex;
 						break;
 					}
@@ -84,6 +89,7 @@ namespace ChanThreadWatch {
 					else {
 						_watchInfoList[listIndex].ListIndex = -1;
 						_watchInfoList[listIndex] = watchInfo;
+						lvThreads.Items[listIndex].Text = pageURL;
 					}
 					watchInfo.PageURL = pageURL;
 					watchInfo.PageAuth = (chkPageAuth.Checked && (txtPageAuth.Text.IndexOf(':') != -1)) ?
@@ -164,7 +170,7 @@ namespace ChanThreadWatch {
 		}
 
 		private void btnAbout_Click(object sender, EventArgs e) {
-			MessageBox.Show(String.Format("Chan Thread Watch{0}Version 1.1.1 (2008-Jan-16){0}jart1126@yahoo.com",
+			MessageBox.Show(String.Format("Chan Thread Watch{0}Version 1.1.2 (2008-Jun-29){0}jart1126@yahoo.com",
 				Environment.NewLine), "About", MessageBoxButtons.OK, MessageBoxIcon.Information);
 		}
 
@@ -243,7 +249,7 @@ namespace ChanThreadWatch {
 
 		private Stream GetToStream(string url, string auth, ref DateTime? cacheTime) {
 			HttpWebRequest req = (HttpWebRequest)WebRequest.Create(url);
-			req.UserAgent = "Chan Thread Watch 1.1.1";
+			req.UserAgent = "Chan Thread Watch 1.1.2";
 			if (cacheTime != null) {
 				req.IfModifiedSince = (DateTime)cacheTime;
 			}
@@ -435,14 +441,18 @@ namespace ChanThreadWatch {
 				pageGetTime = DateTime.Now;
 				if (page != null) {
 					List<string> links = GetLinks(page, pageURL);
-					List<string> imgs = new List<string>();
+					OrderedDictionary imgs = new OrderedDictionary(StringComparer.CurrentCultureIgnoreCase);
+					int i = 0;
 					foreach (string link in links) {
-						if ((link.IndexOf(linkFilter) != -1) && !imgs.Contains(link)) {
-							imgs.Add(link);
+						if (link.IndexOf(linkFilter) != -1) {
+							string imgFilename = URLFilename(link);
+							if (!imgs.Contains(imgFilename)) {
+								imgs.Add(imgFilename, link);
+							}
 						}
 					}
-					for (int i = 0; i < imgs.Count; i++) {
-						saveFilename = URLFilename(imgs[i]);
+					foreach (DictionaryEntry imgEntry in imgs) {
+						saveFilename = (string)imgEntry.Key;
 						savePath = (saveFilename.Length != 0) ? Path.Combine(saveDir, saveFilename) : null;
 						if ((savePath != null) && !File.Exists(savePath)) {
 							for (numTries = 1; numTries <= maxTries; numTries++) {
@@ -456,13 +466,14 @@ namespace ChanThreadWatch {
 										" (retry " + (numTries - 1).ToString() + ")"));
 								}
 								try {
-									GetToFile(imgs[i], imgAuth, savePath);
+									GetToFile((string)imgEntry.Value, imgAuth, savePath);
 									break;
 								}
 								catch {
 								}
 							}
 						}
+						i++;
 					}
 					page = null;
 				}
