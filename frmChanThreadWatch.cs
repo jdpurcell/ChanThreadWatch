@@ -505,12 +505,9 @@ namespace ChanThreadWatch {
 			string latestStr = html.Substring(start, end - start).Trim();
 			int latest = ParseVersionNumber(latestStr);
 			if (latest == -1) return;
-			int current = -1;
+			int current = ParseVersionNumber(General.Version);
 			if (!String.IsNullOrEmpty(Settings.LatestUpdateVersion)) {
-				current = ParseVersionNumber(Settings.LatestUpdateVersion);
-			}
-			if (current == -1) {
-				current = ParseVersionNumber(General.Version);
+				current = Math.Max(current, ParseVersionNumber(Settings.LatestUpdateVersion));
 			}
 			if (latest > current) {
 				lock (_promptSync) {
