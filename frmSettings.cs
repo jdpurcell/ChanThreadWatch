@@ -43,6 +43,8 @@ namespace ChanThreadWatch {
 					}
 				}
 
+				string oldAbsoluteDownloadFolder = Settings.AbsoluteDownloadDir;
+
 				Settings.DownloadFolder = downloadFolder;
 				Settings.DownloadFolderIsRelative = chkRelativePath.Checked;
 				Settings.UseCustomUserAgent = chkCustomUserAgent.Checked;
@@ -52,6 +54,12 @@ namespace ChanThreadWatch {
 				Settings.VerifyImageHashes = chkVerifyImageHashes.Checked;
 				Settings.CheckForUpdates = chkCheckForUpdates.Checked;
 				Settings.UseExeDirForSettings = rbSettingsInExeFolder.Checked;
+
+				if (Settings.AbsoluteDownloadDir != oldAbsoluteDownloadFolder) {
+					MessageBox.Show("The new download folder will not affect threads currently being watched until the program is restared.  " +
+						"If you reload the thread list at next run, make sure you have moved the threads' download folders into the new download folder, otherwise they will be redownloaded.",
+						"Download Folder Changed", MessageBoxButtons.OK, MessageBoxIcon.Information);
+				}
 
 				DialogResult = DialogResult.OK;
 			}
@@ -78,18 +86,9 @@ namespace ChanThreadWatch {
 		}
 
 		private void SetDownloadFolderTextBox(string path) {
-			if (path.Length == 0) {
-			}
-			else if (Path.IsPathRooted(path) && chkRelativePath.Checked) {
-				Uri appDirUri = new Uri(Path.Combine(Settings.ExeDir, "dummy.bin"));
-				Uri downloadDirUri = new Uri(Path.Combine(path, "dummy.bin"));
-				path = Uri.UnescapeDataString(appDirUri.MakeRelativeUri(downloadDirUri).ToString());
-				path = (path.Length == 0) ? "." : Path.GetDirectoryName(path.Replace('/', Path.DirectorySeparatorChar));
-			}
-			else if (!Path.IsPathRooted(path) && !chkRelativePath.Checked) {
-				path = Path.GetFullPath(path);
-			}
-			txtDownloadFolder.Text = path;
+			txtDownloadFolder.Text = chkRelativePath.Checked ?
+				General.GetRelativeDirectoryPath(path, Settings.ExeDir) :
+				General.GetAbsoluteDirectoryPath(path, Settings.ExeDir);
 		}
 	}
 }

@@ -17,6 +17,7 @@ namespace ChanThreadWatch {
 		public int WaitSeconds;
 		public bool OneTime;
 		public string SaveDir;
+		public string SaveBaseDir;
 		public long NextCheck;
 	}
 

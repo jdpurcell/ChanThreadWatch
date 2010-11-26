@@ -20,6 +20,8 @@ namespace ChanThreadWatch {
 		// ReleaseDate property and version in AssemblyInfo.cs should be updated for each release.
 
 		// Change log:
+		// 1.4.3 (2010-Nov-26):
+		//   * Download folder in thread list is stored as relative path.
 		// 1.4.2 (2010-Apr-02):
 		//   * Fixed crash with non-4chan threads containing mailto links.
 		//   * Enabled auto-scaling to fix text truncation with larger font sizes.
@@ -101,7 +103,7 @@ namespace ChanThreadWatch {
 				miCheckEvery.MenuItems.Add(menuItem);
 			}
 
-			if ((GetDownloadFolder() == null) || !Directory.Exists(GetDownloadFolder())) {
+			if ((Settings.DownloadFolder == null) || !Directory.Exists(Settings.AbsoluteDownloadDir)) {
 				Settings.DownloadFolder = Path.Combine(Environment.GetFolderPath(
 					Environment.SpecialFolder.MyDocuments), "Watched Threads");
 				Settings.DownloadFolderIsRelative = false;
@@ -212,7 +214,7 @@ namespace ChanThreadWatch {
 				return;
 			}
 
-			if (!AddThread(pageURL, pageAuth, imageAuth, waitSeconds, chkOneTime.Checked, null)) {
+			if (!AddThread(pageURL, pageAuth, imageAuth, waitSeconds, chkOneTime.Checked, null, null)) {
 				MessageBox.Show("The same thread is already being watched or downloaded.",
 					"Duplicate Thread", MessageBoxButtons.OK, MessageBoxIcon.Error);
 				return;
@@ -239,7 +241,7 @@ namespace ChanThreadWatch {
 				foreach (ListViewItem item in lvThreads.SelectedItems) {
 					WatchInfo wi = _watchInfoList[item.Index];
 					if ((wi.WatchThread == null) || !wi.WatchThread.IsAlive) {
-						AddThread(wi.PageURL, wi.PageAuth, wi.ImageAuth, wi.WaitSeconds, wi.OneTime, wi.SaveDir);
+						AddThread(wi.PageURL, wi.PageAuth, wi.ImageAuth, wi.WaitSeconds, wi.OneTime, wi.SaveDir, wi.SaveBaseDir);
 					}
 				}
 			}
@@ -356,15 +358,7 @@ namespace ChanThreadWatch {
 			txtImageAuth.Enabled = chkImageAuth.Checked;
 		}
 
-		private string GetDownloadFolder() {
-			string path = Settings.DownloadFolder;
-			if (!String.IsNullOrEmpty(path) && (Settings.DownloadFolderIsRelative == true)) {
-				path = Path.GetFullPath(path);
-			}
-			return path;
-		}
-
-		private bool AddThread(string pageURL, string pageAuth, string imageAuth, int waitSeconds, bool oneTime, string saveDir) {
+		private bool AddThread(string pageURL, string pageAuth, string imageAuth, int waitSeconds, bool oneTime, string saveDir, string saveBaseDir) {
 			const int liDuplicate = -2;
 			const int liNotFound = -1;
 			WatchInfo watchInfo = new WatchInfo();
@@ -394,6 +388,7 @@ namespace ChanThreadWatch {
 					watchInfo.WaitSeconds = waitSeconds;
 					watchInfo.OneTime = oneTime;
 					watchInfo.SaveDir = saveDir;
+					watchInfo.SaveBaseDir = saveBaseDir;
 					watchInfo.NextCheck = TickCount.Now;
 					watchInfo.ListIndex = listIndex;
 					watchInfo.WatchThread = new Thread(WatchThread);
@@ -447,7 +442,7 @@ namespace ChanThreadWatch {
 							sw.WriteLine(w.ImageAuth);
 							sw.WriteLine(w.WaitSeconds.ToString());
 							sw.WriteLine(w.OneTime ? "1" : "0");
-							sw.WriteLine(w.SaveDir);
+							sw.WriteLine(General.GetRelativeDirectoryPath(w.SaveDir, w.SaveBaseDir));
 						}
 					}
 				}
@@ -468,6 +463,7 @@ namespace ChanThreadWatch {
 					return;
 				}
 			}
+			string saveBaseDir = Settings.AbsoluteDownloadDir;
 			int i = 1;
 			while (i <= lines.Length - linesPerThread) {
 				string pageURL = lines[i++];
@@ -475,8 +471,8 @@ namespace ChanThreadWatch {
 				string imageAuth = lines[i++];
 				int waitSeconds = Math.Max(Int32.Parse(lines[i++]), 60);
 				bool oneTime = lines[i++] == "1";
-				string saveDir = lines[i++];
-				AddThread(pageURL, pageAuth, imageAuth, waitSeconds, oneTime, saveDir);
+				string saveDir = General.GetAbsoluteDirectoryPath(lines[i++], saveBaseDir);
+				AddThread(pageURL, pageAuth, imageAuth, waitSeconds, oneTime, saveDir, saveBaseDir);
 			}
 		}
 
@@ -577,9 +573,8 @@ namespace ChanThreadWatch {
 				saveDir = watchInfo.SaveDir;
 			}
 			if (String.IsNullOrEmpty(saveDir)) {
-				saveDir = Settings.DownloadFolder;
-				if (Settings.DownloadFolderIsRelative == true) saveDir = Path.GetFullPath(saveDir);
-				saveDir = Path.Combine(saveDir, General.CleanFilename(site + "_" + board + "_" + thread));
+				string saveBaseDir = Settings.AbsoluteDownloadDir;
+				saveDir = Path.Combine(saveBaseDir, General.CleanFilename(site + "_" + board + "_" + thread));
 				if (!Directory.Exists(saveDir)) {
 					try { Directory.CreateDirectory(saveDir); }
 					catch {
@@ -591,6 +586,7 @@ namespace ChanThreadWatch {
 				}
 				lock (_watchInfoList) {
 					watchInfo.SaveDir = saveDir;
+					watchInfo.SaveBaseDir = saveBaseDir;
 				}
 			}
 			saveThumbsDir = Path.Combine(saveDir, "thumbs");

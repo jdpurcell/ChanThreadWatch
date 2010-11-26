@@ -19,7 +19,7 @@ namespace ChanThreadWatch {
 
 		public static string ReleaseDate {
 			get {
-				return "2010-Apr-02";
+				return "2010-Nov-26";
 			}
 		}
 
@@ -366,6 +366,40 @@ namespace ChanThreadWatch {
 			catch {
 				return null;
 			}
+		}
+
+		public static string GetRelativeDirectoryPath(string dir, string baseDir) {
+			if (dir.Length != 0 && Path.IsPathRooted(dir)) {
+				Uri baseDirUri = new Uri(Path.Combine(baseDir, "dummy.txt"));
+				Uri targetDirUri = new Uri(Path.Combine(dir, "dummy.txt"));
+				dir = Uri.UnescapeDataString(baseDirUri.MakeRelativeUri(targetDirUri).ToString());
+				dir = (dir.Length == 0) ? "." : Path.GetDirectoryName(dir.Replace('/', Path.DirectorySeparatorChar));
+			}
+			return dir;
+		}
+
+		public static string GetAbsoluteDirectoryPath(string dir, string baseDir) {
+			if (dir.Length != 0 && !Path.IsPathRooted(dir)) {
+				dir = Path.GetFullPath(Path.Combine(baseDir, dir));
+			}
+			return dir;
+		}
+
+		public static string GetRelativeFilePath(string filePath, string baseDir) {
+			if (filePath.Length != 0 && Path.IsPathRooted(filePath)) {
+				string dir = Path.GetDirectoryName(filePath);
+				string fileName = Path.GetFileName(filePath);
+				dir = GetRelativeDirectoryPath(dir, baseDir);
+				filePath = (dir == ".") ? fileName : Path.Combine(dir, fileName);
+			}
+			return filePath;
+		}
+
+		public static string GetAbsoluteFilePath(string filePath, string baseDir) {
+			if (filePath.Length != 0 && !Path.IsPathRooted(filePath)) {
+				filePath = Path.GetFullPath(Path.Combine(baseDir, filePath));
+			}
+			return filePath;
 		}
 
 		public static ElementInfo FindElement(string html, string name, int offset, int htmlLen) {

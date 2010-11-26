@@ -145,6 +145,16 @@ namespace ChanThreadWatch {
 			}
 		}
 
+		public static string AbsoluteDownloadDir {
+			get {
+				string dir = DownloadFolder;
+				if (!String.IsNullOrEmpty(dir) && (DownloadFolderIsRelative == true)) {
+					dir = General.GetAbsoluteDirectoryPath(dir, ExeDir);
+				}
+				return dir;
+			}
+		}
+
 		private static string Get(string name) {
 			lock (_settings) {
 				string value;
