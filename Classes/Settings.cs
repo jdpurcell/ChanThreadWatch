@@ -66,9 +66,9 @@ namespace ChanThreadWatch {
 			set { SetBool("SaveThumbnails", value); }
 		}
 
-		public static bool? UseOriginalFilenames {
-			get { return GetBool("UseOriginalFilenames"); }
-			set { SetBool("UseOriginalFilenames", value); }
+		public static bool? UseOriginalFileNames {
+			get { return GetBool("UseOriginalFileNames"); }
+			set { SetBool("UseOriginalFileNames", value); }
 		}
 
 		public static bool? VerifyImageHashes {
@@ -209,7 +209,7 @@ namespace ChanThreadWatch {
 		public static void Load() {
 			string path = Path.Combine(GetSettingsDir(), SettingsFileName);
 
-			_settings = new Dictionary<string, string>();
+			_settings = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
 			if (!File.Exists(path)) {
 				return;

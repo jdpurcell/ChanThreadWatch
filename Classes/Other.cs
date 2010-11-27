@@ -62,13 +62,13 @@ namespace ChanThreadWatch {
 
 		public string FileName {
 			get {
-				return Path.GetFileNameWithoutExtension(General.CleanFilename(General.URLFilename(URL)));
+				return Path.GetFileNameWithoutExtension(General.CleanFileName(General.URLFileName(URL)));
 			}
 		}
 
 		public string Extension {
 			get {
-				return Path.GetExtension(General.CleanFilename(General.URLFilename(URL)));
+				return Path.GetExtension(General.CleanFileName(General.URLFileName(URL)));
 			}
 		}
 	}
@@ -79,7 +79,7 @@ namespace ChanThreadWatch {
 
 		public string FileNameWithExt {
 			get {
-				return General.CleanFilename(General.URLFilename(URL));
+				return General.CleanFileName(General.URLFileName(URL));
 			}
 		}
 	}

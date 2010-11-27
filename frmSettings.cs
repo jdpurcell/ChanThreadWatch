@@ -16,7 +16,7 @@ namespace ChanThreadWatch {
 			chkCustomUserAgent.Checked = Settings.UseCustomUserAgent ?? false;
 			txtCustomUserAgent.Text = Settings.CustomUserAgent ?? String.Empty;
 			chkSaveThumbnails.Checked = Settings.SaveThumbnails ?? false;
-			chkUseOriginalFilenames.Checked = Settings.UseOriginalFilenames ?? false;
+			chkUseOriginalFileNames.Checked = Settings.UseOriginalFileNames ?? false;
 			chkVerifyImageHashes.Checked = Settings.VerifyImageHashes ?? true;
 			chkCheckForUpdates.Checked = Settings.CheckForUpdates ?? false;
 			if (Settings.UseExeDirForSettings == true) {
@@ -50,7 +50,7 @@ namespace ChanThreadWatch {
 				Settings.UseCustomUserAgent = chkCustomUserAgent.Checked;
 				Settings.CustomUserAgent = txtCustomUserAgent.Text;
 				Settings.SaveThumbnails = chkSaveThumbnails.Checked;
-				Settings.UseOriginalFilenames = chkUseOriginalFilenames.Checked;
+				Settings.UseOriginalFileNames = chkUseOriginalFileNames.Checked;
 				Settings.VerifyImageHashes = chkVerifyImageHashes.Checked;
 				Settings.CheckForUpdates = chkCheckForUpdates.Checked;
 				Settings.UseExeDirForSettings = rbSettingsInExeFolder.Checked;

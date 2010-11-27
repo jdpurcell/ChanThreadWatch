@@ -34,7 +34,7 @@
 			this.lblSettingsLocation = new System.Windows.Forms.Label();
 			this.rbSettingsInAppDataFolder = new System.Windows.Forms.RadioButton();
 			this.rbSettingsInExeFolder = new System.Windows.Forms.RadioButton();
-			this.chkUseOriginalFilenames = new System.Windows.Forms.CheckBox();
+			this.chkUseOriginalFileNames = new System.Windows.Forms.CheckBox();
 			this.chkVerifyImageHashes = new System.Windows.Forms.CheckBox();
 			this.chkCheckForUpdates = new System.Windows.Forms.CheckBox();
 			this.chkSaveThumbnails = new System.Windows.Forms.CheckBox();
@@ -147,15 +147,15 @@
 			this.rbSettingsInExeFolder.Text = "Executable folder";
 			this.rbSettingsInExeFolder.UseVisualStyleBackColor = true;
 			// 
-			// chkUseOriginalFilenames
+			// chkUseOriginalFileNames
 			// 
-			this.chkUseOriginalFilenames.AutoSize = true;
-			this.chkUseOriginalFilenames.Location = new System.Drawing.Point(10, 96);
-			this.chkUseOriginalFilenames.Name = "chkUseOriginalFilenames";
-			this.chkUseOriginalFilenames.Size = new System.Drawing.Size(282, 17);
-			this.chkUseOriginalFilenames.TabIndex = 7;
-			this.chkUseOriginalFilenames.Text = "Use original filenames (only supported for some sites)";
-			this.chkUseOriginalFilenames.UseVisualStyleBackColor = true;
+			this.chkUseOriginalFileNames.AutoSize = true;
+			this.chkUseOriginalFileNames.Location = new System.Drawing.Point(10, 96);
+			this.chkUseOriginalFileNames.Name = "chkUseOriginalFileNames";
+			this.chkUseOriginalFileNames.Size = new System.Drawing.Size(282, 17);
+			this.chkUseOriginalFileNames.TabIndex = 7;
+			this.chkUseOriginalFileNames.Text = "Use original filenames (only supported for some sites)";
+			this.chkUseOriginalFileNames.UseVisualStyleBackColor = true;
 			// 
 			// chkVerifyImageHashes
 			// 
@@ -203,7 +203,7 @@
 			this.Controls.Add(this.chkSaveThumbnails);
 			this.Controls.Add(this.chkCheckForUpdates);
 			this.Controls.Add(this.chkVerifyImageHashes);
-			this.Controls.Add(this.chkUseOriginalFilenames);
+			this.Controls.Add(this.chkUseOriginalFileNames);
 			this.Controls.Add(this.rbSettingsInExeFolder);
 			this.Controls.Add(this.rbSettingsInAppDataFolder);
 			this.Controls.Add(this.lblSettingsLocation);
@@ -235,7 +235,7 @@
 		private System.Windows.Forms.Label lblSettingsLocation;
 		private System.Windows.Forms.RadioButton rbSettingsInAppDataFolder;
 		private System.Windows.Forms.RadioButton rbSettingsInExeFolder;
-		private System.Windows.Forms.CheckBox chkUseOriginalFilenames;
+		private System.Windows.Forms.CheckBox chkUseOriginalFileNames;
 		private System.Windows.Forms.CheckBox chkVerifyImageHashes;
 		private System.Windows.Forms.CheckBox chkCheckForUpdates;
 		private System.Windows.Forms.CheckBox chkSaveThumbnails;

@@ -61,7 +61,7 @@ namespace ChanThreadWatch {
 		}
 
 		public virtual List<ImageInfo> GetImages(List<ReplaceInfo> replaceList, List<ThumbnailInfo> thumbnailList) {
-			var filenames = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+			var fileNames = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 			List<ImageInfo> images = new List<ImageInfo>();
 			ElementInfo elem;
 			int offset = 0;
@@ -83,7 +83,7 @@ namespace ChanThreadWatch {
 				ThumbnailInfo thumb = null;
 
 				image.URL = url;
-				if (image.URL == null) continue;
+				if (image.URL == null || image.FileName.Length == 0) continue;
 				pos = Math.Max(
 					image.URL.LastIndexOf("http://", StringComparison.OrdinalIgnoreCase),
 					image.URL.LastIndexOf("https://", StringComparison.OrdinalIgnoreCase));
@@ -126,9 +126,9 @@ namespace ChanThreadWatch {
 					}
 				}
 
-				if (!filenames.ContainsKey(image.FileName)) {
+				if (!fileNames.ContainsKey(image.FileName)) {
 					images.Add(image);
-					filenames.Add(image.FileName, 0);
+					fileNames.Add(image.FileName, 0);
 				}
 				if (thumb != null) {
 					thumbnailList.Add(thumb);
@@ -170,7 +170,7 @@ namespace ChanThreadWatch {
 				attr = General.GetAttribute(elem, "href");
 				if (attr == null || String.IsNullOrEmpty(attr.Value)) continue;
 				image.URL = General.ProperURL(_url, HttpUtility.HtmlDecode(attr.Value));
-				if (image.URL == null) continue;
+				if (image.URL == null || image.FileName.Length == 0) continue;
 				image.Referer = _url;
 				if (replaceList != null) {
 					replaceList.Add(
@@ -186,7 +186,7 @@ namespace ChanThreadWatch {
 				if (elem == null) continue;
 				value = General.GetAttributeValue(elem, "title");
 				if (String.IsNullOrEmpty(value)) continue;
-				image.OriginalFileName = Path.GetFileNameWithoutExtension(General.CleanFilename(HttpUtility.HtmlDecode(value)));
+				image.OriginalFileName = Path.GetFileNameWithoutExtension(General.CleanFileName(HttpUtility.HtmlDecode(value)));
 
 				elem = General.FindElement(_html, "a", elem.Offset + 1, postEnd);
 				if (elem == null) continue;

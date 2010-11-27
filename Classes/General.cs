@@ -402,6 +402,54 @@ namespace ChanThreadWatch {
 			return filePath;
 		}
 
+		public static int GetMaximumFileNameLength(string dir) {
+			// Kind of a binary search except we only know whether the middle
+			// item is <= or > the target rather than <, =, or >.
+			int min = 0;
+			int max = 4096;
+			while (max >= min + 2) {
+				int n = (min + max) / 2;
+				if (IsFileNameTooLong(dir, n)) {
+					max = n - 1;
+				}
+				else {
+					min = n;
+				}
+			}
+			if (max > min) {
+				return IsFileNameTooLong(dir, max) ? min : max;
+			}
+			else {
+				return min;
+			}
+		}
+
+		public static bool IsFileNameTooLong(string dir, int fileNameLength) {
+			string path = null;
+			bool foundFreeFileName = false;
+			for (char c = 'a'; c <= 'z'; c++) {
+				path = Path.Combine(dir, new string(c, fileNameLength));
+				if (!File.Exists(path)) {
+					foundFreeFileName = true;
+					break;
+				}
+			}
+			if (!foundFreeFileName) {
+				throw new Exception("Unable to determine if filename is too long.");
+			}
+			try {
+				using (File.Create(path)) { }
+				try {
+					File.Delete(path);
+				}
+				catch { }
+				return false;
+			}
+			catch (PathTooLongException) {
+				return true;
+			}
+		}
+
 		public static ElementInfo FindElement(string html, string name, int offset, int htmlLen) {
 			ElementInfo elem = new ElementInfo();
 
@@ -546,12 +594,12 @@ namespace ChanThreadWatch {
 			}
 		}
 
-		public static string URLFilename(string url) {
+		public static string URLFileName(string url) {
 			int pos = url.LastIndexOf("/");
 			return (pos == -1) ? String.Empty : url.Substring(pos + 1);
 		}
 
-		public static string CleanFilename(string src) {
+		public static string CleanFileName(string src) {
 			char[] dst = new char[src.Length];
 			char[] inv = Path.GetInvalidFileNameChars();
 			int iDst = 0;

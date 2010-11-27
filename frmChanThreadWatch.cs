@@ -558,7 +558,14 @@ namespace ChanThreadWatch {
 			string pageAuth = watchInfo.PageAuth;
 			string imgAuth = watchInfo.ImageAuth;
 			string page = null;
-			string saveDir, saveFilename, savePath, saveThumbsDir, site, board, thread;
+			string saveDir;
+			string saveFileName;
+			string savePath;
+			string saveThumbsDir;
+			string site;
+			string board;
+			string thread;
+			int maxFileNameLength;
 			int pageIndex;
 			int numTries;
 			const int maxTries = 3;
@@ -574,7 +581,7 @@ namespace ChanThreadWatch {
 			}
 			if (String.IsNullOrEmpty(saveDir)) {
 				string saveBaseDir = Settings.AbsoluteDownloadDir;
-				saveDir = Path.Combine(saveBaseDir, General.CleanFilename(site + "_" + board + "_" + thread));
+				saveDir = Path.Combine(saveBaseDir, General.CleanFileName(site + "_" + board + "_" + thread));
 				if (!Directory.Exists(saveDir)) {
 					try { Directory.CreateDirectory(saveDir); }
 					catch {
@@ -590,6 +597,7 @@ namespace ChanThreadWatch {
 				}
 			}
 			saveThumbsDir = Path.Combine(saveDir, "thumbs");
+			maxFileNameLength = General.GetMaximumFileNameLength(saveDir);
 
 			pageList.Add(new PageInfo { URL = pageURL });
 
@@ -599,8 +607,8 @@ namespace ChanThreadWatch {
 
 				pageIndex = 0;
 				do {
-					saveFilename = General.CleanFilename(thread) + ((pageIndex == 0) ? String.Empty : ("_" + (pageIndex + 1))) + ".html";
-					savePath = Path.Combine(saveDir, saveFilename);
+					saveFileName = General.CleanFileName(thread) + ((pageIndex == 0) ? String.Empty : ("_" + (pageIndex + 1))) + ".html";
+					savePath = Path.Combine(saveDir, saveFileName);
 
 					PageInfo pageInfo = pageList[pageIndex];
 					pageInfo.IsFresh = false;
@@ -653,16 +661,16 @@ namespace ChanThreadWatch {
 							foreach (ImageInfo image in images) {
 								for (int iName = 0; iName < 2; iName++) {
 									int iSuffix = 1;
-									string filename;
+									string fileName;
 									do {
-										filename = ((iName == 0) ? image.FileName : image.OriginalFileName) +
+										fileName = ((iName == 0) ? image.FileName : image.OriginalFileName) +
 											((iSuffix == 1) ? String.Empty : ("_" + iSuffix)) + image.Extension;
 										iSuffix++;
 									}
-									while (completedImageDiskNames.ContainsKey(filename));
-									if (File.Exists(Path.Combine(saveDir, filename))) {
-										completedImageDiskNames[filename] = 0;
-										completedImages[image.FileName] = filename;
+									while (completedImageDiskNames.ContainsKey(fileName));
+									if (File.Exists(Path.Combine(saveDir, fileName))) {
+										completedImageDiskNames[fileName] = 0;
+										completedImages[image.FileName] = fileName;
 										break;
 									}
 								}
@@ -710,28 +718,36 @@ namespace ChanThreadWatch {
 				int totalImageCount = completedImages.Count + pendingImages.Count;
 				while (pendingImages.Count != 0) {
 					ImageInfo image = pendingImages.Dequeue();
+					bool downloadCompleted = false;
 					bool pathTooLong = false;
 
 				MakeImagePath:
-					if ((Settings.UseOriginalFilenames == true) && !String.IsNullOrEmpty(image.OriginalFileName) && !pathTooLong) {
-						saveFilename = image.OriginalFileName;
-					}
-					else if (!String.IsNullOrEmpty(image.FileName)) {
-						saveFilename = image.FileName;
+					if ((Settings.UseOriginalFileNames == true) && !String.IsNullOrEmpty(image.OriginalFileName) && !pathTooLong) {
+						saveFileName = image.OriginalFileName;
 					}
 					else {
-						continue;
+						saveFileName = image.FileName;
 					}
 
 					int iSuffix = 1;
 					do {
-						savePath = Path.Combine(saveDir, saveFilename + ((iSuffix == 1) ?
+						savePath = Path.Combine(saveDir, saveFileName + ((iSuffix == 1) ?
 							String.Empty : ("_" + iSuffix)) + image.Extension) ;
 						iSuffix++;
 					}
 					while (File.Exists(savePath));
 
-					bool downloadCompleted = false;
+					if (Path.GetFileName(savePath).Length > maxFileNameLength) {
+						if (!pathTooLong) {
+							pathTooLong = true;
+							goto MakeImagePath;
+						}
+						else {
+							downloadCompleted = true;
+							goto SkipDownload;
+						}
+					}
+
 					byte[] prevHash = null;
 					for (numTries = 1; numTries <= maxTries; numTries++) {
 						lock (_watchInfoList) {
@@ -760,14 +776,8 @@ namespace ChanThreadWatch {
 						}
 						catch (Exception ex) {
 							if (ex is PathTooLongException) {
-								if (!pathTooLong) {
-									pathTooLong = true;
-									goto MakeImagePath;
-								}
-								else {
-									downloadCompleted = true;
-									break;
-								}
+								downloadCompleted = true;
+								break;
 							}
 							if ((ex is DirectoryNotFoundException) || (ex is UnauthorizedAccessException)) {
 								lock (_watchInfoList) {
@@ -777,6 +787,8 @@ namespace ChanThreadWatch {
 							}
 						}
 					}
+
+				SkipDownload:
 					if (downloadCompleted) {
 						completedImages[image.FileName] = Path.GetFileName(savePath);
 					}
@@ -842,9 +854,9 @@ namespace ChanThreadWatch {
 						for (int i = 0; i < pageInfo.ReplaceList.Count; i++) {
 							ReplaceInfo replace = pageInfo.ReplaceList[i];
 							if ((replace.Type == ReplaceType.ImageLinkHref) &&
-								completedImages.TryGetValue(replace.Tag, out saveFilename))
+								completedImages.TryGetValue(replace.Tag, out saveFileName))
 							{
-								replace.Value = "href=\"" + HttpUtility.HtmlAttributeEncode(saveFilename) + "\"";
+								replace.Value = "href=\"" + HttpUtility.HtmlAttributeEncode(saveFileName) + "\"";
 							}
 							if (replace.Type == ReplaceType.ImageSrc) {
 								replace.Value = "src=\"thumbs/" + HttpUtility.HtmlAttributeEncode(replace.Tag) + "\"";
