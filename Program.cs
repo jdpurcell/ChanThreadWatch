@@ -23,9 +23,16 @@ namespace ChanThreadWatch {
 			SecurityIdentifier sid = new SecurityIdentifier(WellKnownSidType.WorldSid, null);
 			MutexSecurity security = new MutexSecurity();
 			bool createdNew;
-			security.AddAccessRule(new MutexAccessRule(sid, MutexRights.FullControl, AccessControlType.Allow));
-			security.AddAccessRule(new MutexAccessRule(sid, MutexRights.ChangePermissions, AccessControlType.Deny));
-			security.AddAccessRule(new MutexAccessRule(sid, MutexRights.Delete, AccessControlType.Deny));
+			try {
+				security.AddAccessRule(new MutexAccessRule(sid, MutexRights.FullControl, AccessControlType.Allow));
+				security.AddAccessRule(new MutexAccessRule(sid, MutexRights.ChangePermissions, AccessControlType.Deny));
+				security.AddAccessRule(new MutexAccessRule(sid, MutexRights.Delete, AccessControlType.Deny));
+			}
+			catch (ArgumentOutOfRangeException) {
+				// Work-around for Mono.  Just return here since Mutexes in Mono don't
+				// work properly even with with default security.
+				return true;
+			}
 			_mutex = new Mutex(false, @"Global\ChanThreadWatch", out createdNew, security);
 			try {
 				if (!_mutex.WaitOne(0, false)) {
