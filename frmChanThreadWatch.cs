@@ -24,6 +24,7 @@ namespace ChanThreadWatch {
 			foreach (ColumnHeader columnHeader in lvThreads.Columns) {
 				columnHeader.Width = Convert.ToInt32(columnHeader.Width * scaleFactorX);
 			}
+			General.EnableDoubleBuffering(lvThreads);
 
 			// Souldn't matter since the limit is supposed to be per connection group
 			ServicePointManager.DefaultConnectionLimit = Int32.MaxValue;

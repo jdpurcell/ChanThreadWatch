@@ -656,6 +656,15 @@ namespace ChanThreadWatch {
 			return new string(dst, 0, iDst);
 		}
 
+		public static void EnableDoubleBuffering<T>(T control) where T : Control {
+			typeof(T).InvokeMember(
+			"DoubleBuffered", 
+			BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.SetProperty,
+			null, 
+			control, 
+			new object[] { true });
+		}
+
 		public static void SetFontAndScaling(Form form) {
 			form.SuspendLayout();
 			form.Font = new Font("Tahoma", 8.25f);
