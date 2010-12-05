@@ -118,33 +118,37 @@ namespace ChanThreadWatch {
 
 		private void btnAdd_Click(object sender, EventArgs e) {
 			if (_isExiting) return;
-
-			string pageURL = txtPageURL.Text.Trim();
-			string pageAuth = (chkPageAuth.Checked && (txtPageAuth.Text.IndexOf(':') != -1)) ? txtPageAuth.Text : String.Empty;
-			string imageAuth = (chkImageAuth.Checked && (txtImageAuth.Text.IndexOf(':') != -1)) ? txtImageAuth.Text : String.Empty;
-			int waitSeconds = Int32.Parse((string)cboCheckEvery.SelectedItem) * 60;
-
-			if (pageURL.Length == 0) return;
-			if (!pageURL.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
-				!pageURL.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
-			{
-				pageURL = "http://" + pageURL;
-			}
-			pageURL = General.ProperURL(HttpUtility.HtmlDecode(pageURL));
+			if (txtPageURL.Text.Trim().Length == 0) return;
+			string pageURL = FormatURLFromUser(txtPageURL.Text);
 			if (pageURL == null) {
 				MessageBox.Show("The specified URL is invalid.", "Invalid URL", MessageBoxButtons.OK, MessageBoxIcon.Error);
 				return;
 			}
-
-			if (!AddThread(pageURL, pageAuth, imageAuth, waitSeconds, chkOneTime.Checked, null, null)) {
+			if (!AddThread(pageURL)) {
 				MessageBox.Show("The same thread is already being watched or downloaded.",
 					"Duplicate Thread", MessageBoxButtons.OK, MessageBoxIcon.Error);
 				return;
 			}
-
 			txtPageURL.Clear();
 			txtPageURL.Focus();
+			SaveThreadList();
+		}
 
+		private void btnAddFromClipboard_Click(object sender, EventArgs e) {
+			if (_isExiting) return;
+			string text;
+			try {
+				text = Clipboard.GetText();
+			}
+			catch {
+				return;
+			}
+			string[] urls = text.Split(new [] { "\r\n", "\r", "\n" }, StringSplitOptions.RemoveEmptyEntries);
+			for (int iURL = 0; iURL < urls.Length; iURL++) {
+				string url = FormatURLFromUser(urls[iURL]);
+				if (url == null) continue;
+				AddThread(url);
+			}
 			SaveThreadList();
 		}
 
@@ -170,18 +174,18 @@ namespace ChanThreadWatch {
 		}
 
 		private void miOpenFolder_Click(object sender, EventArgs e) {
-			foreach (string dir in GetFromSelectedThreadWatchers(wi => wi.ThreadDownloadDirectory)) {
+			foreach (ThreadWatcher watcher in SelectedThreadWatchers) {
 				try {
-					Process.Start(dir);
+					Process.Start(watcher.ThreadDownloadDirectory);
 				}
 				catch { }
 			}
 		}
 
 		private void miOpenURL_Click(object sender, EventArgs e) {
-			foreach (string url in GetFromSelectedThreadWatchers(wi => wi.PageURL)) {
+			foreach (ThreadWatcher watcher in SelectedThreadWatchers) {
 				try {
-					Process.Start(url);
+					Process.Start(watcher.PageURL);
 				}
 				catch { }
 			}
@@ -189,12 +193,36 @@ namespace ChanThreadWatch {
 
 		private void miCopyURL_Click(object sender, EventArgs e) {
 			StringBuilder sb = new StringBuilder();
-			foreach (string url in GetFromSelectedThreadWatchers(wi => wi.PageURL)) {
+			foreach (ThreadWatcher watcher in SelectedThreadWatchers) {
 				if (sb.Length != 0) sb.Append(Environment.NewLine);
-				sb.Append(url);
+				sb.Append(watcher.PageURL);
 			}
-			Clipboard.Clear();
-			Clipboard.SetText(sb.ToString());
+			try {
+				Clipboard.Clear();
+				Clipboard.SetText(sb.ToString());
+			}
+			catch (Exception ex) {
+				MessageBox.Show("Unable to copy to clipboard: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+			}
+		}
+
+		private void miRemove_Click(object sender, EventArgs e) {
+			RemoveThreads(false, true);
+		}
+
+		private void miRemoveAndDeleteFolder_Click(object sender, EventArgs e) {
+			if (MessageBox.Show("Are you sure you want to delete the selected threads and all associated files from disk?",
+				"Delete From Disk", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+			{
+				return;
+			}
+			RemoveThreads(false, true,
+				(watcher) => {
+					try {
+						Directory.Delete(watcher.ThreadDownloadDirectory, true);
+					}
+					catch { }
+				});
 		}
 
 		private void miCheckNow_Click(object sender, EventArgs e) {
@@ -247,6 +275,8 @@ namespace ChanThreadWatch {
 					miStart.Visible = anyStopped;
 					miCheckNow.Visible = anyRunning;
 					miCheckEvery.Visible = anyRunning;
+					miRemove.Visible = anyStopped;
+					miRemoveAndDeleteFolder.Visible = anyStopped;
 					cmThreads.Show(lvThreads, e.Location);
 				}
 			}
@@ -301,13 +331,20 @@ namespace ChanThreadWatch {
 			}));
 		}
 
+		private bool AddThread(string pageURL) {
+			string pageAuth = (chkPageAuth.Checked && (txtPageAuth.Text.IndexOf(':') != -1)) ? txtPageAuth.Text : String.Empty;
+			string imageAuth = (chkImageAuth.Checked && (txtImageAuth.Text.IndexOf(':') != -1)) ? txtImageAuth.Text : String.Empty;
+			int waitSeconds = Int32.Parse((string)cboCheckEvery.SelectedItem) * 60;
+			return AddThread(pageURL, pageAuth, imageAuth, waitSeconds, chkOneTime.Checked, null, null);
+		}
+
 		private bool AddThread(string pageURL, string pageAuth, string imageAuth, int checkInterval, bool oneTime, string saveDir, StopReason? stopReason) {
 			ThreadWatcher watcher = null;
 
-			foreach (ThreadWatcher selectedWatcher in SelectedThreadWatchers) {
-				if (String.Equals(selectedWatcher.PageURL, pageURL, StringComparison.OrdinalIgnoreCase)) {
-					if (selectedWatcher.IsRunning) return false;
-					watcher = selectedWatcher;
+			foreach (ThreadWatcher existingWatcher in ThreadWatchers) {
+				if (String.Equals(existingWatcher.PageURL, pageURL, StringComparison.OrdinalIgnoreCase)) {
+					if (existingWatcher.IsRunning) return false;
+					watcher = existingWatcher;
 					break;
 				}
 			}
@@ -343,11 +380,30 @@ namespace ChanThreadWatch {
 			return true;
 		}
 
+		private string FormatURLFromUser(string url) {
+			url = url.Trim();
+			if (url.Length == 0) return null;
+			if (!url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+				!url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+			{
+				url = "http://" + url;
+			}
+			return General.ProperURL(HttpUtility.HtmlDecode(url));
+		}
+
 		private void RemoveThreads(bool removeCompleted, bool removeSelected) {
+			RemoveThreads(removeCompleted, removeSelected, null);
+		}
+
+		private void RemoveThreads(bool removeCompleted, bool removeSelected, Action<ThreadWatcher> preRemoveAction) {
 			int i = 0;
 			while (i < lvThreads.Items.Count) {
 				ThreadWatcher watcher = (ThreadWatcher)lvThreads.Items[i].Tag;
 				if ((removeCompleted || (removeSelected && lvThreads.Items[i].Selected)) && !watcher.IsRunning) {
+					if (preRemoveAction != null) {
+						try { preRemoveAction(watcher); }
+						catch { }
+					}
 					lvThreads.Items.RemoveAt(i);
 					_watcherListIndexes.Remove(watcher);
 				}
@@ -550,15 +606,6 @@ namespace ChanThreadWatch {
 			}
 			catch {
 				return -1;
-			}
-		}
-
-		private IEnumerable<string> GetFromSelectedThreadWatchers(Func<ThreadWatcher, string> selector) {
-			foreach (ThreadWatcher watcher in SelectedThreadWatchers) {
-				string value = selector(watcher);
-				if (!String.IsNullOrEmpty(value)) {
-					yield return value;
-				}
 			}
 		}
 

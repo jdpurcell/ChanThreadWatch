@@ -3,6 +3,8 @@
   * Workaround for downloads stalling when site is sluggish.
   * Saves thread list when updated instead of just on exit.
   * Saves stopped threads in thread list.
+  * Ability to add URL(s) from clipboard with single click.
+  * Ability to delete stopped threads from disk in the context menu.
   * Allows only one instance to run at a time.
 1.4.3 (2010-Nov-26):
   * Download folder in thread list is stored as relative path.

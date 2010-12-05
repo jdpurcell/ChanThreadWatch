@@ -53,6 +53,9 @@
 			this.rbOpenURL = new System.Windows.Forms.RadioButton();
 			this.rbOpenFolder = new System.Windows.Forms.RadioButton();
 			this.tmrUpdateWaitStatus = new System.Windows.Forms.Timer(this.components);
+			this.btnAddFromClipboard = new System.Windows.Forms.Button();
+			this.miRemove = new System.Windows.Forms.MenuItem();
+			this.miRemoveAndDeleteFolder = new System.Windows.Forms.MenuItem();
 			this.grpAddThread.SuspendLayout();
 			this.grpDoubleClick.SuspendLayout();
 			this.SuspendLayout();
@@ -225,7 +228,7 @@
 			this.btnAbout.Location = new System.Drawing.Point(568, 310);
 			this.btnAbout.Name = "btnAbout";
 			this.btnAbout.Size = new System.Drawing.Size(60, 23);
-			this.btnAbout.TabIndex = 5;
+			this.btnAbout.TabIndex = 6;
 			this.btnAbout.Text = "About";
 			this.btnAbout.UseVisualStyleBackColor = true;
 			this.btnAbout.Click += new System.EventHandler(this.btnAbout_Click);
@@ -236,7 +239,7 @@
 			this.btnSettings.Location = new System.Drawing.Point(492, 310);
 			this.btnSettings.Name = "btnSettings";
 			this.btnSettings.Size = new System.Drawing.Size(67, 23);
-			this.btnSettings.TabIndex = 4;
+			this.btnSettings.TabIndex = 5;
 			this.btnSettings.Text = "Settings";
 			this.btnSettings.UseVisualStyleBackColor = true;
 			this.btnSettings.Click += new System.EventHandler(this.btnSettings_Click);
@@ -249,6 +252,8 @@
             this.miStop,
             this.miStart,
             this.miCopyURL,
+            this.miRemove,
+            this.miRemoveAndDeleteFolder,
             this.miCheckNow,
             this.miCheckEvery});
 			// 
@@ -284,13 +289,13 @@
 			// 
 			// miCheckNow
 			// 
-			this.miCheckNow.Index = 5;
+			this.miCheckNow.Index = 7;
 			this.miCheckNow.Text = "Check Now";
 			this.miCheckNow.Click += new System.EventHandler(this.miCheckNow_Click);
 			// 
 			// miCheckEvery
 			// 
-			this.miCheckEvery.Index = 6;
+			this.miCheckEvery.Index = 8;
 			this.miCheckEvery.Text = "Check Every";
 			// 
 			// grpDoubleClick
@@ -332,10 +337,33 @@
 			this.tmrUpdateWaitStatus.Interval = 500;
 			this.tmrUpdateWaitStatus.Tick += new System.EventHandler(this.tmrUpdateWaitStatus_Tick);
 			// 
+			// btnAddFromClipboard
+			// 
+			this.btnAddFromClipboard.Location = new System.Drawing.Point(508, 208);
+			this.btnAddFromClipboard.Name = "btnAddFromClipboard";
+			this.btnAddFromClipboard.Size = new System.Drawing.Size(120, 23);
+			this.btnAddFromClipboard.TabIndex = 4;
+			this.btnAddFromClipboard.Text = "Add From Clipboard";
+			this.btnAddFromClipboard.UseVisualStyleBackColor = true;
+			this.btnAddFromClipboard.Click += new System.EventHandler(this.btnAddFromClipboard_Click);
+			// 
+			// miRemove
+			// 
+			this.miRemove.Index = 5;
+			this.miRemove.Text = "Remove";
+			this.miRemove.Click += new System.EventHandler(this.miRemove_Click);
+			// 
+			// miRemoveAndDeleteFolder
+			// 
+			this.miRemoveAndDeleteFolder.Index = 6;
+			this.miRemoveAndDeleteFolder.Text = "Remove and Delete Folder";
+			this.miRemoveAndDeleteFolder.Click += new System.EventHandler(this.miRemoveAndDeleteFolder_Click);
+			// 
 			// frmChanThreadWatch
 			// 
 			this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
 			this.ClientSize = new System.Drawing.Size(636, 341);
+			this.Controls.Add(this.btnAddFromClipboard);
 			this.Controls.Add(this.grpDoubleClick);
 			this.Controls.Add(this.btnSettings);
 			this.Controls.Add(this.btnAbout);
@@ -387,6 +415,9 @@
 		private System.Windows.Forms.RadioButton rbOpenFolder;
 		private System.Windows.Forms.MenuItem miStart;
 		private System.Windows.Forms.Timer tmrUpdateWaitStatus;
+		private System.Windows.Forms.Button btnAddFromClipboard;
+		private System.Windows.Forms.MenuItem miRemove;
+		private System.Windows.Forms.MenuItem miRemoveAndDeleteFolder;
 	}
 }
 
