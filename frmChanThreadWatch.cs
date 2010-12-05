@@ -1,8 +1,8 @@
-using System;
-using System.Collections;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Net;
 using System.Text;
 using System.Threading;
 using System.Web;
@@ -10,85 +10,23 @@ using System.Windows.Forms;
 
 namespace ChanThreadWatch {
 	public partial class frmChanThreadWatch : Form {
-		private List<WatchInfo> _watchInfoList = new List<WatchInfo>();
-		private object _promptSync = new object();
-
-		// Can't lock or Join in the UI thread because if it gets stuck waiting and a worker thread
-		// tries to Invoke, it will never return because Invoke needs to run on the (frozen) UI
-		// thread.  And I don't like the idea of BeginInvoke in this particular situation.
+		private Dictionary<ThreadWatcher, int> _watcherListIndexes = new Dictionary<ThreadWatcher, int>();
+		private object _startupPromptSync = new object();
+		private bool _isExiting;
 
 		// ReleaseDate property and version in AssemblyInfo.cs should be updated for each release.
 
-		// Change log:
-		// 1.4.3 (2010-Nov-26):
-		//   * Download folder in thread list is stored as relative path.
-		// 1.4.2 (2010-Apr-02):
-		//   * Fixed crash with non-4chan threads containing mailto links.
-		//   * Enabled auto-scaling to fix text truncation with larger font sizes.
-		//   * Enter key is a shortcut for "Add Thread".
-		//   * Backs up the page before redownloading in case it 404s in the middle of
-		//     downloading.
-		//   * Fixed non-breaking spaces being converted to spaces when post-processing
-		//     HTML.
-		// 1.4.1 (2010-Jan-01):
-		//   * Workaround for crash in Mono when program update checking is enabled.
-		// 1.4.0 (2010-Jan-01):
-		//   * Option to download thumbnails and post-process HTML to create a mostly-
-		//     working thread backup (no external CSS, no embedded images other than
-		//     thumbnails, etc).
-		//   * Fixed handling of special characters in filenames.
-		//   * Ability to restart stopped threads in the context menu.
-		// 1.3.0 (2009-Dec-28):
-		//   * Option to verify hash of downloaded images (currently 4chan only).
-		//   * Option to save images with original filenames (currently 4chan only).
-		//   * Option to automatically check for program updates (disabled by default).
-		//   * Various fixes related to URL parsing, file error handling, etc.
-		// 1.2.3 (2009-Dec-25):
-		//   * Restores 4chan and AnonIB support.
-		//   * Custom link parsing and other code to allow for automatic downloading of
-		//     multiple page threads (not implemented for any site at this time as I
-		//     didn't find any I wanted to support).
-		// 1.2.2 (2009-Aug-22):
-		//   * Download folder can be relative to the executable folder.
-		//   * Settings and thread list can be saved in the executable folder instead of
-		//     the application data folder.
-		//   * Detects image wrapper pages and sends referer for better site
-		//     compatibility.
-		//   * Locking is utilized properly when exiting.
-		// 1.2.1 (2009-May-06):
-		//   * Works with HTTPS sites (stupid bug).
-		// 1.2.0 (2009-May-05):
-		//   * Settings are remembered across runs.
-		//   * Thread list is remembered across runs, with a prompt at start before
-		//     reloading.
-		//   * Main window is resizable.
-		//   * Download location is configurable. Default download location is now in My
-		//     Documents for limited user account compatibility.
-		//   * User Agent is configurable.
-		//   * Added context menu for the thread list. Moved Stop and Open Folder buttons
-		//     there and added new features: Open URL, Copy URL, Check Now, Check Every X
-		//     Minutes.
-		//   * Double-clicking a thread can open its folder or URL (configurable).
-		// 1.1.3 (2008-Jul-08):
-		//   * Restores AnonIB support.
-		// 1.1.2 (2008-Jun-29):
-		//   * Ignores duplicate filenames when creating image URL list; fixes incorrect
-		//     image count on 4chan.
-		//   * Doesn't convert page URL to lowercase; fixes 404 problem when page URL
-		//     contains uppercase characters.
-		// 1.1.1 (2008-Jan-16):
-		//   * Workarounds for Mono's form scaling problems and HttpWebResponse
-		//     LastModified bug.
-		// 1.1.0 (2008-Jan-07):
-		//   * Fixed UI sluggishness and freezing caused by accidentally leaving a Sleep
-		//     inside one of the locks for debugging.
-		//   * Supports AnonIB.
-		// 1.0.0 (2007-Dec-05):
-		//   * Initial release.
-
 		public frmChanThreadWatch() {
 			InitializeComponent();
+			int initialWidth = ClientSize.Width;
 			General.SetFontAndScaling(this);
+			float scaleFactorX = (float)ClientSize.Width / initialWidth;
+			foreach (ColumnHeader columnHeader in lvThreads.Columns) {
+				columnHeader.Width = Convert.ToInt32(columnHeader.Width * scaleFactorX);
+			}
+
+			// Souldn't matter since the limit is supposed to be per connection group
+			ServicePointManager.DefaultConnectionLimit = Int32.MaxValue;
 
 			Settings.Load();
 
@@ -141,10 +79,7 @@ namespace ChanThreadWatch {
 		}
 
 		private void frmChanThreadWatch_Shown(object sender, EventArgs e) {
-			try {
-				LoadThreadList();
-			}
-			catch { }
+			LoadThreadList();
 		}
 
 		private void frmChanThreadWatch_FormClosed(object sender, FormClosedEventArgs e) {
@@ -160,43 +95,29 @@ namespace ChanThreadWatch {
 			}
 			catch { }
 
-			using (SoftLock.Obtain(_watchInfoList)) {
-				try {
-					SaveThreadList();
-				}
-				catch { }
-				foreach (WatchInfo w in _watchInfoList) {
-					w.Stop = true;
-				}
-			}
+			SaveThreadList();
 
-			while (true) {
-				Thread watchThread = null;
-				using (SoftLock.Obtain(_watchInfoList)) {
-					foreach (WatchInfo w in _watchInfoList) {
-						if ((w.WatchThread != null) && w.WatchThread.IsAlive) {
-							watchThread = w.WatchThread;
-							break;
-						}
-					}
-				}
-				if (watchThread == null) break;
-				while (watchThread.IsAlive) {
-					Thread.Sleep(10);
-					// Don't call DoEvents inside the lock because it could allow another
-					// part of the UI thread to enter the lock as well.
+			_isExiting = true;
+			foreach (ThreadWatcher watcher in ThreadWatchers) {
+				watcher.Stop(StopReason.Exiting);
+			}
+			foreach (ThreadWatcher watcher in ThreadWatchers) {
+				while (!watcher.WaitUntilStopped(50)) {
 					Application.DoEvents();
 				}
 			}
+			Program.ReleaseMutex();
 		}
 
 		private void txtPageURL_KeyDown(object sender, KeyEventArgs e) {
 			if (e.KeyCode == Keys.Enter) {
-				btnAdd_Click(null, null);
+				btnAdd_Click(txtPageURL, null);
 			}
 		}
 
 		private void btnAdd_Click(object sender, EventArgs e) {
+			if (_isExiting) return;
+
 			string pageURL = txtPageURL.Text.Trim();
 			string pageAuth = (chkPageAuth.Checked && (txtPageAuth.Text.IndexOf(':') != -1)) ? txtPageAuth.Text : String.Empty;
 			string imageAuth = (chkImageAuth.Checked && (txtImageAuth.Text.IndexOf(':') != -1)) ? txtImageAuth.Text : String.Empty;
@@ -222,6 +143,8 @@ namespace ChanThreadWatch {
 
 			txtPageURL.Clear();
 			txtPageURL.Focus();
+
+			SaveThreadList();
 		}
 
 		private void btnRemoveCompleted_Click(object sender, EventArgs e) {
@@ -229,45 +152,43 @@ namespace ChanThreadWatch {
 		}
 
 		private void miStop_Click(object sender, EventArgs e) {
-			using (SoftLock.Obtain(_watchInfoList)) {
-				foreach (ListViewItem item in lvThreads.SelectedItems) {
-					_watchInfoList[item.Index].Stop = true;
-				}
+			foreach (ThreadWatcher watcher in SelectedThreadWatchers) {
+				watcher.Stop(StopReason.UserRequest);
 			}
+			SaveThreadList();
 		}
 
 		private void miStart_Click(object sender, EventArgs e) {
-			using (SoftLock.Obtain(_watchInfoList)) {
-				foreach (ListViewItem item in lvThreads.SelectedItems) {
-					WatchInfo wi = _watchInfoList[item.Index];
-					if ((wi.WatchThread == null) || !wi.WatchThread.IsAlive) {
-						AddThread(wi.PageURL, wi.PageAuth, wi.ImageAuth, wi.WaitSeconds, wi.OneTime, wi.SaveDir, wi.SaveBaseDir);
-					}
+			if (_isExiting) return;
+			foreach (ThreadWatcher watcher in SelectedThreadWatchers) {
+				if (!watcher.IsRunning) {
+					watcher.Start();
 				}
 			}
+			SaveThreadList();
 		}
 
 		private void miOpenFolder_Click(object sender, EventArgs e) {
-			foreach (string dir in GetFromSelected(wi => wi.SaveDir)) {
+			foreach (string dir in GetFromSelectedThreadWatchers(wi => wi.ThreadDownloadDirectory)) {
 				try {
 					Process.Start(dir);
 				}
-				catch {}
+				catch { }
 			}
 		}
 
 		private void miOpenURL_Click(object sender, EventArgs e) {
-			foreach (string url in GetFromSelected(wi => wi.PageURL)) {
+			foreach (string url in GetFromSelectedThreadWatchers(wi => wi.PageURL)) {
 				try {
 					Process.Start(url);
 				}
-				catch {}
+				catch { }
 			}
 		}
 
 		private void miCopyURL_Click(object sender, EventArgs e) {
 			StringBuilder sb = new StringBuilder();
-			foreach (string url in GetFromSelected(wi => wi.PageURL)) {
+			foreach (string url in GetFromSelectedThreadWatchers(wi => wi.PageURL)) {
 				if (sb.Length != 0) sb.Append(Environment.NewLine);
 				sb.Append(url);
 			}
@@ -276,24 +197,19 @@ namespace ChanThreadWatch {
 		}
 
 		private void miCheckNow_Click(object sender, EventArgs e) {
-			using (SoftLock.Obtain(_watchInfoList)) {
-				foreach (ListViewItem item in lvThreads.SelectedItems) {
-					_watchInfoList[item.Index].NextCheck = TickCount.Now;
-				}
+			foreach (ThreadWatcher watcher in SelectedThreadWatchers) {
+				watcher.MillisecondsUntilNextCheck = 0;
 			}
 		}
 
 		private void miCheckEvery_Click(object sender, EventArgs e) {
 			MenuItem menuItem = sender as MenuItem;
 			if (menuItem != null) {
-				int waitSeconds = Convert.ToInt32(menuItem.Tag) * 60;
-				using (SoftLock.Obtain(_watchInfoList)) {
-					foreach (ListViewItem item in lvThreads.SelectedItems) {
-						WatchInfo wi = _watchInfoList[item.Index];
-						wi.NextCheck += (waitSeconds - wi.WaitSeconds) * 1000;
-						wi.WaitSeconds = waitSeconds;
-					}
+				int checkIntervalSeconds = Convert.ToInt32(menuItem.Tag) * 60;
+				foreach (ThreadWatcher watcher in SelectedThreadWatchers) {
+					watcher.CheckIntervalSeconds = checkIntervalSeconds;
 				}
+				UpdateWaitingWatcherStatuses();
 			}
 		}
 
@@ -320,13 +236,10 @@ namespace ChanThreadWatch {
 				if (lvThreads.SelectedItems.Count != 0) {
 					bool anyRunning = false;
 					bool anyStopped = false;
-					using (SoftLock.Obtain(_watchInfoList)) {
-						foreach (ListViewItem item in lvThreads.SelectedItems) {
-							WatchInfo wi = _watchInfoList[item.Index];
-							bool isRunning = (wi.WatchThread != null) && wi.WatchThread.IsAlive;
-							anyRunning |= isRunning;
-							anyStopped |= !isRunning;
-						}
+					foreach (ThreadWatcher watcher in SelectedThreadWatchers) {
+						bool isRunning = watcher.IsRunning;
+						anyRunning |= isRunning;
+						anyStopped |= !isRunning;
 					}
 					miStop.Visible = anyRunning;
 					miStart.Visible = anyStopped;
@@ -358,122 +271,224 @@ namespace ChanThreadWatch {
 			txtImageAuth.Enabled = chkImageAuth.Checked;
 		}
 
-		private bool AddThread(string pageURL, string pageAuth, string imageAuth, int waitSeconds, bool oneTime, string saveDir, string saveBaseDir) {
-			const int liDuplicate = -2;
-			const int liNotFound = -1;
-			WatchInfo watchInfo = new WatchInfo();
-			int listIndex = liNotFound;
+		private void tmrUpdateWaitStatus_Tick(object sender, EventArgs e) {
+			UpdateWaitingWatcherStatuses();
+		}
 
-			using (SoftLock.Obtain(_watchInfoList)) {
-				foreach (WatchInfo w in _watchInfoList) {
-					if (String.Equals(w.PageURL, pageURL, StringComparison.OrdinalIgnoreCase)) {
-						listIndex = ((w.WatchThread != null) && w.WatchThread.IsAlive) ? liDuplicate : w.ListIndex;
-						break;
-					}
+		private void ThreadWatcher_DownloadStatus(ThreadWatcher watcher, DownloadStatusEventArgs args) {
+			BeginInvoke((MethodInvoker)(() => {
+				SetDownloadStatus(watcher, args.DownloadType, args.CompleteCount, args.TotalCount);
+				SetupWaitTimer();
+			}));
+		}
+
+		private void ThreadWatcher_WaitStatus(ThreadWatcher watcher, EventArgs args) {
+			BeginInvoke((MethodInvoker)(() => {
+				SetWaitStatus(watcher);
+				SetupWaitTimer();
+			}));
+		}
+
+		private void ThreadWatcher_StopStatus(ThreadWatcher watcher, StopStatusEventArgs args) {
+			BeginInvoke((MethodInvoker)(() => {
+				SetStopStatus(watcher, args.StopReason);
+				SetupWaitTimer();
+				if (args.StopReason != StopReason.UserRequest && args.StopReason != StopReason.Exiting) {
+					SaveThreadList();
 				}
-				if (listIndex != liDuplicate) {
-					if (listIndex == liNotFound) {
-						lvThreads.Items.Add(new ListViewItem(pageURL)).SubItems.Add(String.Empty);
-						_watchInfoList.Add(watchInfo);
-						listIndex = _watchInfoList.Count - 1;
-					}
-					else {
-						_watchInfoList[listIndex].ListIndex = -1;
-						_watchInfoList[listIndex] = watchInfo;
-						lvThreads.Items[listIndex].Text = pageURL;
-					}
-					watchInfo.PageURL = pageURL;
-					watchInfo.PageAuth = pageAuth;
-					watchInfo.ImageAuth = imageAuth;
-					watchInfo.WaitSeconds = waitSeconds;
-					watchInfo.OneTime = oneTime;
-					watchInfo.SaveDir = saveDir;
-					watchInfo.SaveBaseDir = saveBaseDir;
-					watchInfo.NextCheck = TickCount.Now;
-					watchInfo.ListIndex = listIndex;
-					watchInfo.WatchThread = new Thread(WatchThread);
+			}));
+		}
+
+		private bool AddThread(string pageURL, string pageAuth, string imageAuth, int checkInterval, bool oneTime, string saveDir, StopReason? stopReason) {
+			ThreadWatcher watcher = null;
+
+			foreach (ThreadWatcher selectedWatcher in SelectedThreadWatchers) {
+				if (String.Equals(selectedWatcher.PageURL, pageURL, StringComparison.OrdinalIgnoreCase)) {
+					if (selectedWatcher.IsRunning) return false;
+					watcher = selectedWatcher;
+					break;
 				}
 			}
 
-			if (listIndex == liDuplicate) return false;
+			if (watcher == null) {
+				watcher = new ThreadWatcher(pageURL);
+				watcher.ThreadDownloadDirectory = saveDir;
+				watcher.DownloadStatus += ThreadWatcher_DownloadStatus;
+				watcher.WaitStatus += ThreadWatcher_WaitStatus;
+				watcher.StopStatus += ThreadWatcher_StopStatus;
 
-			watchInfo.WatchThread.Start(watchInfo);
+				ListViewItem item = new ListViewItem(pageURL);
+				item.Tag = watcher;
+				item.SubItems.Add(String.Empty);
+				lvThreads.Items.Add(item);
+
+				_watcherListIndexes[watcher] = lvThreads.Items.Count - 1;
+			}
+
+			watcher.PageAuth = pageAuth;
+			watcher.ImageAuth = imageAuth;
+			watcher.CheckIntervalSeconds = checkInterval;
+			watcher.OneTimeDownload = oneTime;
+
+			if (stopReason == null) {
+				watcher.Start();
+			}
+			else {
+				watcher.StopReason = stopReason.Value;
+				SetStopStatus(watcher, stopReason.Value);
+			}
+
 			return true;
 		}
 
 		private void RemoveThreads(bool removeCompleted, bool removeSelected) {
-			using (SoftLock.Obtain(_watchInfoList)) {
-				int i = 0;
-				while (i < _watchInfoList.Count) {
-					WatchInfo watchInfo = _watchInfoList[i];
-					if ((removeCompleted || (removeSelected && lvThreads.Items[i].Selected)) &&
-						(watchInfo.Stop || !watchInfo.WatchThread.IsAlive))
-					{
-						watchInfo.ListIndex = -1;
-						_watchInfoList.RemoveAt(i);
-						lvThreads.Items.RemoveAt(i);
-					}
-					else {
-						watchInfo.ListIndex = i;
-						i++;
-					}
+			int i = 0;
+			while (i < lvThreads.Items.Count) {
+				ThreadWatcher watcher = (ThreadWatcher)lvThreads.Items[i].Tag;
+				if ((removeCompleted || (removeSelected && lvThreads.Items[i].Selected)) && !watcher.IsRunning) {
+					lvThreads.Items.RemoveAt(i);
+					_watcherListIndexes.Remove(watcher);
+				}
+				else {
+					_watcherListIndexes[watcher] = i;
+					i++;
 				}
 			}
 		}
 
-		private void SetStatus(WatchInfo watchInfo, string status) {
-			if (watchInfo.ListIndex == -1) return;
-			Invoke((MethodInvoker)delegate() {
-				var item = lvThreads.Items[watchInfo.ListIndex].SubItems[1];
-				if (item.Text != status) {
-					item.Text = status;
-				}
-			});
+		private void SetupWaitTimer() {
+			bool anyWaiting = false;
+			foreach (ThreadWatcher watcher in WaitingThreadWatchers) {
+				anyWaiting = true;
+				break;
+			}
+			if (!tmrUpdateWaitStatus.Enabled && anyWaiting) {
+				tmrUpdateWaitStatus.Start();
+			}
+			else if (tmrUpdateWaitStatus.Enabled && !anyWaiting) {
+				tmrUpdateWaitStatus.Stop();
+			}
+		}
+
+		private void UpdateWaitingWatcherStatuses() {
+			foreach (ThreadWatcher watcher in WaitingThreadWatchers) {
+				SetWaitStatus(watcher);
+			}
+		}
+
+		private void SetStatus(ThreadWatcher watcher, string status) {
+			int listIndex;
+			if (!_watcherListIndexes.TryGetValue(watcher, out listIndex)) return;
+			var subItem = lvThreads.Items[listIndex].SubItems[1];
+			if (subItem.Text != status) {
+				subItem.Text = status;
+			}
+		}
+
+		private void SetDownloadStatus(ThreadWatcher watcher, DownloadType downloadType, int completeCount, int totalCount) {
+			string type;
+			bool hideDetail = false;
+			switch (downloadType) {
+				case DownloadType.Page:
+					type = totalCount == 1 ? "page" : "pages";
+					hideDetail = totalCount == 1;
+					break;
+				case DownloadType.Image:
+					type = "images";
+					break;
+				case DownloadType.Thumbnail:
+					type = "thumbnails";
+					break;
+				default:
+					return;
+			}
+			string status = hideDetail ? "Downloading " + type :
+				String.Format("Downloading {0}: {1} of {2} completed", type, completeCount, totalCount);
+			SetStatus(watcher, status);
+		}
+
+		private void SetWaitStatus(ThreadWatcher watcher) {
+			int remainingSeconds = (watcher.MillisecondsUntilNextCheck + 999) / 1000;
+			SetStatus(watcher, String.Format("Waiting {0} seconds", remainingSeconds));
+		}
+
+		private void SetStopStatus(ThreadWatcher watcher, StopReason stopReason) {
+			string status = "Stopped: ";
+			switch (stopReason) {
+				case StopReason.UserRequest:
+					status += "User requested";
+					break;
+				case StopReason.Exiting:
+					status += "Exiting";
+					break;
+				case StopReason.PageNotFound:
+					status += "Page not found";
+					break;
+				case StopReason.DownloadComplete:
+					status += "Download complete";
+					break;
+				case StopReason.IOError:
+					status += "Error writing to disk";
+					break;
+				default:
+					status += "Unknown error";
+					break;
+			}
+			SetStatus(watcher, status);
 		}
 
 		private void SaveThreadList() {
-			using (SoftLock.Obtain(_watchInfoList)) {
+			if (_isExiting) return;
+			try {
 				using (StreamWriter sw = new StreamWriter(Path.Combine(Settings.GetSettingsDir(), Settings.ThreadsFileName))) {
-					sw.WriteLine("1"); // File version
-					foreach (WatchInfo w in _watchInfoList) {
-						if ((w.WatchThread != null) && w.WatchThread.IsAlive) {
-							sw.WriteLine(w.PageURL);
-							sw.WriteLine(w.PageAuth);
-							sw.WriteLine(w.ImageAuth);
-							sw.WriteLine(w.WaitSeconds.ToString());
-							sw.WriteLine(w.OneTime ? "1" : "0");
-							sw.WriteLine(General.GetRelativeDirectoryPath(w.SaveDir, w.SaveBaseDir));
-						}
+					sw.WriteLine("2"); // File version
+					foreach (ThreadWatcher watcher in ThreadWatchers) {
+						sw.WriteLine(watcher.PageURL);
+						sw.WriteLine(watcher.PageAuth);
+						sw.WriteLine(watcher.ImageAuth);
+						sw.WriteLine(watcher.CheckIntervalSeconds.ToString());
+						sw.WriteLine(watcher.OneTimeDownload ? "1" : "0");
+						sw.WriteLine(General.GetRelativeDirectoryPath(watcher.ThreadDownloadDirectory, watcher.MainDownloadDirectory));
+						sw.WriteLine(watcher.IsRunning ? String.Empty : ((int)watcher.StopReason).ToString());
 					}
 				}
 			}
+			catch { }
 		}
 
 		private void LoadThreadList() {
-			const int linesPerThread = 6;
-			string path = Path.Combine(Settings.GetSettingsDir(), Settings.ThreadsFileName);
-			if (!File.Exists(path)) return;
-			string[] lines = File.ReadAllLines(path);
-			if ((lines.Length < 1) || (Int32.Parse(lines[0]) != 1)) return;
-			if (lines.Length < (1 + linesPerThread)) return;
-			using (SoftLock.Obtain(_promptSync)) {
-				if (MessageBox.Show("Would you like to reload the list of active threads from the last run?",
-					"Reload Threads", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.No)
-				{
-					return;
+			try {
+				string path = Path.Combine(Settings.GetSettingsDir(), Settings.ThreadsFileName);
+				if (!File.Exists(path)) return;
+				string[] lines = File.ReadAllLines(path);
+				if (lines.Length < 1) return;
+				int fileVersion = Int32.Parse(lines[0]);
+				int linesPerThread;
+				switch (fileVersion) {
+					case 1: linesPerThread = 6; break;
+					case 2: linesPerThread = 7; break;
+					default: return;
+				}
+				if (lines.Length < (1 + linesPerThread)) return;
+				int i = 1;
+				while (i <= lines.Length - linesPerThread) {
+					string pageURL = lines[i++];
+					string pageAuth = lines[i++];
+					string imageAuth = lines[i++];
+					int checkIntervalSeconds = Math.Max(Int32.Parse(lines[i++]), 60);
+					bool oneTimeDownload = lines[i++] == "1";
+					string saveDir = General.GetAbsoluteDirectoryPath(lines[i++], Settings.AbsoluteDownloadDir);
+					StopReason? stopReason = null;
+					if (fileVersion >= 2) {
+						string stopReasonLine = lines[i++];
+						if (stopReasonLine.Length != 0) {
+							stopReason = (StopReason)Int32.Parse(stopReasonLine);
+						}
+					}
+					AddThread(pageURL, pageAuth, imageAuth, checkIntervalSeconds, oneTimeDownload, saveDir, stopReason);
 				}
 			}
-			string saveBaseDir = Settings.AbsoluteDownloadDir;
-			int i = 1;
-			while (i <= lines.Length - linesPerThread) {
-				string pageURL = lines[i++];
-				string pageAuth = lines[i++];
-				string imageAuth = lines[i++];
-				int waitSeconds = Math.Max(Int32.Parse(lines[i++]), 60);
-				bool oneTime = lines[i++] == "1";
-				string saveDir = General.GetAbsoluteDirectoryPath(lines[i++], saveBaseDir);
-				AddThread(pageURL, pageAuth, imageAuth, waitSeconds, oneTime, saveDir, saveBaseDir);
-			}
+			catch { }
 		}
 
 		private void CheckForUpdates() {
@@ -485,7 +500,7 @@ namespace ChanThreadWatch {
 		private void CheckForUpdateThread() {
 			string html;
 			try {
-				html = General.GetToString(General.ProgramURL);
+				html = General.DownloadPageToString(General.ProgramURL);
 			}
 			catch {
 				return;
@@ -506,16 +521,16 @@ namespace ChanThreadWatch {
 				current = Math.Max(current, ParseVersionNumber(Settings.LatestUpdateVersion));
 			}
 			if (latest > current) {
-				lock (_promptSync) {
+				lock (_startupPromptSync) {
 					if (IsDisposed) return;
 					Settings.LatestUpdateVersion = latestStr;
-					Invoke((MethodInvoker)delegate() {
+					Invoke((MethodInvoker)(() => {
 						if (MessageBox.Show("A newer version of Chan Thread Watch is available.  Would you like to open the Chan Thread Watch website?",
 							"Newer Version Found", MessageBoxButtons.YesNo, MessageBoxIcon.Information) == DialogResult.Yes)
 						{
 							Process.Start(General.ProgramURL);
 						}
-					});
+					}));
 				}
 			}
 		}
@@ -535,358 +550,37 @@ namespace ChanThreadWatch {
 			}
 		}
 
-		private List<string> GetFromSelected(WatchInfoSelector selector) {
-			List<string> values = new List<string>();
-			using (SoftLock.Obtain(_watchInfoList)) {
-				foreach (ListViewItem item in lvThreads.SelectedItems) {
-					string value = selector(_watchInfoList[item.Index]);
-					if (!String.IsNullOrEmpty(value)) {
-						values.Add(value);
-					}
+		private IEnumerable<string> GetFromSelectedThreadWatchers(Func<ThreadWatcher, string> selector) {
+			foreach (ThreadWatcher watcher in SelectedThreadWatchers) {
+				string value = selector(watcher);
+				if (!String.IsNullOrEmpty(value)) {
+					yield return value;
 				}
 			}
-			return values;
 		}
 
-		private void WatchThread(object p) {
-			WatchInfo watchInfo = (WatchInfo)p;
-			SiteHelper siteHelper;
-			List<PageInfo> pageList = new List<PageInfo>();
-			var completedImages = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-			var completedThumbs = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-			string pageURL = watchInfo.PageURL;
-			string pageAuth = watchInfo.PageAuth;
-			string imgAuth = watchInfo.ImageAuth;
-			string page = null;
-			string saveDir;
-			string saveFileName;
-			string savePath;
-			string saveThumbsDir;
-			string site;
-			string board;
-			string thread;
-			int maxFileNameLength;
-			int pageIndex;
-			int numTries;
-			const int maxTries = 3;
-			long waitRemain;
-
-			siteHelper = SiteHelper.GetInstance(pageURL);
-			siteHelper.SetURL(pageURL);
-			site = siteHelper.GetSiteName();
-			board = siteHelper.GetBoardName();
-			thread = siteHelper.GetThreadName();
-			lock (_watchInfoList) {
-				saveDir = watchInfo.SaveDir;
-			}
-			if (String.IsNullOrEmpty(saveDir)) {
-				string saveBaseDir = Settings.AbsoluteDownloadDir;
-				saveDir = Path.Combine(saveBaseDir, General.CleanFileName(site + "_" + board + "_" + thread));
-				if (!Directory.Exists(saveDir)) {
-					try { Directory.CreateDirectory(saveDir); }
-					catch {
-						lock (_watchInfoList) {
-							SetStatus(watchInfo, "Stopped, unable to create folder");
-							return;
-						}
-					}
-				}
-				lock (_watchInfoList) {
-					watchInfo.SaveDir = saveDir;
-					watchInfo.SaveBaseDir = saveBaseDir;
+		private IEnumerable<ThreadWatcher> ThreadWatchers {
+			get {
+				foreach (ListViewItem item in lvThreads.Items) {
+					yield return (ThreadWatcher)item.Tag;
 				}
 			}
-			saveThumbsDir = Path.Combine(saveDir, "thumbs");
-			maxFileNameLength = General.GetMaximumFileNameLength(saveDir);
+		}
 
-			pageList.Add(new PageInfo { URL = pageURL });
-
-			while (true) {
-				Queue<ImageInfo> pendingImages = new Queue<ImageInfo>();
-				Queue<ThumbnailInfo> pendingThumbs = new Queue<ThumbnailInfo>();
-
-				pageIndex = 0;
-				do {
-					saveFileName = General.CleanFileName(thread) + ((pageIndex == 0) ? String.Empty : ("_" + (pageIndex + 1))) + ".html";
-					savePath = Path.Combine(saveDir, saveFileName);
-
-					PageInfo pageInfo = pageList[pageIndex];
-					pageInfo.IsFresh = false;
-					pageInfo.Path = savePath;
-					pageInfo.ReplaceList = (Settings.SaveThumbnails == true) ? new List<ReplaceInfo>() : null;
-					for (numTries = 1; numTries <= maxTries; numTries++) {
-						lock (_watchInfoList) {
-							if (watchInfo.Stop) {
-								SetStatus(watchInfo, "Stopped by user");
-								return;
-							}
-							SetStatus(watchInfo, String.Format("Downloading page{0}{1}",
-								(pageIndex == 0) ? String.Empty : (" " + (pageIndex + 1)),
-								(numTries == 1) ? String.Empty : (" (retry " + (numTries - 1) + ")")));
-						}
-						try {
-							page = General.GetToString(pageInfo.URL, pageAuth, savePath, true, ref pageInfo.CacheTime,
-								out pageInfo.Encoding, pageInfo.ReplaceList);
-							pageInfo.IsFresh = true;
-							break;
-						}
-						catch (HTTP404Exception) {
-							lock (_watchInfoList) {
-								SetStatus(watchInfo, "Stopped, page not found");
-							}
-							return;
-						}
-						catch (HTTP304Exception) {
-							page = null;
-							break;
-						}
-						catch (Exception ex) {
-							if ((ex is DirectoryNotFoundException) || (ex is PathTooLongException) || (ex is UnauthorizedAccessException)) {
-								lock (_watchInfoList) {
-									SetStatus(watchInfo, "Stopped, unable to write file");
-									return;
-								}
-							}
-							page = null;
-						}
-					}
-
-					if (page != null) {
-						siteHelper.SetHTML(page);
-
-						List<ThumbnailInfo> thumbs = new List<ThumbnailInfo>();
-						List<ImageInfo> images = siteHelper.GetImages(pageInfo.ReplaceList, thumbs);
-						if (completedImages.Count == 0) {
-							var completedImageDiskNames = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-							foreach (ImageInfo image in images) {
-								for (int iName = 0; iName < 2; iName++) {
-									int iSuffix = 1;
-									string fileName;
-									do {
-										fileName = ((iName == 0) ? image.FileName : image.OriginalFileName) +
-											((iSuffix == 1) ? String.Empty : ("_" + iSuffix)) + image.Extension;
-										iSuffix++;
-									}
-									while (completedImageDiskNames.ContainsKey(fileName));
-									if (File.Exists(Path.Combine(saveDir, fileName))) {
-										completedImageDiskNames[fileName] = 0;
-										completedImages[image.FileName] = fileName;
-										break;
-									}
-								}
-							}
-							foreach (ThumbnailInfo thumb in thumbs) {
-								if (File.Exists(Path.Combine(saveThumbsDir, thumb.FileNameWithExt))) {
-									completedThumbs[thumb.FileNameWithExt] = 0;
-								}
-							}
-						}
-						foreach (ImageInfo image in images) {
-							if (!completedImages.ContainsKey(image.FileName)) {
-								pendingImages.Enqueue(image);
-							}
-						}
-						foreach (ThumbnailInfo thumb in thumbs) {
-							if (!completedThumbs.ContainsKey(thumb.FileNameWithExt)) {
-								pendingThumbs.Enqueue(thumb);
-							}
-						}
-
-						string nextPageURL = siteHelper.GetNextPageURL();
-						if (!String.IsNullOrEmpty(nextPageURL)) {
-							PageInfo nextPageInfo = new PageInfo { URL = nextPageURL };
-							if (pageIndex == pageList.Count - 1) {
-								pageList.Add(nextPageInfo);
-							}
-							else if (pageList[pageIndex + 1].URL != nextPageURL) {
-								pageList[pageIndex + 1] = nextPageInfo;
-							}
-						}
-						else if (pageIndex < pageList.Count - 1) {
-							pageList.RemoveRange(pageIndex + 1, pageList.Count - (pageIndex + 1));
-						}
-
-						page = null;
-					}
+		private IEnumerable<ThreadWatcher> SelectedThreadWatchers {
+			get {
+				foreach (ListViewItem item in lvThreads.SelectedItems) {
+					yield return (ThreadWatcher)item.Tag;
 				}
-				while (++pageIndex < pageList.Count);
+			}
+		}
 
-				lock (_watchInfoList) {
-					watchInfo.NextCheck = TickCount.Now + (watchInfo.WaitSeconds * 1000);
-				}
-
-				int totalImageCount = completedImages.Count + pendingImages.Count;
-				while (pendingImages.Count != 0) {
-					ImageInfo image = pendingImages.Dequeue();
-					bool downloadCompleted = false;
-					bool pathTooLong = false;
-
-				MakeImagePath:
-					if ((Settings.UseOriginalFileNames == true) && !String.IsNullOrEmpty(image.OriginalFileName) && !pathTooLong) {
-						saveFileName = image.OriginalFileName;
+		private IEnumerable<ThreadWatcher> WaitingThreadWatchers {
+			get {
+				foreach (KeyValuePair<ThreadWatcher, int> kvp in _watcherListIndexes) {
+					if (kvp.Key.IsWaiting) {
+						yield return kvp.Key;
 					}
-					else {
-						saveFileName = image.FileName;
-					}
-
-					int iSuffix = 1;
-					do {
-						savePath = Path.Combine(saveDir, saveFileName + ((iSuffix == 1) ?
-							String.Empty : ("_" + iSuffix)) + image.Extension) ;
-						iSuffix++;
-					}
-					while (File.Exists(savePath));
-
-					if (Path.GetFileName(savePath).Length > maxFileNameLength) {
-						if (!pathTooLong) {
-							pathTooLong = true;
-							goto MakeImagePath;
-						}
-						else {
-							downloadCompleted = true;
-							goto SkipDownload;
-						}
-					}
-
-					byte[] prevHash = null;
-					for (numTries = 1; numTries <= maxTries; numTries++) {
-						lock (_watchInfoList) {
-							if (watchInfo.Stop) {
-								SetStatus(watchInfo, "Stopped by user");
-								return;
-							}
-							SetStatus(watchInfo, String.Format("Downloading image {0} of {1}{2}",
-								totalImageCount - pendingImages.Count, totalImageCount,
-								(numTries == 1) ? String.Empty : (" (retry " + (numTries - 1) + ")")));
-						}
-						try {
-							HashType hashType = (Settings.VerifyImageHashes != false) ? image.HashType : HashType.None;
-							byte[] hash = General.GetToFile(image.URL, imgAuth, image.Referer, savePath, hashType);
-							if (hashType != HashType.None && !General.ArraysAreEqual(hash, image.Hash) &&
-								(prevHash == null || !General.ArraysAreEqual(hash, prevHash)))
-							{
-								prevHash = hash;
-								throw new Exception("Hash of downloaded file is incorrect.");
-							}
-							downloadCompleted = true;
-							break;
-						}
-						catch (HTTP404Exception) {
-							break;
-						}
-						catch (Exception ex) {
-							if (ex is PathTooLongException) {
-								downloadCompleted = true;
-								break;
-							}
-							if ((ex is DirectoryNotFoundException) || (ex is UnauthorizedAccessException)) {
-								lock (_watchInfoList) {
-									SetStatus(watchInfo, "Stopped, unable to write file");
-									return;
-								}
-							}
-						}
-					}
-
-				SkipDownload:
-					if (downloadCompleted) {
-						completedImages[image.FileName] = Path.GetFileName(savePath);
-					}
-				}
-
-				if (Settings.SaveThumbnails == true) {
-					if ((pendingThumbs.Count != 0) && !Directory.Exists(saveThumbsDir)) {
-						try { Directory.CreateDirectory(saveThumbsDir); }
-						catch {
-							lock (_watchInfoList) {
-								SetStatus(watchInfo, "Stopped, unable to create folder");
-								return;
-							}
-						}
-					}
-
-					int totalThumbCount = completedThumbs.Count + pendingThumbs.Count;
-					while (pendingThumbs.Count != 0) {
-						ThumbnailInfo thumb = pendingThumbs.Dequeue();
-
-						savePath = Path.Combine(saveThumbsDir, thumb.FileNameWithExt);
-
-						bool downloadCompleted = false;
-						for (numTries = 1; numTries <= maxTries; numTries++) {
-							lock (_watchInfoList) {
-								if (watchInfo.Stop) {
-									SetStatus(watchInfo, "Stopped by user");
-									return;
-								}
-								SetStatus(watchInfo, String.Format("Downloading thumbnail {0} of {1}{2}",
-									totalThumbCount - pendingThumbs.Count, totalThumbCount,
-									(numTries == 1) ? String.Empty : (" (retry " + (numTries - 1) + ")")));
-							}
-							try {
-								General.GetToFile(thumb.URL, pageAuth, thumb.Referer, savePath, HashType.None);
-								downloadCompleted = true;
-								break;
-							}
-							catch (HTTP404Exception) {
-								break;
-							}
-							catch (Exception ex) {
-								if (ex is PathTooLongException) {
-									downloadCompleted = true;
-									break;
-								}
-								if ((ex is DirectoryNotFoundException) || (ex is UnauthorizedAccessException)) {
-									lock (_watchInfoList) {
-										SetStatus(watchInfo, "Stopped, unable to write file");
-										return;
-									}
-								}
-							}
-						}
-						if (downloadCompleted) {
-							completedThumbs[thumb.FileNameWithExt] = 0;
-						}
-					}
-
-					foreach (PageInfo pageInfo in pageList) {
-						if (!pageInfo.IsFresh) continue;
-						page = General.BytesToString(File.ReadAllBytes(pageInfo.Path), pageInfo.Encoding);
-						for (int i = 0; i < pageInfo.ReplaceList.Count; i++) {
-							ReplaceInfo replace = pageInfo.ReplaceList[i];
-							if ((replace.Type == ReplaceType.ImageLinkHref) &&
-								completedImages.TryGetValue(replace.Tag, out saveFileName))
-							{
-								replace.Value = "href=\"" + HttpUtility.HtmlAttributeEncode(saveFileName) + "\"";
-							}
-							if (replace.Type == ReplaceType.ImageSrc) {
-								replace.Value = "src=\"thumbs/" + HttpUtility.HtmlAttributeEncode(replace.Tag) + "\"";
-							}
-						}
-						General.AddOtherReplaces(page, pageInfo.ReplaceList);
-						using (StreamWriter sw = new StreamWriter(pageInfo.Path, false, pageInfo.Encoding)) {
-							General.WriteReplacedString(page, pageInfo.ReplaceList, sw);
-						}
-						if (General.FindElementClose(page, "html", 0) != -1 && File.Exists(pageInfo.Path + ".bak")) {
-							try { File.Delete(pageInfo.Path + ".bak"); }
-							catch { }
-						}
-					}
-				}
-
-				while (true) {
-					lock (_watchInfoList) {
-						waitRemain = watchInfo.NextCheck - TickCount.Now;
-						if (waitRemain <= 0) {
-							break;
-						}
-						if (watchInfo.Stop || watchInfo.OneTime) {
-							SetStatus(watchInfo, watchInfo.Stop ? "Stopped by user" :
-								"Stopped, download finished");
-							return;
-						}
-						SetStatus(watchInfo, String.Format("Waiting {0:0} seconds", Math.Ceiling(waitRemain / 1000.0)));
-					}
-					Thread.Sleep(200);
 				}
 			}
 		}

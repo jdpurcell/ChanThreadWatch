@@ -54,10 +54,14 @@ namespace ChanThreadWatch {
 				Settings.VerifyImageHashes = chkVerifyImageHashes.Checked;
 				Settings.CheckForUpdates = chkCheckForUpdates.Checked;
 				Settings.UseExeDirForSettings = rbSettingsInExeFolder.Checked;
+				try {
+					Settings.Save();
+				}
+				catch { }
 
 				if (Settings.AbsoluteDownloadDir != oldAbsoluteDownloadFolder) {
 					MessageBox.Show("The new download folder will not affect threads currently being watched until the program is restared.  " +
-						"If you reload the thread list at next run, make sure you have moved the threads' download folders into the new download folder, otherwise they will be redownloaded.",
+						"If you are still watching the threads at next run, make sure you have moved their download folders into the new download folder, otherwise they will be redownloaded.",
 						"Download Folder Changed", MessageBoxButtons.OK, MessageBoxIcon.Information);
 				}
 

@@ -44,7 +44,7 @@
 			// 
 			this.txtDownloadFolder.Location = new System.Drawing.Point(108, 8);
 			this.txtDownloadFolder.Name = "txtDownloadFolder";
-			this.txtDownloadFolder.Size = new System.Drawing.Size(412, 21);
+			this.txtDownloadFolder.Size = new System.Drawing.Size(412, 20);
 			this.txtDownloadFolder.TabIndex = 1;
 			// 
 			// lblDownloadFolder
@@ -52,7 +52,7 @@
 			this.lblDownloadFolder.AutoSize = true;
 			this.lblDownloadFolder.Location = new System.Drawing.Point(8, 12);
 			this.lblDownloadFolder.Name = "lblDownloadFolder";
-			this.lblDownloadFolder.Size = new System.Drawing.Size(89, 13);
+			this.lblDownloadFolder.Size = new System.Drawing.Size(87, 13);
 			this.lblDownloadFolder.TabIndex = 0;
 			this.lblDownloadFolder.Text = "Download folder:";
 			// 
@@ -91,7 +91,7 @@
 			this.chkCustomUserAgent.AutoSize = true;
 			this.chkCustomUserAgent.Location = new System.Drawing.Point(10, 42);
 			this.chkCustomUserAgent.Name = "chkCustomUserAgent";
-			this.chkCustomUserAgent.Size = new System.Drawing.Size(121, 17);
+			this.chkCustomUserAgent.Size = new System.Drawing.Size(117, 17);
 			this.chkCustomUserAgent.TabIndex = 4;
 			this.chkCustomUserAgent.Text = "Custom user agent:";
 			this.chkCustomUserAgent.UseVisualStyleBackColor = true;
@@ -102,7 +102,7 @@
 			this.txtCustomUserAgent.Enabled = false;
 			this.txtCustomUserAgent.Location = new System.Drawing.Point(140, 40);
 			this.txtCustomUserAgent.Name = "txtCustomUserAgent";
-			this.txtCustomUserAgent.Size = new System.Drawing.Size(564, 21);
+			this.txtCustomUserAgent.Size = new System.Drawing.Size(564, 20);
 			this.txtCustomUserAgent.TabIndex = 5;
 			// 
 			// chkRelativePath
@@ -110,7 +110,7 @@
 			this.chkRelativePath.AutoSize = true;
 			this.chkRelativePath.Location = new System.Drawing.Point(616, 12);
 			this.chkRelativePath.Name = "chkRelativePath";
-			this.chkRelativePath.Size = new System.Drawing.Size(90, 17);
+			this.chkRelativePath.Size = new System.Drawing.Size(89, 17);
 			this.chkRelativePath.TabIndex = 3;
 			this.chkRelativePath.Text = "Relative path";
 			this.chkRelativePath.UseVisualStyleBackColor = true;
@@ -121,7 +121,7 @@
 			this.lblSettingsLocation.AutoSize = true;
 			this.lblSettingsLocation.Location = new System.Drawing.Point(8, 176);
 			this.lblSettingsLocation.Name = "lblSettingsLocation";
-			this.lblSettingsLocation.Size = new System.Drawing.Size(87, 13);
+			this.lblSettingsLocation.Size = new System.Drawing.Size(85, 13);
 			this.lblSettingsLocation.TabIndex = 10;
 			this.lblSettingsLocation.Text = "Save settings in:";
 			// 
@@ -130,7 +130,7 @@
 			this.rbSettingsInAppDataFolder.AutoSize = true;
 			this.rbSettingsInAppDataFolder.Location = new System.Drawing.Point(108, 174);
 			this.rbSettingsInAppDataFolder.Name = "rbSettingsInAppDataFolder";
-			this.rbSettingsInAppDataFolder.Size = new System.Drawing.Size(133, 17);
+			this.rbSettingsInAppDataFolder.Size = new System.Drawing.Size(130, 17);
 			this.rbSettingsInAppDataFolder.TabIndex = 11;
 			this.rbSettingsInAppDataFolder.TabStop = true;
 			this.rbSettingsInAppDataFolder.Text = "Application data folder";
@@ -141,7 +141,7 @@
 			this.rbSettingsInExeFolder.AutoSize = true;
 			this.rbSettingsInExeFolder.Location = new System.Drawing.Point(252, 174);
 			this.rbSettingsInExeFolder.Name = "rbSettingsInExeFolder";
-			this.rbSettingsInExeFolder.Size = new System.Drawing.Size(109, 17);
+			this.rbSettingsInExeFolder.Size = new System.Drawing.Size(107, 17);
 			this.rbSettingsInExeFolder.TabIndex = 12;
 			this.rbSettingsInExeFolder.TabStop = true;
 			this.rbSettingsInExeFolder.Text = "Executable folder";
@@ -152,7 +152,7 @@
 			this.chkUseOriginalFileNames.AutoSize = true;
 			this.chkUseOriginalFileNames.Location = new System.Drawing.Point(10, 96);
 			this.chkUseOriginalFileNames.Name = "chkUseOriginalFileNames";
-			this.chkUseOriginalFileNames.Size = new System.Drawing.Size(282, 17);
+			this.chkUseOriginalFileNames.Size = new System.Drawing.Size(273, 17);
 			this.chkUseOriginalFileNames.TabIndex = 7;
 			this.chkUseOriginalFileNames.Text = "Use original filenames (only supported for some sites)";
 			this.chkUseOriginalFileNames.UseVisualStyleBackColor = true;
@@ -162,7 +162,7 @@
 			this.chkVerifyImageHashes.AutoSize = true;
 			this.chkVerifyImageHashes.Location = new System.Drawing.Point(10, 120);
 			this.chkVerifyImageHashes.Name = "chkVerifyImageHashes";
-			this.chkVerifyImageHashes.Size = new System.Drawing.Size(275, 17);
+			this.chkVerifyImageHashes.Size = new System.Drawing.Size(265, 17);
 			this.chkVerifyImageHashes.TabIndex = 8;
 			this.chkVerifyImageHashes.Text = "Verify image hashes (only supported for some sites)";
 			this.chkVerifyImageHashes.UseVisualStyleBackColor = true;
@@ -172,7 +172,7 @@
 			this.chkCheckForUpdates.AutoSize = true;
 			this.chkCheckForUpdates.Location = new System.Drawing.Point(10, 144);
 			this.chkCheckForUpdates.Name = "chkCheckForUpdates";
-			this.chkCheckForUpdates.Size = new System.Drawing.Size(364, 17);
+			this.chkCheckForUpdates.Size = new System.Drawing.Size(353, 17);
 			this.chkCheckForUpdates.TabIndex = 9;
 			this.chkCheckForUpdates.Text = "Automatically check for and notify of updated versions of this program";
 			this.chkCheckForUpdates.UseVisualStyleBackColor = true;
@@ -182,24 +182,17 @@
 			this.chkSaveThumbnails.AutoSize = true;
 			this.chkSaveThumbnails.Location = new System.Drawing.Point(10, 72);
 			this.chkSaveThumbnails.Name = "chkSaveThumbnails";
-			this.chkSaveThumbnails.Size = new System.Drawing.Size(219, 17);
+			this.chkSaveThumbnails.Size = new System.Drawing.Size(221, 17);
 			this.chkSaveThumbnails.TabIndex = 6;
 			this.chkSaveThumbnails.Text = "Save thumbnails and post-process HTML";
 			this.chkSaveThumbnails.UseVisualStyleBackColor = true;
 			// 
 			// frmSettings
 			// 
-			this.Name = "frmSettings";
-			this.Text = "Settings";
-			this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle;
-			this.MaximizeBox = false;
-			this.MinimizeBox = false;
-			this.ShowIcon = false;
-			this.ShowInTaskbar = false;
 			this.AcceptButton = this.btnOK;
+			this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
 			this.CancelButton = this.btnCancel;
 			this.ClientSize = new System.Drawing.Size(714, 201);
-			this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
 			this.Controls.Add(this.chkSaveThumbnails);
 			this.Controls.Add(this.chkCheckForUpdates);
 			this.Controls.Add(this.chkVerifyImageHashes);
@@ -215,7 +208,14 @@
 			this.Controls.Add(this.btnBrowse);
 			this.Controls.Add(this.lblDownloadFolder);
 			this.Controls.Add(this.txtDownloadFolder);
-			this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
+			this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle;
+			this.MaximizeBox = false;
+			this.MinimizeBox = false;
+			this.Name = "frmSettings";
+			this.ShowIcon = false;
+			this.ShowInTaskbar = false;
+			this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
+			this.Text = "Settings";
 			this.Load += new System.EventHandler(this.frmSettings_Load);
 			this.ResumeLayout(false);
 			this.PerformLayout();

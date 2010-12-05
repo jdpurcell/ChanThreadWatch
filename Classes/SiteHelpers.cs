@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
 using System.Reflection;
 using System.Web;
 
@@ -61,8 +60,9 @@ namespace ChanThreadWatch {
 		}
 
 		public virtual List<ImageInfo> GetImages(List<ReplaceInfo> replaceList, List<ThumbnailInfo> thumbnailList) {
-			var fileNames = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-			List<ImageInfo> images = new List<ImageInfo>();
+			HashSet<string> imageFileNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+			HashSet<string> thumbnailFileNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+			List<ImageInfo> imageList = new List<ImageInfo>();
 			ElementInfo elem;
 			int offset = 0;
 			AttributeInfo attr;
@@ -119,23 +119,24 @@ namespace ChanThreadWatch {
 										Offset = attr.Offset,
 										Length = attr.Length,
 										Type = ReplaceType.ImageSrc,
-										Tag = thumb.FileNameWithExt
+										Tag = thumb.FileName
 									});
 							}
 						}
 					}
 				}
 
-				if (!fileNames.ContainsKey(image.FileName)) {
-					images.Add(image);
-					fileNames.Add(image.FileName, 0);
+				if (!imageFileNames.Contains(image.FileName)) {
+					imageList.Add(image);
+					imageFileNames.Add(image.FileName);
 				}
-				if (thumb != null) {
+				if (thumb != null && !thumbnailFileNames.Contains(thumb.FileName)) {
 					thumbnailList.Add(thumb);
+					thumbnailFileNames.Add(thumb.FileName);
 				}
 			}
 
-			return images;
+			return imageList;
 		}
 
 		public virtual string GetNextPageURL() {
@@ -145,7 +146,7 @@ namespace ChanThreadWatch {
 
 	public class SiteHelper_4chan_org : SiteHelper {
 		public override List<ImageInfo> GetImages(List<ReplaceInfo> replaceList, List<ThumbnailInfo> thumbnailList) {
-			List<ImageInfo> images = new List<ImageInfo>();
+			List<ImageInfo> imageList = new List<ImageInfo>();
 			ElementInfo elem;
 			AttributeInfo attr;
 			int offset = 0;
@@ -186,7 +187,7 @@ namespace ChanThreadWatch {
 				if (elem == null) continue;
 				value = General.GetAttributeValue(elem, "title");
 				if (String.IsNullOrEmpty(value)) continue;
-				image.OriginalFileName = Path.GetFileNameWithoutExtension(General.CleanFileName(HttpUtility.HtmlDecode(value)));
+				image.OriginalFileName = General.CleanFileName(HttpUtility.HtmlDecode(value));
 
 				elem = General.FindElement(_html, "a", elem.Offset + 1, postEnd);
 				if (elem == null) continue;
@@ -215,7 +216,7 @@ namespace ChanThreadWatch {
 							Offset = attr.Offset,
 							Length = attr.Length,
 							Type = ReplaceType.ImageSrc,
-							Tag = thumb.FileNameWithExt
+							Tag = thumb.FileName
 						});
 				}
 				value = General.GetAttributeValue(elem, "md5");
@@ -226,11 +227,11 @@ namespace ChanThreadWatch {
 				catch { continue; }
 				image.HashType = HashType.MD5;
 
-				images.Add(image);
+				imageList.Add(image);
 				thumbnailList.Add(thumb);
 			}
 
-			return images;
+			return imageList;
 		}
 	}
 }

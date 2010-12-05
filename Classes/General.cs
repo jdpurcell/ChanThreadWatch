@@ -6,6 +6,7 @@ using System.IO;
 using System.Net;
 using System.Reflection;
 using System.Text;
+using System.Threading;
 using System.Windows.Forms;
 
 namespace ChanThreadWatch {
@@ -19,7 +20,7 @@ namespace ChanThreadWatch {
 
 		public static string ReleaseDate {
 			get {
-				return "2010-Nov-26";
+				return "2010-Dec-05";
 			}
 		}
 
@@ -29,53 +30,132 @@ namespace ChanThreadWatch {
 			}
 		}
 
-		private static Stream GetResponseStream(string url, string auth, string referer, ref DateTime? cacheTime, out string charSet) {
-			HttpWebRequest req = (HttpWebRequest)WebRequest.Create(url);
-			req.UserAgent = (Settings.UseCustomUserAgent == true) ? Settings.CustomUserAgent : ("Chan Thread Watch " + Version);
-			req.Referer = referer;
-			if (cacheTime != null) {
-				req.IfModifiedSince = cacheTime.Value;
-			}
-			if (!String.IsNullOrEmpty(auth)) {
-				Encoding encoding = Encoding.GetEncoding("iso-8859-1");
-				req.Headers.Add("Authorization", "Basic " + Convert.ToBase64String(encoding.GetBytes(auth)));
-			}
-			HttpWebResponse resp;
+		public static void DownloadAsync(string url, string auth, string referer, string connectionName, DateTime? cacheLastModifiedTime, Action<HttpWebResponse> onResponse, Action<byte[], int> onDownloadChunk, Action onComplete, Action<Exception> onException) {
+			const int readBufferSize = 8192;
+			const int requestTimeoutMS = 60000;
+			const int readTimeoutMS = 60000;
+			object timedOutSync = new object();
+			bool timedOutFlag = false;
 			try {
-				resp = (HttpWebResponse)req.GetResponse();
-				cacheTime = null;
-				if (resp.Headers["Last-Modified"] != null) {
+				HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
+				if (connectionName != null) {
+					request.ConnectionGroupName = connectionName;
+				}
+				request.UserAgent = (Settings.UseCustomUserAgent == true) ? Settings.CustomUserAgent : ("Chan Thread Watch " + Version);
+				request.Referer = referer;
+				if (cacheLastModifiedTime != null) {
+					request.IfModifiedSince = cacheLastModifiedTime.Value;
+				}
+				if (!String.IsNullOrEmpty(auth)) {
+					Encoding encoding = Encoding.GetEncoding("iso-8859-1");
+					request.Headers.Add("Authorization", "Basic " + Convert.ToBase64String(encoding.GetBytes(auth)));
+				}
+				IAsyncResult requestResult = request.BeginGetResponse((requestResultParam) => {
+					lock (timedOutSync) {
+						if (timedOutFlag) return;
+					}
+					HttpWebResponse response = null;
+					Stream responseStream = null;
+					Action cleanupResponse = () => {
+						if (responseStream != null) {
+							try { responseStream.Close(); } catch { }
+							responseStream = null;
+						}
+						if (response != null) {
+							try { response.Close(); } catch { }
+							response = null;
+						}
+					};
 					try {
-						// Parse the time string ourself instead of using .LastModified because
-						// older versions of Mono don't convert it from GMT to local.
-						cacheTime = DateTime.ParseExact(resp.Headers["Last-Modified"], new string[] {
-							"r", "dddd, dd-MMM-yy HH:mm:ss G\\MT", "ddd MMM d HH:mm:ss yyyy" },
-							CultureInfo.InvariantCulture, DateTimeStyles.AllowWhiteSpaces |
-							DateTimeStyles.AssumeUniversal);
+						response = (HttpWebResponse)request.EndGetResponse(requestResultParam);
+						onResponse(response);
+						responseStream = response.GetResponseStream();
+						byte[] buff = new byte[readBufferSize];
+						AsyncCallback readCallback = null;
+						readCallback = (readResultParam) => {
+							lock (timedOutSync) {
+								if (timedOutFlag) return;
+							}
+							try {
+								if (readResultParam != null) {
+									int bytesRead = responseStream.EndRead(readResultParam);
+									if (bytesRead == 0) {
+										cleanupResponse();
+										onComplete();
+										return;
+									}
+									onDownloadChunk(buff, bytesRead);
+								}
+								IAsyncResult readResult = responseStream.BeginRead(buff, 0, buff.Length, readCallback, null);
+								ThreadPool.RegisterWaitForSingleObject(readResult.AsyncWaitHandle,
+									(state, timedOut) => {
+										if (!timedOut) return;
+										lock (timedOutSync) {
+											timedOutFlag = true;
+										}
+										cleanupResponse();
+										onException(new Exception("Timed out while reading response."));
+									}, null, readTimeoutMS, true);
+							}
+							catch (Exception ex) {
+								cleanupResponse();
+								onException(ex);
+							}
+						};
+						readCallback(null);
 					}
-					catch { }
-				}
+					catch (Exception ex) {
+						cleanupResponse();
+						if (ex is WebException) {
+							WebException webEx = (WebException)ex;
+							if (webEx.Status == WebExceptionStatus.ProtocolError) {
+								HttpStatusCode code = ((HttpWebResponse)webEx.Response).StatusCode;
+								if (code == HttpStatusCode.NotFound) {
+									ex = new HTTP404Exception();
+								}
+								else if (code == HttpStatusCode.NotModified) {
+									ex = new HTTP304Exception();
+								}
+							}
+						}
+						onException(ex);
+					}
+				}, null);
+				ThreadPool.RegisterWaitForSingleObject(requestResult.AsyncWaitHandle,
+					(state, timedOut) => {
+						if (!timedOut) return;
+						lock (timedOutSync) {
+							timedOutFlag = true;
+						}
+						request.Abort();
+						onException(new Exception("Timed out while waiting for response."));
+					}, null, requestTimeoutMS, true);
 			}
-			catch (WebException ex) {
-				if (ex.Status == WebExceptionStatus.ProtocolError) {
-					HttpStatusCode code = ((HttpWebResponse)ex.Response).StatusCode;
-					if (code == HttpStatusCode.NotFound) {
-						throw new HTTP404Exception();
-					}
-					else if (code == HttpStatusCode.NotModified) {
-						throw new HTTP304Exception();
-					}
-				}
-				throw;
+			catch (Exception ex) {
+				onException(ex);
 			}
-			charSet = GetCharSetFromContentType(resp.ContentType);
-			return resp.GetResponseStream();
 		}
 
-		private static Stream GetResponseStream(string url, string auth, string referer) {
-			DateTime? cacheTime = null;
-			string charSet;
-			return GetResponseStream(url, auth, referer, ref cacheTime, out charSet);
+		public static string DownloadPageToString(string url) {
+			HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
+			request.UserAgent = "Chan Thread Watch " + Version;
+			HttpWebResponse response = null;
+			Stream responseStream = null;
+			MemoryStream memoryStream = null;
+			try {
+				response = (HttpWebResponse)request.GetResponse();
+				responseStream = response.GetResponseStream();
+				memoryStream = new MemoryStream();
+				CopyStream(responseStream, memoryStream);
+				byte[] pageBytes = memoryStream.ToArray();
+				Encoding encoding = DetectHTMLEncoding(pageBytes, GetCharSetFromContentType(response.ContentType));
+				return HTMLBytesToString(pageBytes, encoding);
+			}
+			finally {
+				if (responseStream != null) try { responseStream.Close(); } catch { }
+				if (response != null) try { response.Close(); } catch { }
+				if (memoryStream != null) try { memoryStream.Close(); } catch { }
+			}
 		}
 
 		private static void CopyStream(Stream srcStream, params Stream[] dstStreams) {
@@ -91,68 +171,10 @@ namespace ChanThreadWatch {
 			}
 		}
 
-		public static string GetToString(string url, string auth, string savePath, bool saveBackup, ref DateTime? cacheTime, out Encoding encoding, List<ReplaceInfo> replaceList) {
-			Stream rs = null;
-			MemoryStream ms = null;
-			FileStream fs = null;
-			try {
-				string httpCharSet;
-				rs = GetResponseStream(url, auth, null, ref cacheTime, out httpCharSet);
-				ms = new MemoryStream();
-				if (savePath != null) {
-					if (saveBackup && File.Exists(savePath)) {
-						string backupPath = savePath + ".bak";
-						if (File.Exists(backupPath)) {
-							try { File.Delete(backupPath); }
-							catch { }
-						}
-						try { File.Move(savePath, backupPath); }
-						catch { }
-					}
-					fs = new FileStream(savePath, FileMode.Create, FileAccess.Write, FileShare.Read);
-				}
-				CopyStream(rs, ms, fs);
-				byte[] bytes = ms.ToArray();
-				encoding = GetEncoding(bytes, httpCharSet);
-				return BytesToString(bytes, encoding, replaceList);
-			}
-			finally {
-				if (rs != null) rs.Close();
-				if (ms != null) ms.Close();
-				if (fs != null) fs.Close();
-			}
-		}
-
-		public static string GetToString(string url) {
-			DateTime? cacheTime = null;
-			Encoding encoding;
-			return GetToString(url, null, null, false, ref cacheTime, out encoding, null);
-		}
-
-		public static byte[] GetToFile(string url, string auth, string referer, string path, HashType hashType) {
-			Stream rs = null;
-			FileStream fs = null;
-			HashGeneratorStream hs = null;
-			try {
-				rs = GetResponseStream(url, auth, referer);
-				fs = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read);
-				if (hashType != HashType.None) {
-					hs = new HashGeneratorStream(hashType);
-				}
-				CopyStream(rs, fs, hs);
-				return (hs != null) ? hs.GetDataHash() : null;
-			}
-			finally {
-				if (rs != null) rs.Close();
-				if (fs != null) fs.Close();
-				if (hs != null) hs.Close();
-			}
-		}
-
 		// Converts all whitespace to regular spaces and only keeps 1 space consecutively.
 		// This simplifies parsing, e.g. in FindElement.  Also removes null characters, which
 		// helps DetectCharacterSet convert UTF16/UTF32 to an ASCII string.
-		public static string BytesToString(byte[] bytes, Encoding encoding, List<ReplaceInfo> replaceList) {
+		public static string HTMLBytesToString(byte[] bytes, Encoding encoding, List<ReplaceInfo> replaceList) {
 			int preambleLen = encoding.GetPreamble().Length;
 			char[] src = encoding.GetChars(bytes, preambleLen, bytes.Length - preambleLen);
 			char[] dst = new char[src.Length];
@@ -185,32 +207,28 @@ namespace ChanThreadWatch {
 			return new string(dst, 0, iDst);
 		}
 
-		public static string BytesToString(byte[] bytes, Encoding encoding) {
-			return BytesToString(bytes, encoding, null);
+		public static string HTMLBytesToString(byte[] bytes, Encoding encoding) {
+			return HTMLBytesToString(bytes, encoding, null);
 		}
 
-		public static void WriteReplacedString(string str, List<ReplaceInfo> replaceList, TextWriter outStream) {
-			int offset = 0;
-			replaceList.Sort((x, y) => x.Offset.CompareTo(y.Offset));
-			for (int iReplace = 0; iReplace < replaceList.Count; iReplace++) {
-				ReplaceInfo replace = replaceList[iReplace];
-				if (replace.Offset < offset || replace.Length < 0) continue;
-				if (replace.Offset + replace.Length > str.Length) break;
-				if (replace.Offset > offset) {
-					outStream.Write(str.Substring(offset, replace.Offset - offset));
+		public static DateTime? GetResponseLastModifiedTime(HttpWebResponse response) {
+			DateTime? lastModified = null;
+			if (response.Headers["Last-Modified"] != null) {
+				try {
+					// Parse the time string ourself instead of using .LastModified because
+					// older versions of Mono don't convert it from GMT to local.
+					lastModified = DateTime.ParseExact(response.Headers["Last-Modified"], new string[] {
+						"r", "dddd, dd-MMM-yy HH:mm:ss G\\MT", "ddd MMM d HH:mm:ss yyyy" },
+						CultureInfo.InvariantCulture, DateTimeStyles.AllowWhiteSpaces |
+						DateTimeStyles.AssumeUniversal);
 				}
-				if (!String.IsNullOrEmpty(replace.Value)) {
-					outStream.Write(replace.Value);
-				}
-				offset = replace.Offset + replace.Length;
+				catch { }
 			}
-			if (str.Length > offset) {
-				outStream.Write(str.Substring(offset));
-			}
+			return lastModified;
 		}
 
-		private static Encoding GetEncoding(byte[] bytes, string httpCharSet) {
-			string charSet = httpCharSet ?? DetectCharacterSet(bytes);
+		public static Encoding DetectHTMLEncoding(byte[] bytes, string httpCharSet) {
+			string charSet = httpCharSet ?? DetectHTMLCharacterSet(bytes);
 			if (charSet != null) {
 				if (IsUTF(charSet)) {
 					int bomLength;
@@ -248,8 +266,8 @@ namespace ChanThreadWatch {
 			return Encoding.GetEncoding("iso-8859-1");
 		}
 
-		private static string DetectCharacterSet(byte[] bytes) {
-			string html = BytesToString(bytes, Encoding.ASCII);
+		private static string DetectHTMLCharacterSet(byte[] bytes) {
+			string html = HTMLBytesToString(bytes, Encoding.ASCII);
 			ElementInfo elem;
 			string value;
 			int headClose;
@@ -281,7 +299,7 @@ namespace ChanThreadWatch {
 			return null;
 		}
 
-		private static string GetCharSetFromContentType(string contentType) {
+		public static string GetCharSetFromContentType(string contentType) {
 			foreach (string part in contentType.Split(';')) {
 				if (part.TrimStart().StartsWith("charset", StringComparison.OrdinalIgnoreCase)) {
 					int pos = part.IndexOf('=');
@@ -450,6 +468,43 @@ namespace ChanThreadWatch {
 			}
 		}
 
+		public static void WriteReplacedString(string str, List<ReplaceInfo> replaceList, TextWriter outStream) {
+			int offset = 0;
+			replaceList.Sort((x, y) => x.Offset.CompareTo(y.Offset));
+			for (int iReplace = 0; iReplace < replaceList.Count; iReplace++) {
+				ReplaceInfo replace = replaceList[iReplace];
+				if (replace.Offset < offset || replace.Length < 0) continue;
+				if (replace.Offset + replace.Length > str.Length) break;
+				if (replace.Offset > offset) {
+					outStream.Write(str.Substring(offset, replace.Offset - offset));
+				}
+				if (!String.IsNullOrEmpty(replace.Value)) {
+					outStream.Write(replace.Value);
+				}
+				offset = replace.Offset + replace.Length;
+			}
+			if (str.Length > offset) {
+				outStream.Write(str.Substring(offset));
+			}
+		}
+
+		public static void AddOtherReplaces(string html, List<ReplaceInfo> replaceList) {
+			ElementInfo elem;
+			int offset;
+
+			offset = 0;
+			while ((elem = FindElement(html, "base", offset)) != null) {
+				offset = elem.Offset + 1;
+				replaceList.Add(
+					new ReplaceInfo {
+						Offset = elem.Offset,
+						Length = elem.Length,
+						Type = ReplaceType.Other,
+						Value = String.Empty
+					});
+			}
+		}
+
 		public static ElementInfo FindElement(string html, string name, int offset, int htmlLen) {
 			ElementInfo elem = new ElementInfo();
 
@@ -577,23 +632,6 @@ namespace ChanThreadWatch {
 			return (attr != null) ? attr.Value : null;
 		}
 
-		public static void AddOtherReplaces(string html, List<ReplaceInfo> replaceList) {
-			ElementInfo elem;
-			int offset;
-
-			offset = 0;
-			while ((elem = FindElement(html, "base", offset)) != null) {
-				offset = elem.Offset + 1;
-				replaceList.Add(
-					new ReplaceInfo {
-						Offset = elem.Offset,
-						Length = elem.Length,
-						Type = ReplaceType.Other,
-						Value = String.Empty
-					});
-			}
-		}
-
 		public static string URLFileName(string url) {
 			int pos = url.LastIndexOf("/");
 			return (pos == -1) ? String.Empty : url.Substring(pos + 1);
@@ -620,10 +658,10 @@ namespace ChanThreadWatch {
 
 		public static void SetFontAndScaling(Form form) {
 			form.SuspendLayout();
-			form.Font = new Font("Tahoma", 8.25F);
-			if (form.Font.Name != "Tahoma") form.Font = new Font("Arial", 8.25F);
+			form.Font = new Font("Tahoma", 8.25f);
+			if (form.Font.Name != "Tahoma") form.Font = new Font("Arial", 8.25f);
 			form.AutoScaleMode = AutoScaleMode.Font;
-			form.AutoScaleDimensions = new SizeF(6F, 13F);
+			form.AutoScaleDimensions = new SizeF(6f, 13f);
 			form.ResumeLayout(false);
 		}
 	}

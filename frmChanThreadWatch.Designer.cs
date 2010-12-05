@@ -1,4 +1,4 @@
-namespace ChanThreadWatch {
+﻿namespace ChanThreadWatch {
 	partial class frmChanThreadWatch {
 		/// <summary>
 		/// Required designer variable.
@@ -23,6 +23,7 @@ namespace ChanThreadWatch {
 		/// the contents of this method with the code editor.
 		/// </summary>
 		private void InitializeComponent() {
+			this.components = new System.ComponentModel.Container();
 			this.lvThreads = new System.Windows.Forms.ListView();
 			this.chURL = new System.Windows.Forms.ColumnHeader();
 			this.chStatus = new System.Windows.Forms.ColumnHeader();
@@ -51,6 +52,7 @@ namespace ChanThreadWatch {
 			this.grpDoubleClick = new System.Windows.Forms.GroupBox();
 			this.rbOpenURL = new System.Windows.Forms.RadioButton();
 			this.rbOpenFolder = new System.Windows.Forms.RadioButton();
+			this.tmrUpdateWaitStatus = new System.Windows.Forms.Timer(this.components);
 			this.grpAddThread.SuspendLayout();
 			this.grpDoubleClick.SuspendLayout();
 			this.SuspendLayout();
@@ -78,12 +80,12 @@ namespace ChanThreadWatch {
 			// chURL
 			// 
 			this.chURL.Text = "URL";
-			this.chURL.Width = 300;
+			this.chURL.Width = 340;
 			// 
 			// chStatus
 			// 
 			this.chStatus.Text = "Status";
-			this.chStatus.Width = 300;
+			this.chStatus.Width = 260;
 			// 
 			// grpAddThread
 			// 
@@ -110,7 +112,7 @@ namespace ChanThreadWatch {
 			this.lblCheckEvery.AutoSize = true;
 			this.lblCheckEvery.Location = new System.Drawing.Point(10, 128);
 			this.lblCheckEvery.Name = "lblCheckEvery";
-			this.lblCheckEvery.Size = new System.Drawing.Size(119, 13);
+			this.lblCheckEvery.Size = new System.Drawing.Size(115, 13);
 			this.lblCheckEvery.TabIndex = 7;
 			this.lblCheckEvery.Text = "Check every (minutes):";
 			// 
@@ -135,7 +137,7 @@ namespace ChanThreadWatch {
 			this.txtImageAuth.Enabled = false;
 			this.txtImageAuth.Location = new System.Drawing.Point(164, 72);
 			this.txtImageAuth.Name = "txtImageAuth";
-			this.txtImageAuth.Size = new System.Drawing.Size(184, 21);
+			this.txtImageAuth.Size = new System.Drawing.Size(184, 20);
 			this.txtImageAuth.TabIndex = 5;
 			// 
 			// txtPageAuth
@@ -143,7 +145,7 @@ namespace ChanThreadWatch {
 			this.txtPageAuth.Enabled = false;
 			this.txtPageAuth.Location = new System.Drawing.Point(164, 44);
 			this.txtPageAuth.Name = "txtPageAuth";
-			this.txtPageAuth.Size = new System.Drawing.Size(184, 21);
+			this.txtPageAuth.Size = new System.Drawing.Size(184, 20);
 			this.txtPageAuth.TabIndex = 3;
 			// 
 			// chkImageAuth
@@ -151,7 +153,7 @@ namespace ChanThreadWatch {
 			this.chkImageAuth.AutoSize = true;
 			this.chkImageAuth.Location = new System.Drawing.Point(12, 74);
 			this.chkImageAuth.Name = "chkImageAuth";
-			this.chkImageAuth.Size = new System.Drawing.Size(143, 17);
+			this.chkImageAuth.Size = new System.Drawing.Size(136, 17);
 			this.chkImageAuth.TabIndex = 4;
 			this.chkImageAuth.Text = "Image auth (user:pass):";
 			this.chkImageAuth.UseVisualStyleBackColor = true;
@@ -162,7 +164,7 @@ namespace ChanThreadWatch {
 			this.chkPageAuth.AutoSize = true;
 			this.chkPageAuth.Location = new System.Drawing.Point(12, 46);
 			this.chkPageAuth.Name = "chkPageAuth";
-			this.chkPageAuth.Size = new System.Drawing.Size(137, 17);
+			this.chkPageAuth.Size = new System.Drawing.Size(132, 17);
 			this.chkPageAuth.TabIndex = 2;
 			this.chkPageAuth.Text = "Page auth (user:pass):";
 			this.chkPageAuth.UseVisualStyleBackColor = true;
@@ -173,7 +175,7 @@ namespace ChanThreadWatch {
 			this.chkOneTime.AutoSize = true;
 			this.chkOneTime.Location = new System.Drawing.Point(12, 100);
 			this.chkOneTime.Name = "chkOneTime";
-			this.chkOneTime.Size = new System.Drawing.Size(185, 17);
+			this.chkOneTime.Size = new System.Drawing.Size(181, 17);
 			this.chkOneTime.TabIndex = 6;
 			this.chkOneTime.Text = "Don\'t watch (one-time download)";
 			this.chkOneTime.UseVisualStyleBackColor = true;
@@ -184,7 +186,7 @@ namespace ChanThreadWatch {
 			this.lblURL.AutoSize = true;
 			this.lblURL.Location = new System.Drawing.Point(10, 22);
 			this.lblURL.Name = "lblURL";
-			this.lblURL.Size = new System.Drawing.Size(30, 13);
+			this.lblURL.Size = new System.Drawing.Size(32, 13);
 			this.lblURL.TabIndex = 0;
 			this.lblURL.Text = "URL:";
 			// 
@@ -192,7 +194,7 @@ namespace ChanThreadWatch {
 			// 
 			this.txtPageURL.Location = new System.Drawing.Point(48, 18);
 			this.txtPageURL.Name = "txtPageURL";
-			this.txtPageURL.Size = new System.Drawing.Size(300, 21);
+			this.txtPageURL.Size = new System.Drawing.Size(300, 20);
 			this.txtPageURL.TabIndex = 1;
 			this.txtPageURL.KeyDown += new System.Windows.Forms.KeyEventHandler(this.txtPageURL_KeyDown);
 			// 
@@ -308,7 +310,7 @@ namespace ChanThreadWatch {
 			this.rbOpenURL.AutoSize = true;
 			this.rbOpenURL.Location = new System.Drawing.Point(12, 38);
 			this.rbOpenURL.Name = "rbOpenURL";
-			this.rbOpenURL.Size = new System.Drawing.Size(73, 17);
+			this.rbOpenURL.Size = new System.Drawing.Size(76, 17);
 			this.rbOpenURL.TabIndex = 1;
 			this.rbOpenURL.TabStop = true;
 			this.rbOpenURL.Text = "Open URL";
@@ -319,26 +321,31 @@ namespace ChanThreadWatch {
 			this.rbOpenFolder.AutoSize = true;
 			this.rbOpenFolder.Location = new System.Drawing.Point(12, 18);
 			this.rbOpenFolder.Name = "rbOpenFolder";
-			this.rbOpenFolder.Size = new System.Drawing.Size(84, 17);
+			this.rbOpenFolder.Size = new System.Drawing.Size(83, 17);
 			this.rbOpenFolder.TabIndex = 0;
 			this.rbOpenFolder.TabStop = true;
 			this.rbOpenFolder.Text = "Open Folder";
 			this.rbOpenFolder.UseVisualStyleBackColor = true;
 			// 
+			// tmrUpdateWaitStatus
+			// 
+			this.tmrUpdateWaitStatus.Interval = 500;
+			this.tmrUpdateWaitStatus.Tick += new System.EventHandler(this.tmrUpdateWaitStatus_Tick);
+			// 
 			// frmChanThreadWatch
 			// 
-			this.Name = "frmChanThreadWatch";
-			this.Text = "Chan Thread Watch";
+			this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
 			this.ClientSize = new System.Drawing.Size(636, 341);
-			this.MinimumSize = new System.Drawing.Size(644, 368);
-			this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
 			this.Controls.Add(this.grpDoubleClick);
 			this.Controls.Add(this.btnSettings);
 			this.Controls.Add(this.btnAbout);
 			this.Controls.Add(this.btnRemoveCompleted);
 			this.Controls.Add(this.grpAddThread);
 			this.Controls.Add(this.lvThreads);
-			this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
+			this.MinimumSize = new System.Drawing.Size(644, 368);
+			this.Name = "frmChanThreadWatch";
+			this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
+			this.Text = "Chan Thread Watch";
 			this.Shown += new System.EventHandler(this.frmChanThreadWatch_Shown);
 			this.FormClosed += new System.Windows.Forms.FormClosedEventHandler(this.frmChanThreadWatch_FormClosed);
 			this.grpAddThread.ResumeLayout(false);
@@ -379,6 +386,7 @@ namespace ChanThreadWatch {
 		private System.Windows.Forms.RadioButton rbOpenURL;
 		private System.Windows.Forms.RadioButton rbOpenFolder;
 		private System.Windows.Forms.MenuItem miStart;
+		private System.Windows.Forms.Timer tmrUpdateWaitStatus;
 	}
 }
 
