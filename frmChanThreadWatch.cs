@@ -354,6 +354,7 @@ namespace ChanThreadWatch {
 					i++;
 				}
 			}
+			SaveThreadList();
 		}
 
 		private void SetupWaitTimer() {
