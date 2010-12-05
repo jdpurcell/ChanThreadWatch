@@ -211,6 +211,7 @@ namespace ChanThreadWatch {
 				}
 				UpdateWaitingWatcherStatuses();
 			}
+			SaveThreadList();
 		}
 
 		private void btnSettings_Click(object sender, EventArgs e) {
