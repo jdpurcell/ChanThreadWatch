@@ -47,6 +47,8 @@
 			this.miStop = new System.Windows.Forms.MenuItem();
 			this.miStart = new System.Windows.Forms.MenuItem();
 			this.miCopyURL = new System.Windows.Forms.MenuItem();
+			this.miRemove = new System.Windows.Forms.MenuItem();
+			this.miRemoveAndDeleteFolder = new System.Windows.Forms.MenuItem();
 			this.miCheckNow = new System.Windows.Forms.MenuItem();
 			this.miCheckEvery = new System.Windows.Forms.MenuItem();
 			this.grpDoubleClick = new System.Windows.Forms.GroupBox();
@@ -54,8 +56,6 @@
 			this.rbOpenFolder = new System.Windows.Forms.RadioButton();
 			this.tmrUpdateWaitStatus = new System.Windows.Forms.Timer(this.components);
 			this.btnAddFromClipboard = new System.Windows.Forms.Button();
-			this.miRemove = new System.Windows.Forms.MenuItem();
-			this.miRemoveAndDeleteFolder = new System.Windows.Forms.MenuItem();
 			this.grpAddThread.SuspendLayout();
 			this.grpDoubleClick.SuspendLayout();
 			this.SuspendLayout();
@@ -287,6 +287,18 @@
 			this.miCopyURL.Text = "Copy URL";
 			this.miCopyURL.Click += new System.EventHandler(this.miCopyURL_Click);
 			// 
+			// miRemove
+			// 
+			this.miRemove.Index = 5;
+			this.miRemove.Text = "Remove";
+			this.miRemove.Click += new System.EventHandler(this.miRemove_Click);
+			// 
+			// miRemoveAndDeleteFolder
+			// 
+			this.miRemoveAndDeleteFolder.Index = 6;
+			this.miRemoveAndDeleteFolder.Text = "Remove and Delete Folder";
+			this.miRemoveAndDeleteFolder.Click += new System.EventHandler(this.miRemoveAndDeleteFolder_Click);
+			// 
 			// miCheckNow
 			// 
 			this.miCheckNow.Index = 7;
@@ -339,25 +351,14 @@
 			// 
 			// btnAddFromClipboard
 			// 
-			this.btnAddFromClipboard.Location = new System.Drawing.Point(508, 208);
+			this.btnAddFromClipboard.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
+			this.btnAddFromClipboard.Location = new System.Drawing.Point(508, 212);
 			this.btnAddFromClipboard.Name = "btnAddFromClipboard";
 			this.btnAddFromClipboard.Size = new System.Drawing.Size(120, 23);
 			this.btnAddFromClipboard.TabIndex = 4;
 			this.btnAddFromClipboard.Text = "Add From Clipboard";
 			this.btnAddFromClipboard.UseVisualStyleBackColor = true;
 			this.btnAddFromClipboard.Click += new System.EventHandler(this.btnAddFromClipboard_Click);
-			// 
-			// miRemove
-			// 
-			this.miRemove.Index = 5;
-			this.miRemove.Text = "Remove";
-			this.miRemove.Click += new System.EventHandler(this.miRemove_Click);
-			// 
-			// miRemoveAndDeleteFolder
-			// 
-			this.miRemoveAndDeleteFolder.Index = 6;
-			this.miRemoveAndDeleteFolder.Text = "Remove and Delete Folder";
-			this.miRemoveAndDeleteFolder.Click += new System.EventHandler(this.miRemoveAndDeleteFolder_Click);
 			// 
 			// frmChanThreadWatch
 			// 
