@@ -362,6 +362,7 @@
 			// 
 			// frmChanThreadWatch
 			// 
+			this.AllowDrop = true;
 			this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
 			this.ClientSize = new System.Drawing.Size(636, 341);
 			this.Controls.Add(this.btnAddFromClipboard);
@@ -376,7 +377,9 @@
 			this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
 			this.Text = "Chan Thread Watch";
 			this.Shown += new System.EventHandler(this.frmChanThreadWatch_Shown);
+			this.DragDrop += new System.Windows.Forms.DragEventHandler(this.frmChanThreadWatch_DragDrop);
 			this.FormClosed += new System.Windows.Forms.FormClosedEventHandler(this.frmChanThreadWatch_FormClosed);
+			this.DragEnter += new System.Windows.Forms.DragEventHandler(this.frmChanThreadWatch_DragEnter);
 			this.grpAddThread.ResumeLayout(false);
 			this.grpAddThread.PerformLayout();
 			this.grpDoubleClick.ResumeLayout(false);

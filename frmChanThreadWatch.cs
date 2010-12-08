@@ -110,6 +110,27 @@ namespace ChanThreadWatch {
 			Program.ReleaseMutex();
 		}
 
+		private void frmChanThreadWatch_DragEnter(object sender, DragEventArgs e) {
+			if (e.Data.GetDataPresent("UniformResourceLocatorW") ||
+				e.Data.GetDataPresent("UniformResourceLocator"))
+			{
+				e.Effect = DragDropEffects.Copy;
+			}
+		}
+
+		private void frmChanThreadWatch_DragDrop(object sender, DragEventArgs e) {
+			if (e.Data.GetDataPresent("UniformResourceLocatorW")) {
+				byte[] data = ((MemoryStream)e.Data.GetData("UniformResourceLocatorW")).ToArray();
+				string url = Encoding.Unicode.GetString(data, 0, General.StrLenW(data) * 2);
+				AddThread(url);
+			}
+			else if (e.Data.GetDataPresent("UniformResourceLocator")) {
+				byte[] data = ((MemoryStream)e.Data.GetData("UniformResourceLocator")).ToArray();
+				string url = Encoding.Default.GetString(data, 0, General.StrLen(data));
+				AddThread(url);
+			}
+		}
+
 		private void txtPageURL_KeyDown(object sender, KeyEventArgs e) {
 			if (e.KeyCode == Keys.Enter) {
 				btnAdd_Click(txtPageURL, null);
@@ -258,6 +279,16 @@ namespace ChanThreadWatch {
 		private void lvThreads_KeyDown(object sender, KeyEventArgs e) {
 			if (e.KeyCode == Keys.Delete) {
 				RemoveThreads(false, true);
+			}
+			else if (e.Control && e.KeyCode == Keys.A) {
+				foreach (ListViewItem item in lvThreads.Items) {
+					item.Selected = true;
+				}
+			}
+			else if (e.Control && e.KeyCode == Keys.I) {
+				foreach (ListViewItem item in lvThreads.Items) {
+					item.Selected = !item.Selected;
+				}
 			}
 		}
 

@@ -656,6 +656,20 @@ namespace ChanThreadWatch {
 			return new string(dst, 0, iDst);
 		}
 
+		public static int StrLen(byte[] bytes) {
+			for (int i = 0; i < bytes.Length; i++) {
+				if (bytes[i] == 0) return i;
+			}
+			return bytes.Length;
+		}
+
+		public static int StrLenW(byte[] bytes) {
+			for (int i = 0; i < bytes.Length - 1; i += 2) {
+				if (bytes[i] == 0 && bytes[i + 1] == 0) return i / 2;
+			}
+			return bytes.Length / 2;
+		}
+
 		public static void EnableDoubleBuffering<T>(T control) where T : Control {
 			typeof(T).InvokeMember(
 			"DoubleBuffered", 
