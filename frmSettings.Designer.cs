@@ -193,9 +193,9 @@
 			this.chkRenameDownloadFolderWithDescription.AutoSize = true;
 			this.chkRenameDownloadFolderWithDescription.Location = new System.Drawing.Point(10, 96);
 			this.chkRenameDownloadFolderWithDescription.Name = "chkRenameDownloadFolderWithDescription";
-			this.chkRenameDownloadFolderWithDescription.Size = new System.Drawing.Size(220, 17);
+			this.chkRenameDownloadFolderWithDescription.Size = new System.Drawing.Size(253, 17);
 			this.chkRenameDownloadFolderWithDescription.TabIndex = 7;
-			this.chkRenameDownloadFolderWithDescription.Text = "Use description as download folder name";
+			this.chkRenameDownloadFolderWithDescription.Text = "Use description as thread download folder name";
 			this.chkRenameDownloadFolderWithDescription.UseVisualStyleBackColor = true;
 			// 
 			// frmSettings

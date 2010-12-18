@@ -1,3 +1,11 @@
+1.6.0 (2010-Dec-18):
+  * Replaced URL column with user customizable description.
+  * Added "Last Image On" and "Added On" columns.
+  * Made columns sortable.
+  * Option to rename thread download folders with the description.
+  * Ability to add threads by dropping a link or favicon.
+  * Added an application icon.
+  * Added shortcut key Ctrl+A to select all items.
 1.5.0 (2010-Dec-05):
   * Downloads multiple files within a thread concurrently.
   * Workaround for downloads stalling when site is sluggish.
