@@ -25,8 +25,10 @@
 		private void InitializeComponent() {
 			this.components = new System.ComponentModel.Container();
 			this.lvThreads = new System.Windows.Forms.ListView();
-			this.chURL = new System.Windows.Forms.ColumnHeader();
+			this.chDescription = new System.Windows.Forms.ColumnHeader();
 			this.chStatus = new System.Windows.Forms.ColumnHeader();
+			this.chLastImageOn = new System.Windows.Forms.ColumnHeader();
+			this.chAddedOn = new System.Windows.Forms.ColumnHeader();
 			this.grpAddThread = new System.Windows.Forms.GroupBox();
 			this.lblCheckEvery = new System.Windows.Forms.Label();
 			this.cboCheckEvery = new System.Windows.Forms.ComboBox();
@@ -42,6 +44,7 @@
 			this.btnAbout = new System.Windows.Forms.Button();
 			this.btnSettings = new System.Windows.Forms.Button();
 			this.cmThreads = new System.Windows.Forms.ContextMenu();
+			this.miEditDescription = new System.Windows.Forms.MenuItem();
 			this.miOpenFolder = new System.Windows.Forms.MenuItem();
 			this.miOpenURL = new System.Windows.Forms.MenuItem();
 			this.miStop = new System.Windows.Forms.MenuItem();
@@ -52,43 +55,59 @@
 			this.miCheckNow = new System.Windows.Forms.MenuItem();
 			this.miCheckEvery = new System.Windows.Forms.MenuItem();
 			this.grpDoubleClick = new System.Windows.Forms.GroupBox();
+			this.rbEditDescription = new System.Windows.Forms.RadioButton();
 			this.rbOpenURL = new System.Windows.Forms.RadioButton();
 			this.rbOpenFolder = new System.Windows.Forms.RadioButton();
 			this.tmrUpdateWaitStatus = new System.Windows.Forms.Timer(this.components);
 			this.btnAddFromClipboard = new System.Windows.Forms.Button();
+			this.tmrSaveThreadList = new System.Windows.Forms.Timer(this.components);
 			this.grpAddThread.SuspendLayout();
 			this.grpDoubleClick.SuspendLayout();
 			this.SuspendLayout();
 			// 
 			// lvThreads
 			// 
+			this.lvThreads.AllowColumnReorder = true;
 			this.lvThreads.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom)
 						| System.Windows.Forms.AnchorStyles.Left)
 						| System.Windows.Forms.AnchorStyles.Right)));
 			this.lvThreads.Columns.AddRange(new System.Windows.Forms.ColumnHeader[] {
-            this.chURL,
-            this.chStatus});
+            this.chDescription,
+            this.chStatus,
+            this.chLastImageOn,
+            this.chAddedOn});
 			this.lvThreads.FullRowSelect = true;
 			this.lvThreads.HideSelection = false;
 			this.lvThreads.Location = new System.Drawing.Point(8, 8);
 			this.lvThreads.Name = "lvThreads";
-			this.lvThreads.Size = new System.Drawing.Size(620, 164);
+			this.lvThreads.Size = new System.Drawing.Size(620, 196);
 			this.lvThreads.TabIndex = 0;
 			this.lvThreads.UseCompatibleStateImageBehavior = false;
 			this.lvThreads.View = System.Windows.Forms.View.Details;
 			this.lvThreads.MouseDoubleClick += new System.Windows.Forms.MouseEventHandler(this.lvThreads_MouseDoubleClick);
 			this.lvThreads.MouseClick += new System.Windows.Forms.MouseEventHandler(this.lvThreads_MouseClick);
+			this.lvThreads.ColumnClick += new System.Windows.Forms.ColumnClickEventHandler(this.lvThreads_ColumnClick);
 			this.lvThreads.KeyDown += new System.Windows.Forms.KeyEventHandler(this.lvThreads_KeyDown);
 			// 
-			// chURL
+			// chDescription
 			// 
-			this.chURL.Text = "URL";
-			this.chURL.Width = 340;
+			this.chDescription.Text = "Description";
+			this.chDescription.Width = 220;
 			// 
 			// chStatus
 			// 
 			this.chStatus.Text = "Status";
-			this.chStatus.Width = 260;
+			this.chStatus.Width = 250;
+			// 
+			// chLastImageOn
+			// 
+			this.chLastImageOn.Text = "Last Image On";
+			this.chLastImageOn.Width = 130;
+			// 
+			// chAddedOn
+			// 
+			this.chAddedOn.Text = "Added On";
+			this.chAddedOn.Width = 130;
 			// 
 			// grpAddThread
 			// 
@@ -103,7 +122,7 @@
 			this.grpAddThread.Controls.Add(this.lblURL);
 			this.grpAddThread.Controls.Add(this.txtPageURL);
 			this.grpAddThread.Controls.Add(this.btnAdd);
-			this.grpAddThread.Location = new System.Drawing.Point(8, 176);
+			this.grpAddThread.Location = new System.Drawing.Point(8, 208);
 			this.grpAddThread.Name = "grpAddThread";
 			this.grpAddThread.Size = new System.Drawing.Size(360, 157);
 			this.grpAddThread.TabIndex = 1;
@@ -214,7 +233,7 @@
 			// btnRemoveCompleted
 			// 
 			this.btnRemoveCompleted.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-			this.btnRemoveCompleted.Location = new System.Drawing.Point(508, 180);
+			this.btnRemoveCompleted.Location = new System.Drawing.Point(508, 212);
 			this.btnRemoveCompleted.Name = "btnRemoveCompleted";
 			this.btnRemoveCompleted.Size = new System.Drawing.Size(120, 23);
 			this.btnRemoveCompleted.TabIndex = 3;
@@ -225,7 +244,7 @@
 			// btnAbout
 			// 
 			this.btnAbout.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-			this.btnAbout.Location = new System.Drawing.Point(568, 310);
+			this.btnAbout.Location = new System.Drawing.Point(568, 342);
 			this.btnAbout.Name = "btnAbout";
 			this.btnAbout.Size = new System.Drawing.Size(60, 23);
 			this.btnAbout.TabIndex = 6;
@@ -236,7 +255,7 @@
 			// btnSettings
 			// 
 			this.btnSettings.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-			this.btnSettings.Location = new System.Drawing.Point(492, 310);
+			this.btnSettings.Location = new System.Drawing.Point(492, 342);
 			this.btnSettings.Name = "btnSettings";
 			this.btnSettings.Size = new System.Drawing.Size(67, 23);
 			this.btnSettings.TabIndex = 5;
@@ -247,6 +266,7 @@
 			// cmThreads
 			// 
 			this.cmThreads.MenuItems.AddRange(new System.Windows.Forms.MenuItem[] {
+            this.miEditDescription,
             this.miOpenFolder,
             this.miOpenURL,
             this.miStop,
@@ -257,70 +277,88 @@
             this.miCheckNow,
             this.miCheckEvery});
 			// 
+			// miEditDescription
+			// 
+			this.miEditDescription.Index = 0;
+			this.miEditDescription.Text = "Edit Description";
+			this.miEditDescription.Click += new System.EventHandler(this.miEditDescription_Click);
+			// 
 			// miOpenFolder
 			// 
-			this.miOpenFolder.Index = 0;
+			this.miOpenFolder.Index = 1;
 			this.miOpenFolder.Text = "Open Folder";
 			this.miOpenFolder.Click += new System.EventHandler(this.miOpenFolder_Click);
 			// 
 			// miOpenURL
 			// 
-			this.miOpenURL.Index = 1;
+			this.miOpenURL.Index = 2;
 			this.miOpenURL.Text = "Open URL";
 			this.miOpenURL.Click += new System.EventHandler(this.miOpenURL_Click);
 			// 
 			// miStop
 			// 
-			this.miStop.Index = 2;
+			this.miStop.Index = 3;
 			this.miStop.Text = "Stop";
 			this.miStop.Click += new System.EventHandler(this.miStop_Click);
 			// 
 			// miStart
 			// 
-			this.miStart.Index = 3;
+			this.miStart.Index = 4;
 			this.miStart.Text = "Start";
 			this.miStart.Click += new System.EventHandler(this.miStart_Click);
 			// 
 			// miCopyURL
 			// 
-			this.miCopyURL.Index = 4;
+			this.miCopyURL.Index = 5;
 			this.miCopyURL.Text = "Copy URL";
 			this.miCopyURL.Click += new System.EventHandler(this.miCopyURL_Click);
 			// 
 			// miRemove
 			// 
-			this.miRemove.Index = 5;
+			this.miRemove.Index = 6;
 			this.miRemove.Text = "Remove";
 			this.miRemove.Click += new System.EventHandler(this.miRemove_Click);
 			// 
 			// miRemoveAndDeleteFolder
 			// 
-			this.miRemoveAndDeleteFolder.Index = 6;
+			this.miRemoveAndDeleteFolder.Index = 7;
 			this.miRemoveAndDeleteFolder.Text = "Remove and Delete Folder";
 			this.miRemoveAndDeleteFolder.Click += new System.EventHandler(this.miRemoveAndDeleteFolder_Click);
 			// 
 			// miCheckNow
 			// 
-			this.miCheckNow.Index = 7;
+			this.miCheckNow.Index = 8;
 			this.miCheckNow.Text = "Check Now";
 			this.miCheckNow.Click += new System.EventHandler(this.miCheckNow_Click);
 			// 
 			// miCheckEvery
 			// 
-			this.miCheckEvery.Index = 8;
+			this.miCheckEvery.Index = 9;
 			this.miCheckEvery.Text = "Check Every";
 			// 
 			// grpDoubleClick
 			// 
 			this.grpDoubleClick.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+			this.grpDoubleClick.Controls.Add(this.rbEditDescription);
 			this.grpDoubleClick.Controls.Add(this.rbOpenURL);
 			this.grpDoubleClick.Controls.Add(this.rbOpenFolder);
-			this.grpDoubleClick.Location = new System.Drawing.Point(376, 176);
+			this.grpDoubleClick.Location = new System.Drawing.Point(376, 208);
 			this.grpDoubleClick.Name = "grpDoubleClick";
-			this.grpDoubleClick.Size = new System.Drawing.Size(108, 64);
+			this.grpDoubleClick.Size = new System.Drawing.Size(124, 84);
 			this.grpDoubleClick.TabIndex = 2;
 			this.grpDoubleClick.TabStop = false;
 			this.grpDoubleClick.Text = "On Double Click";
+			// 
+			// rbEditDescription
+			// 
+			this.rbEditDescription.AutoSize = true;
+			this.rbEditDescription.Location = new System.Drawing.Point(12, 58);
+			this.rbEditDescription.Name = "rbEditDescription";
+			this.rbEditDescription.Size = new System.Drawing.Size(99, 17);
+			this.rbEditDescription.TabIndex = 2;
+			this.rbEditDescription.TabStop = true;
+			this.rbEditDescription.Text = "Edit Description";
+			this.rbEditDescription.UseVisualStyleBackColor = true;
 			// 
 			// rbOpenURL
 			// 
@@ -352,7 +390,7 @@
 			// btnAddFromClipboard
 			// 
 			this.btnAddFromClipboard.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-			this.btnAddFromClipboard.Location = new System.Drawing.Point(508, 212);
+			this.btnAddFromClipboard.Location = new System.Drawing.Point(508, 244);
 			this.btnAddFromClipboard.Name = "btnAddFromClipboard";
 			this.btnAddFromClipboard.Size = new System.Drawing.Size(120, 23);
 			this.btnAddFromClipboard.TabIndex = 4;
@@ -360,11 +398,17 @@
 			this.btnAddFromClipboard.UseVisualStyleBackColor = true;
 			this.btnAddFromClipboard.Click += new System.EventHandler(this.btnAddFromClipboard_Click);
 			// 
+			// tmrSaveThreadList
+			// 
+			this.tmrSaveThreadList.Enabled = true;
+			this.tmrSaveThreadList.Interval = 60000;
+			this.tmrSaveThreadList.Tick += new System.EventHandler(this.tmrSaveThreadList_Tick);
+			// 
 			// frmChanThreadWatch
 			// 
 			this.AllowDrop = true;
 			this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
-			this.ClientSize = new System.Drawing.Size(636, 341);
+			this.ClientSize = new System.Drawing.Size(636, 373);
 			this.Controls.Add(this.btnAddFromClipboard);
 			this.Controls.Add(this.grpDoubleClick);
 			this.Controls.Add(this.btnSettings);
@@ -372,7 +416,7 @@
 			this.Controls.Add(this.btnRemoveCompleted);
 			this.Controls.Add(this.grpAddThread);
 			this.Controls.Add(this.lvThreads);
-			this.MinimumSize = new System.Drawing.Size(644, 368);
+			this.MinimumSize = new System.Drawing.Size(644, 300);
 			this.Name = "frmChanThreadWatch";
 			this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
 			this.Text = "Chan Thread Watch";
@@ -391,7 +435,6 @@
 		#endregion
 
 		private System.Windows.Forms.ListView lvThreads;
-		private System.Windows.Forms.ColumnHeader chURL;
 		private System.Windows.Forms.ColumnHeader chStatus;
 		private System.Windows.Forms.GroupBox grpAddThread;
 		private System.Windows.Forms.CheckBox chkOneTime;
@@ -422,6 +465,12 @@
 		private System.Windows.Forms.Button btnAddFromClipboard;
 		private System.Windows.Forms.MenuItem miRemove;
 		private System.Windows.Forms.MenuItem miRemoveAndDeleteFolder;
+		private System.Windows.Forms.ColumnHeader chAddedOn;
+		private System.Windows.Forms.ColumnHeader chLastImageOn;
+		private System.Windows.Forms.ColumnHeader chDescription;
+		private System.Windows.Forms.MenuItem miEditDescription;
+		private System.Windows.Forms.RadioButton rbEditDescription;
+		private System.Windows.Forms.Timer tmrSaveThreadList;
 	}
 }
 

@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Drawing;
 using System.IO;
 using System.Windows.Forms;
 
@@ -15,7 +14,8 @@ namespace ChanThreadWatch {
 			chkRelativePath.Checked = Settings.DownloadFolderIsRelative ?? false;
 			chkCustomUserAgent.Checked = Settings.UseCustomUserAgent ?? false;
 			txtCustomUserAgent.Text = Settings.CustomUserAgent ?? String.Empty;
-			chkSaveThumbnails.Checked = Settings.SaveThumbnails ?? false;
+			chkSaveThumbnails.Checked = Settings.SaveThumbnails ?? true;
+			chkRenameDownloadFolderWithDescription.Checked = Settings.RenameDownloadFolderWithDescription ?? false;
 			chkUseOriginalFileNames.Checked = Settings.UseOriginalFileNames ?? false;
 			chkVerifyImageHashes.Checked = Settings.VerifyImageHashes ?? true;
 			chkCheckForUpdates.Checked = Settings.CheckForUpdates ?? false;
@@ -50,6 +50,7 @@ namespace ChanThreadWatch {
 				Settings.UseCustomUserAgent = chkCustomUserAgent.Checked;
 				Settings.CustomUserAgent = txtCustomUserAgent.Text;
 				Settings.SaveThumbnails = chkSaveThumbnails.Checked;
+				Settings.RenameDownloadFolderWithDescription = chkRenameDownloadFolderWithDescription.Checked;
 				Settings.UseOriginalFileNames = chkUseOriginalFileNames.Checked;
 				Settings.VerifyImageHashes = chkVerifyImageHashes.Checked;
 				Settings.CheckForUpdates = chkCheckForUpdates.Checked;

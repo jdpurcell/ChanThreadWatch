@@ -9,13 +9,15 @@ namespace ChanThreadWatch {
 	public class ThreadWatcher {
 		private const int _maxDownloadTries = 3;
 
-		private Thread _watchThread;
+		private static WorkScheduler _workScheduler = new WorkScheduler();
+
+		private WorkScheduler.WorkItem _nextCheckWorkItem;
 		private object _settingsSync = new object();
 		private ManualResetEvent _stopEvent = new ManualResetEvent(false);
 		private StopReason _stopReason;
-		private AutoResetEvent _nextCheckTicksChangedEvent = new AutoResetEvent(false);
 		private bool _hasRun;
-		private volatile bool _isWaiting;
+		private ManualResetEvent _checkFinishedEvent = new ManualResetEvent(true);
+		private bool _isWaiting;
 		private string _pageURL;
 		private string _pageAuth;
 		private string _imageAuth;
@@ -24,6 +26,9 @@ namespace ChanThreadWatch {
 		private string _mainDownloadDir = Settings.AbsoluteDownloadDir;
 		private string _threadDownloadDir;
 		private long _nextCheckTicks;
+		private string _description = String.Empty;
+		private bool _renameThreadDownloadDir;
+		private object _tag;
 
 		public ThreadWatcher(string pageURL) {
 			_pageURL = pageURL;
@@ -31,6 +36,10 @@ namespace ChanThreadWatch {
 
 		public string PageURL {
 			get { return _pageURL; }
+		}
+
+		private string PageHost {
+			get { return (new Uri(PageURL)).Host; }
 		}
 
 		public string PageAuth {
@@ -54,9 +63,8 @@ namespace ChanThreadWatch {
 				lock (_settingsSync) {
 					int changeAmount = value - _checkIntervalSeconds;
 					_checkIntervalSeconds = value;
-					_nextCheckTicks += changeAmount * 1000;
+					NextCheckTicks += changeAmount * 1000;
 				}
-				_nextCheckTicksChangedEvent.Set();
 			}
 		}
 
@@ -70,17 +78,38 @@ namespace ChanThreadWatch {
 		}
 
 		public int MillisecondsUntilNextCheck {
-			get {
-				lock (_settingsSync) {
-					return Math.Max((int)(_nextCheckTicks - Environment.TickCount), 0);
-				}
-			}
+			get { return Math.Max((int)(NextCheckTicks - TickCount.Now), 0); }
+			set { NextCheckTicks = TickCount.Now + value; }
+		}
+
+		private long NextCheckTicks {
+			get { lock (_settingsSync) { return _nextCheckTicks; } }
 			set {
 				lock (_settingsSync) {
-					_nextCheckTicks = Environment.TickCount + value;
+					_nextCheckTicks = value;
+					if (_nextCheckWorkItem != null) {
+						_nextCheckWorkItem.RunAtTicks = _nextCheckTicks;
+					}
 				}
-				_nextCheckTicksChangedEvent.Set();
 			}
+		}
+
+		public string Description {
+			get { lock (_settingsSync) { return _description; } }
+			set {
+				lock (_settingsSync) {
+					_description = value;
+					if (_hasRun && Settings.RenameDownloadFolderWithDescription == true) {
+						_renameThreadDownloadDir = true;
+						TryRenameThreadDownloadDir();
+					}
+				}
+			}
+		}
+
+		public object Tag {
+			get { lock (_settingsSync) { return _tag; } }
+			set { lock (_settingsSync) { _tag = value; } }
 		}
 
 		private void SetSetting<T>(out T field, T value, bool canChangeAfterRunning, bool canChangeWhileRunning) {
@@ -103,8 +132,8 @@ namespace ChanThreadWatch {
 				_stopEvent.Reset();
 				_stopReason = StopReason.Other;
 				_hasRun = true;
-				_watchThread = new Thread(WatchThread);
-				_watchThread.Start();
+				_hasInitialized = false;
+				_nextCheckWorkItem = _workScheduler.AddItem(TickCount.Now, Check, PageHost);
 			}
 		}
 
@@ -113,6 +142,15 @@ namespace ChanThreadWatch {
 				if (!IsStopping) {
 					_stopEvent.Set();
 					_stopReason = reason;
+					_hasRun = true;
+					if (_nextCheckWorkItem != null) {
+						_workScheduler.RemoveItem(_nextCheckWorkItem);
+						_nextCheckWorkItem = null;
+					}
+					if (_checkFinishedEvent.WaitOne(0, false)) {
+						_isWaiting = false;
+						OnStopStatus(new StopStatusEventArgs(reason));
+					}
 				}
 			}
 		}
@@ -122,19 +160,19 @@ namespace ChanThreadWatch {
 		}
 
 		public bool WaitUntilStopped(int timeout) {
-			if (_watchThread != null) {
-				return _watchThread.Join(timeout);
-			}
-			return true;
+			return _checkFinishedEvent.WaitOne(timeout, false);
 		}
 
 		public bool IsRunning {
-			get { return _watchThread != null && _watchThread.IsAlive; }
+			get {
+				lock (_settingsSync) {
+					return !_checkFinishedEvent.WaitOne(0, false) || _nextCheckWorkItem != null;
+				}
+			}
 		}
 
 		public bool IsWaiting {
-			get { return _isWaiting; }
-			private set { _isWaiting = value; }
+			get { lock (_settingsSync) { return _isWaiting; } }
 		}
 
 		public bool IsStopping {
@@ -143,7 +181,6 @@ namespace ChanThreadWatch {
 
 		public StopReason StopReason {
 			get { lock (_settingsSync) { return _stopReason; } }
-			set { SetSetting(out _stopReason, value, false, false); }
 		}
 
 		public event EventHandler<ThreadWatcher, DownloadStatusEventArgs> DownloadStatus;
@@ -152,306 +189,399 @@ namespace ChanThreadWatch {
 
 		public event EventHandler<ThreadWatcher, StopStatusEventArgs> StopStatus;
 
+		public event EventHandler<ThreadWatcher, EventArgs> ThreadDownloadDirectoryRename;
+
 		private void OnDownloadStatus(DownloadStatusEventArgs e) {
 			var evt = DownloadStatus;
-			if (evt != null) evt(this, e);
+			if (evt != null) try { evt(this, e); } catch { }
 		}
 
 		private void OnWaitStatus(EventArgs e) {
 			var evt = WaitStatus;
-			if (evt != null) evt(this, e);
+			if (evt != null) try { evt(this, e); } catch { }
 		}
 
 		private void OnStopStatus(StopStatusEventArgs e) {
 			var evt = StopStatus;
-			if (evt != null) evt(this, e);
+			if (evt != null) try { evt(this, e); } catch { }
 		}
 
-		private void WatchThread() {
-			SiteHelper siteHelper;
-			List<PageInfo> pageList = new List<PageInfo>();
-			var completedImageDiskFileNames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-			var imageDiskFileNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-			var completedThumbs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-			string saveDir;
-			string saveThumbsDir;
-			string threadName;
-			int maxFileNameLength = 0;
+		private void OnThreadDownloadDirectoryRename(EventArgs e) {
+			var evt = ThreadDownloadDirectoryRename;
+			if (evt != null) try { evt(this, e); } catch { }
+		}
 
+		private bool _hasInitialized;
+		private List<PageInfo> _pageList;
+		private HashSet<string> _imageDiskFileNames;
+		private Dictionary<string, DownloadInfo> _completedImages;
+		private Dictionary<string, DownloadInfo> _completedThumbs;
+		private int _maxFileNameLength;
+		private string _threadName;
+
+		private void Check() {
 			try {
-				siteHelper = SiteHelper.GetInstance(PageURL);
-				siteHelper.SetURL(PageURL);
-				threadName = siteHelper.GetThreadName();
-				if (String.IsNullOrEmpty(ThreadDownloadDirectory)) {
-					lock (_settingsSync) {
-						_threadDownloadDir = Path.Combine(MainDownloadDirectory, General.CleanFileName(String.Format(
-							"{0}_{1}_{2}", siteHelper.GetSiteName(), siteHelper.GetBoardName(), threadName)));
-					}
-					if (!Directory.Exists(ThreadDownloadDirectory)) {
-						try {
-							Directory.CreateDirectory(ThreadDownloadDirectory);
-						}
-						catch {
-							Stop(StopReason.IOError);
-						}
-					}
+				SiteHelper siteHelper = SiteHelper.GetInstance(PageHost);
+				string threadDir;
+				string imageDir;
+				string thumbDir;
+
+				lock (_settingsSync) {
+					_nextCheckWorkItem = null;
+					_checkFinishedEvent.Reset();
+					_isWaiting = false;
 				}
-				saveDir = ThreadDownloadDirectory;
-				saveThumbsDir = Path.Combine(ThreadDownloadDirectory, "thumbs");
 
-				pageList.Add(new PageInfo { URL = PageURL });
+				if (!_hasInitialized) {
+					siteHelper.SetURL(PageURL);
 
-				while (!IsStopping) {
-					Queue<ImageInfo> pendingImages = new Queue<ImageInfo>();
-					Queue<ThumbnailInfo> pendingThumbs = new Queue<ThumbnailInfo>();
+					_pageList = new List<PageInfo>();
+					_imageDiskFileNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+					_completedImages = new Dictionary<string, DownloadInfo>(StringComparer.OrdinalIgnoreCase);
+					_completedThumbs = new Dictionary<string, DownloadInfo>(StringComparer.OrdinalIgnoreCase);
+					_maxFileNameLength = 0;
+					_threadName = siteHelper.GetThreadName();
 
-					foreach (PageInfo pageInfo in pageList) {
-						// Reset the fresh flag on all of the pages before downloading starts so that
-						// they're valid even if stopping before all the pages have been downloaded
-						pageInfo.IsFresh = false;
+					if (String.IsNullOrEmpty(ThreadDownloadDirectory)) {
+						lock (_settingsSync) {
+							_threadDownloadDir = Path.Combine(MainDownloadDirectory, General.CleanFileName(String.Format(
+								"{0}_{1}_{2}", siteHelper.GetSiteName(), siteHelper.GetBoardName(), _threadName)));
+						}
+						if (!Directory.Exists(ThreadDownloadDirectory)) {
+							try {
+								Directory.CreateDirectory(ThreadDownloadDirectory);
+							}
+							catch {
+								Stop(StopReason.IOError);
+							}
+						}
+					}
+					if (String.IsNullOrEmpty(Description)) {
+						lock (_settingsSync) {
+							_description = General.GetLastDirectory(_threadDownloadDir);
+						}
 					}
 
-					int pageIndex = 0;
-					OnDownloadStatus(new DownloadStatusEventArgs(DownloadType.Page, 0, pageList.Count));
-					do {
-						string saveFileName = General.CleanFileName(threadName) + ((pageIndex == 0) ? String.Empty : ("_" + (pageIndex + 1))) + ".html";
-						string pageContent = null;
+					_pageList.Add(new PageInfo {
+						URL = PageURL
+					});
 
-						PageInfo pageInfo = pageList[pageIndex];
-						pageInfo.Path = Path.Combine(saveDir, saveFileName);
+					_hasInitialized = true;
+				}
 
-						ManualResetEvent downloadEndEvent = new ManualResetEvent(false);
-						DownloadPageEndCallback downloadEnd = (completed, content, lastModifiedTime, encoding, replaceList) => {
-							if (completed) {
-								pageInfo.IsFresh = true;
-								pageContent = content;
-								pageInfo.CacheTime = lastModifiedTime;
-								pageInfo.Encoding = encoding;
-								pageInfo.ReplaceList = replaceList;
-							}
-							downloadEndEvent.Set();
-						};
-						DownloadPageAsync(pageInfo.Path, pageInfo.URL, PageAuth, pageInfo.CacheTime, downloadEnd);
-						downloadEndEvent.WaitOne();
+				threadDir = ThreadDownloadDirectory;
+				imageDir = ThreadDownloadDirectory;
+				thumbDir = Path.Combine(ThreadDownloadDirectory, "thumbs");
 
-						if (pageContent != null) {
-							siteHelper.SetURL(pageInfo.URL);
-							siteHelper.SetHTML(pageContent);
+				Queue<ImageInfo> pendingImages = new Queue<ImageInfo>();
+				Queue<ThumbnailInfo> pendingThumbs = new Queue<ThumbnailInfo>();
 
-							List<ThumbnailInfo> thumbs = new List<ThumbnailInfo>();
-							List<ImageInfo> images = siteHelper.GetImages(pageInfo.ReplaceList, thumbs);
-							if (completedImageDiskFileNames.Count == 0) {
-								foreach (ImageInfo image in images) {
-									for (int iName = 0; iName < 2; iName++) {
-										string baseFileName = (iName == 0) ? image.OriginalFileName : image.FileName;
-										string baseFileNameNoExtension = Path.GetFileNameWithoutExtension(baseFileName);
-										string baseExtension = Path.GetExtension(baseFileName);
-										int iSuffix = 1;
-										string fileName;
-										do {
-											fileName = baseFileNameNoExtension + ((iSuffix == 1) ? String.Empty :
-												("_" + iSuffix)) + baseExtension;
-											iSuffix++;
-										}
-										while (imageDiskFileNames.Contains(fileName));
-										if (File.Exists(Path.Combine(saveDir, fileName))) {
-											imageDiskFileNames.Add(fileName);
-											completedImageDiskFileNames[image.FileName] = fileName;
-											break;
-										}
-									}
-								}
-								foreach (ThumbnailInfo thumb in thumbs) {
-									if (File.Exists(Path.Combine(saveThumbsDir, thumb.FileName))) {
-										completedThumbs.Add(thumb.FileName);
-									}
-								}
-							}
+				foreach (PageInfo pageInfo in _pageList) {
+					// Reset the fresh flag on all of the pages before downloading starts so that
+					// they're valid even if stopping before all the pages have been downloaded
+					pageInfo.IsFresh = false;
+				}
+
+				int pageIndex = 0;
+				OnDownloadStatus(new DownloadStatusEventArgs(DownloadType.Page, 0, _pageList.Count));
+				while (pageIndex < _pageList.Count && !IsStopping) {
+					string saveFileName = General.CleanFileName(_threadName) + ((pageIndex == 0) ? String.Empty : ("_" + (pageIndex + 1))) + ".html";
+					string pageContent = null;
+
+					PageInfo pageInfo = _pageList[pageIndex];
+					pageInfo.Path = Path.Combine(threadDir, saveFileName);
+
+					ManualResetEvent downloadEndEvent = new ManualResetEvent(false);
+					DownloadPageEndCallback downloadEnd = (result, content, lastModifiedTime, encoding, replaceList) => {
+						if (result == DownloadResult.Completed) {
+							pageInfo.IsFresh = true;
+							pageContent = content;
+							pageInfo.CacheTime = lastModifiedTime;
+							pageInfo.Encoding = encoding;
+							pageInfo.ReplaceList = replaceList;
+						}
+						downloadEndEvent.Set();
+					};
+					DownloadPageAsync(pageInfo.Path, pageInfo.URL, PageAuth, pageInfo.CacheTime, downloadEnd);
+					downloadEndEvent.WaitOne();
+
+					if (pageContent != null) {
+						siteHelper.SetURL(pageInfo.URL);
+						siteHelper.SetHTML(pageContent);
+
+						List<ThumbnailInfo> thumbs = new List<ThumbnailInfo>();
+						List<ImageInfo> images = siteHelper.GetImages(pageInfo.ReplaceList, thumbs);
+						if (_completedImages.Count == 0) {
 							foreach (ImageInfo image in images) {
-								if (!completedImageDiskFileNames.ContainsKey(image.FileName)) {
-									pendingImages.Enqueue(image);
+								for (int iName = 0; iName < 2; iName++) {
+									string baseFileName = (iName == 0) ? image.OriginalFileName : image.FileName;
+									string baseFileNameNoExtension = Path.GetFileNameWithoutExtension(baseFileName);
+									string baseExtension = Path.GetExtension(baseFileName);
+									int iSuffix = 1;
+									string fileName;
+									do {
+										fileName = baseFileNameNoExtension + ((iSuffix == 1) ? String.Empty :
+											("_" + iSuffix)) + baseExtension;
+										iSuffix++;
+									}
+									while (_imageDiskFileNames.Contains(fileName));
+									string path = Path.Combine(imageDir, fileName);
+									if (File.Exists(path)) {
+										_imageDiskFileNames.Add(fileName);
+										_completedImages[image.FileName] = new DownloadInfo {
+											Path = path,
+											Skipped = false
+										};
+										break;
+									}
 								}
 							}
 							foreach (ThumbnailInfo thumb in thumbs) {
-								if (!completedThumbs.Contains(thumb.FileName)) {
-									pendingThumbs.Enqueue(thumb);
+								string path = Path.Combine(thumbDir, thumb.FileName);
+								if (File.Exists(path)) {
+									_completedThumbs[thumb.FileName] = new DownloadInfo {
+										Path = path,
+										Skipped = false
+									};
 								}
 							}
-
-							string nextPageURL = siteHelper.GetNextPageURL();
-							if (!String.IsNullOrEmpty(nextPageURL)) {
-								PageInfo nextPageInfo = new PageInfo { URL = nextPageURL };
-								if (pageIndex == pageList.Count - 1) {
-									pageList.Add(nextPageInfo);
-								}
-								else if (pageList[pageIndex + 1].URL != nextPageURL) {
-									pageList[pageIndex + 1] = nextPageInfo;
-								}
+						}
+						foreach (ImageInfo image in images) {
+							if (!_completedImages.ContainsKey(image.FileName)) {
+								pendingImages.Enqueue(image);
 							}
-							else if (pageIndex < pageList.Count - 1) {
-								pageList.RemoveRange(pageIndex + 1, pageList.Count - (pageIndex + 1));
+						}
+						foreach (ThumbnailInfo thumb in thumbs) {
+							if (!_completedThumbs.ContainsKey(thumb.FileName)) {
+								pendingThumbs.Enqueue(thumb);
 							}
 						}
 
-						OnDownloadStatus(new DownloadStatusEventArgs(DownloadType.Page, pageIndex + 1, pageList.Count));
+						string nextPageURL = siteHelper.GetNextPageURL();
+						if (!String.IsNullOrEmpty(nextPageURL)) {
+							PageInfo nextPageInfo = new PageInfo {
+								URL = nextPageURL
+							};
+							if (pageIndex == _pageList.Count - 1) {
+								_pageList.Add(nextPageInfo);
+							}
+							else if (_pageList[pageIndex + 1].URL != nextPageURL) {
+								_pageList[pageIndex + 1] = nextPageInfo;
+							}
+						}
+						else if (pageIndex < _pageList.Count - 1) {
+							_pageList.RemoveRange(pageIndex + 1, _pageList.Count - (pageIndex + 1));
+						}
 					}
-					while (++pageIndex < pageList.Count && !IsStopping);
 
-					MillisecondsUntilNextCheck = (CheckIntervalSeconds * 1000);
+					pageIndex++;
+					OnDownloadStatus(new DownloadStatusEventArgs(DownloadType.Page, pageIndex, _pageList.Count));
+				}
 
-					if (pendingImages.Count != 0 && !IsStopping) {
-						if (maxFileNameLength == 0) {
-							maxFileNameLength = General.GetMaximumFileNameLength(saveDir);
+				MillisecondsUntilNextCheck = (CheckIntervalSeconds * 1000);
+
+				if (pendingImages.Count != 0 && !IsStopping) {
+					if (_maxFileNameLength == 0) {
+						_maxFileNameLength = General.GetMaximumFileNameLength(imageDir);
+					}
+
+					List<ManualResetEvent> downloadEndEvents = new List<ManualResetEvent>();
+					int completedImageCount = 0;
+					foreach (KeyValuePair<string, DownloadInfo> item in _completedImages) {
+						if (!item.Value.Skipped) completedImageCount++;
+					}
+					int totalImageCount = completedImageCount + pendingImages.Count;
+					OnDownloadStatus(new DownloadStatusEventArgs(DownloadType.Image, completedImageCount, totalImageCount));
+					while (pendingImages.Count != 0 && !IsStopping) {
+						string saveFileNameNoExtension;
+						string saveExtension;
+						string savePath;
+						ImageInfo image = pendingImages.Dequeue();
+						bool pathTooLong = false;
+
+					MakeImagePath:
+						if ((Settings.UseOriginalFileNames == true) && !String.IsNullOrEmpty(image.OriginalFileName) && !pathTooLong) {
+							saveFileNameNoExtension = Path.GetFileNameWithoutExtension(image.OriginalFileName);
+							saveExtension = Path.GetExtension(image.OriginalFileName);
+						}
+						else {
+							saveFileNameNoExtension = Path.GetFileNameWithoutExtension(image.FileName);
+							saveExtension = Path.GetExtension(image.FileName);
+						}
+
+						int iSuffix = 1;
+						bool fileNameTaken;
+						string saveFileName;
+						do {
+							savePath = Path.Combine(imageDir, saveFileNameNoExtension + ((iSuffix == 1) ?
+								String.Empty : ("_" + iSuffix)) + saveExtension);
+							saveFileName = Path.GetFileName(savePath);
+							fileNameTaken = _imageDiskFileNames.Contains(saveFileName);
+							iSuffix++;
+						}
+						while (fileNameTaken);
+
+						if (saveFileName.Length > _maxFileNameLength && !pathTooLong) {
+							pathTooLong = true;
+							goto MakeImagePath;
+						}
+						_imageDiskFileNames.Add(saveFileName);
+
+						HashType hashType = (Settings.VerifyImageHashes != false) ? image.HashType : HashType.None;
+						ManualResetEvent downloadEndEvent = new ManualResetEvent(false);
+						DownloadFileEndCallback onDownloadEnd = (result) => {
+							if (result == DownloadResult.Completed || result == DownloadResult.Skipped) {
+								lock (_completedImages) {
+									_completedImages[image.FileName] = new DownloadInfo {
+										Path = savePath,
+										Skipped = (result == DownloadResult.Skipped)
+									};
+									if (result != DownloadResult.Skipped) {
+										completedImageCount++;
+									}
+									else {
+										totalImageCount--;
+									}
+									OnDownloadStatus(new DownloadStatusEventArgs(DownloadType.Image, completedImageCount, totalImageCount));
+								}
+							}
+							downloadEndEvent.Set();
+						};
+						downloadEndEvents.Add(downloadEndEvent);
+						DownloadFileAsync(savePath, image.URL, ImageAuth, image.Referer, hashType, image.Hash, onDownloadEnd);
+					}
+					foreach (ManualResetEvent downloadEndEvent in downloadEndEvents) {
+						downloadEndEvent.WaitOne();
+					}
+				}
+
+				if (Settings.SaveThumbnails == true) {
+					if (pendingThumbs.Count != 0 && !IsStopping) {
+						if (!Directory.Exists(thumbDir)) {
+							try {
+								Directory.CreateDirectory(thumbDir);
+							}
+							catch {
+								Stop(StopReason.IOError);
+							}
 						}
 
 						List<ManualResetEvent> downloadEndEvents = new List<ManualResetEvent>();
-						int totalImageCount = completedImageDiskFileNames.Count + pendingImages.Count;
-						OnDownloadStatus(new DownloadStatusEventArgs(DownloadType.Image, completedImageDiskFileNames.Count, totalImageCount));
-						while (pendingImages.Count != 0 && !IsStopping) {
-							string saveFileNameNoExtension;
-							string saveExtension;
-							string savePath;
-							ImageInfo image = pendingImages.Dequeue();
-							bool pathTooLong = false;
+						int completedThumbCount = 0;
+						foreach (KeyValuePair<string, DownloadInfo> item in _completedThumbs) {
+							if (!item.Value.Skipped) completedThumbCount++;
+						}
+						int totalThumbCount = completedThumbCount + pendingThumbs.Count;
+						OnDownloadStatus(new DownloadStatusEventArgs(DownloadType.Thumbnail, completedThumbCount, totalThumbCount));
+						while (pendingThumbs.Count != 0 && !IsStopping) {
+							ThumbnailInfo thumb = pendingThumbs.Dequeue();
+							string savePath = Path.Combine(thumbDir, thumb.FileName);
 
-						MakeImagePath:
-							if ((Settings.UseOriginalFileNames == true) && !String.IsNullOrEmpty(image.OriginalFileName) && !pathTooLong) {
-								saveFileNameNoExtension = Path.GetFileNameWithoutExtension(image.OriginalFileName);
-								saveExtension = Path.GetExtension(image.OriginalFileName);
-							}
-							else {
-								saveFileNameNoExtension = Path.GetFileNameWithoutExtension(image.FileName);
-								saveExtension = Path.GetExtension(image.FileName);
-							}
-
-							int iSuffix = 1;
-							bool fileNameTaken;
-							string saveFileName;
-							do {
-								savePath = Path.Combine(saveDir, saveFileNameNoExtension + ((iSuffix == 1) ?
-									String.Empty : ("_" + iSuffix)) + saveExtension);
-								saveFileName = Path.GetFileName(savePath);
-								fileNameTaken = imageDiskFileNames.Contains(saveFileName);
-								iSuffix++;
-							}
-							while (fileNameTaken);
-
-							if (saveFileName.Length > maxFileNameLength && !pathTooLong) {
-								pathTooLong = true;
-								goto MakeImagePath;
-							}
-							imageDiskFileNames.Add(saveFileName);
-
-							HashType hashType = (Settings.VerifyImageHashes != false) ? image.HashType : HashType.None;
 							ManualResetEvent downloadEndEvent = new ManualResetEvent(false);
-							DownloadFileEndCallback onDownloadEnd = (completed) => {
-								if (completed) {
-									lock (completedImageDiskFileNames) {
-										completedImageDiskFileNames[image.FileName] = saveFileName;
-										OnDownloadStatus(new DownloadStatusEventArgs(DownloadType.Image, completedImageDiskFileNames.Count, totalImageCount));
+							DownloadFileEndCallback onDownloadEnd = (result) => {
+								if (result == DownloadResult.Completed || result == DownloadResult.Skipped) {
+									lock (_completedThumbs) {
+										_completedThumbs[thumb.FileName] = new DownloadInfo {
+											Path = savePath,
+											Skipped = (result == DownloadResult.Skipped)
+										};
+										if (result != DownloadResult.Skipped) {
+											completedThumbCount++;
+										}
+										else {
+											totalThumbCount--;
+										}
+										OnDownloadStatus(new DownloadStatusEventArgs(DownloadType.Thumbnail, completedThumbCount, totalThumbCount));
 									}
 								}
 								downloadEndEvent.Set();
 							};
 							downloadEndEvents.Add(downloadEndEvent);
-							DownloadFileAsync(savePath, image.URL, ImageAuth, image.Referer, hashType, image.Hash, onDownloadEnd);
+							DownloadFileAsync(savePath, thumb.URL, PageAuth, thumb.Referer, HashType.None, null, onDownloadEnd);
 						}
 						foreach (ManualResetEvent downloadEndEvent in downloadEndEvents) {
 							downloadEndEvent.WaitOne();
 						}
 					}
 
-					if (Settings.SaveThumbnails == true) {
-						if (pendingThumbs.Count != 0 && !IsStopping) {
-							if (!Directory.Exists(saveThumbsDir)) {
-								try {
-									Directory.CreateDirectory(saveThumbsDir);
-								}
-								catch {
-									Stop(StopReason.IOError);
-								}
-							}
-
-							List<ManualResetEvent> downloadEndEvents = new List<ManualResetEvent>();
-							int totalThumbCount = completedThumbs.Count + pendingThumbs.Count;
-							OnDownloadStatus(new DownloadStatusEventArgs(DownloadType.Thumbnail, completedThumbs.Count, totalThumbCount));
-							while (pendingThumbs.Count != 0 && !IsStopping) {
-								ThumbnailInfo thumb = pendingThumbs.Dequeue();
-								string savePath = Path.Combine(saveThumbsDir, thumb.FileName);
-
-								ManualResetEvent downloadEndEvent = new ManualResetEvent(false);
-								DownloadFileEndCallback onDownloadEnd = (completed) => {
-									if (completed) {
-										lock (completedThumbs) {
-											completedThumbs.Add(thumb.FileName);
-											OnDownloadStatus(new DownloadStatusEventArgs(DownloadType.Thumbnail, completedThumbs.Count, totalThumbCount));
-										}
-									}
-									downloadEndEvent.Set();
+					if (!IsStopping || StopReason != StopReason.IOError) {
+						foreach (PageInfo pageInfo in _pageList) {
+							if (!pageInfo.IsFresh) continue;
+							string pageContent = General.HTMLBytesToString(File.ReadAllBytes(pageInfo.Path), pageInfo.Encoding);
+							for (int i = 0; i < pageInfo.ReplaceList.Count; i++) {
+								ReplaceInfo replace = pageInfo.ReplaceList[i];
+								DownloadInfo downloadInfo = null;
+								Func<string> getRelativeDownloadPath = () => {
+									return General.GetRelativeFilePath(downloadInfo.Path, threadDir).Replace(Path.DirectorySeparatorChar, '/');
 								};
-								downloadEndEvents.Add(downloadEndEvent);
-								DownloadFileAsync(savePath, thumb.URL, PageAuth, thumb.Referer, HashType.None, null, onDownloadEnd);
-							}
-							foreach (ManualResetEvent downloadEndEvent in downloadEndEvents) {
-								downloadEndEvent.WaitOne();
-							}
-						}
-
-						if (!IsStopping || StopReason != StopReason.IOError) {
-							foreach (PageInfo pageInfo in pageList) {
-								if (!pageInfo.IsFresh) continue;
-								string pageContent = General.HTMLBytesToString(File.ReadAllBytes(pageInfo.Path), pageInfo.Encoding);
-								for (int i = 0; i < pageInfo.ReplaceList.Count; i++) {
-									ReplaceInfo replace = pageInfo.ReplaceList[i];
-									string saveFileName;
-									if ((replace.Type == ReplaceType.ImageLinkHref) && completedImageDiskFileNames.TryGetValue(replace.Tag, out saveFileName)) {
-										replace.Value = "href=\"" + HttpUtility.HtmlAttributeEncode(saveFileName) + "\"";
-									}
-									if (replace.Type == ReplaceType.ImageSrc) {
-										replace.Value = "src=\"thumbs/" + HttpUtility.HtmlAttributeEncode(replace.Tag) + "\"";
-									}
+								if (replace.Type == ReplaceType.ImageLinkHref && _completedImages.TryGetValue(replace.Tag, out downloadInfo)) {
+									replace.Value = "href=\"" + HttpUtility.HtmlAttributeEncode(getRelativeDownloadPath()) + "\"";
 								}
-								General.AddOtherReplaces(pageContent, pageInfo.ReplaceList);
-								using (StreamWriter sw = new StreamWriter(pageInfo.Path, false, pageInfo.Encoding)) {
-									General.WriteReplacedString(pageContent, pageInfo.ReplaceList, sw);
-								}
-								if (General.FindElementClose(pageContent, "html", 0) != -1 && File.Exists(pageInfo.Path + ".bak")) {
-									try { File.Delete(pageInfo.Path + ".bak"); }
-									catch { }
+								if (replace.Type == ReplaceType.ImageSrc && _completedThumbs.TryGetValue(replace.Tag, out downloadInfo)) {
+									replace.Value = "src=\"" + HttpUtility.HtmlAttributeEncode(getRelativeDownloadPath()) + "\"";
 								}
 							}
+							General.AddOtherReplaces(pageContent, pageInfo.ReplaceList);
+							using (StreamWriter sw = new StreamWriter(pageInfo.Path, false, pageInfo.Encoding)) {
+								General.WriteReplacedString(pageContent, pageInfo.ReplaceList, sw);
+							}
+							if (General.FindElementClose(pageContent, "html", 0) != -1 && File.Exists(pageInfo.Path + ".bak")) {
+								try { File.Delete(pageInfo.Path + ".bak"); }
+								catch { }
+							}
 						}
-					}
-
-					if (OneTimeDownload) {
-						Stop(StopReason.DownloadComplete);
-					}
-
-					if (IsStopping) break;
-
-					if (MillisecondsUntilNextCheck > 0) {
-						IsWaiting = true;
-						OnWaitStatus(EventArgs.Empty);
-						_nextCheckTicksChangedEvent.WaitOne(0, false);
-						WaitHandle[] waitHandles = new WaitHandle[] { _stopEvent, _nextCheckTicksChangedEvent };
-						do {
-							WaitHandle.WaitAny(waitHandles, MillisecondsUntilNextCheck, false);
-						}
-						while (!IsStopping && MillisecondsUntilNextCheck > 0);
-						IsWaiting = false;
 					}
 				}
 
-				OnStopStatus(new StopStatusEventArgs(StopReason));
+				if (OneTimeDownload) {
+					Stop(StopReason.DownloadComplete);
+				}
 			}
 			catch {
-				OnStopStatus(new StopStatusEventArgs(StopReason.Other));
+				Stop(StopReason.Other);
+			}
+
+			lock (_settingsSync) {
+				_checkFinishedEvent.Set();
+				if (_renameThreadDownloadDir) {
+					TryRenameThreadDownloadDir();
+				}
+				if (!IsStopping) {
+					_nextCheckWorkItem = _workScheduler.AddItem(NextCheckTicks, Check, PageHost);
+					_isWaiting = MillisecondsUntilNextCheck > 0;
+				}
+			}
+			if (IsStopping) {
+				OnStopStatus(new StopStatusEventArgs(StopReason));
+			}
+			else if (IsWaiting) {
+				OnWaitStatus(EventArgs.Empty);
+			}
+		}
+
+		private void TryRenameThreadDownloadDir() {
+			lock (_settingsSync) {
+				if (!_checkFinishedEvent.WaitOne(0, false) || String.IsNullOrEmpty(_threadDownloadDir) ||
+					(IsStopping && (StopReason == StopReason.IOError || StopReason == StopReason.Exiting)))
+				{
+					return;
+				}
+				try {
+					string destDir = Path.Combine(General.RemoveLastDirectory(_threadDownloadDir), General.CleanFileName(_description));
+					if (!destDir.Equals(_threadDownloadDir, StringComparison.OrdinalIgnoreCase)) {
+						Directory.Move(_threadDownloadDir, destDir);
+						_threadDownloadDir = destDir;
+						OnThreadDownloadDirectoryRename(EventArgs.Empty);
+					}
+					_renameThreadDownloadDir = false;
+				}
+				catch { }
 			}
 		}
 
 		private void DownloadPageAsync(string path, string url, string auth, DateTime? cacheLastModifiedTime, DownloadPageEndCallback onDownloadEnd) {
 			ConnectionManager connectionManager = ConnectionManager.GetInstance(url);
-			string connectionName = connectionManager.ObtainConnection();
+			string connectionName = connectionManager.ObtainConnectionGroupName();
 
 			string backupPath = path + ".bak";
 			int tryNumber = 0;
@@ -464,14 +594,14 @@ namespace ChanThreadWatch {
 				List<ReplaceInfo> replaceList = null;
 				string content = null;
 
-				Action<bool> endTryDownload = (completed) => {
-					connectionManager.ReleaseConnection(connectionName);
-					onDownloadEnd(completed, content, lastModifiedTime, encoding, replaceList);
+				Action<DownloadResult> endTryDownload = (result) => {
+					connectionManager.ReleaseConnectionGroupName(connectionName);
+					onDownloadEnd(result, content, lastModifiedTime, encoding, replaceList);
 				};
 
 				tryNumber++;
 				if (IsStopping || tryNumber > _maxDownloadTries) {
-					endTryDownload(false);
+					endTryDownload(DownloadResult.RetryLater);
 					return;
 				}
 
@@ -513,24 +643,24 @@ namespace ChanThreadWatch {
 						encoding = General.DetectHTMLEncoding(pageBytes, httpCharSet);
 						replaceList = (Settings.SaveThumbnails == true) ? new List<ReplaceInfo>() : null;
 						content = General.HTMLBytesToString(pageBytes, encoding, replaceList);
-						endTryDownload(true);
+						endTryDownload(DownloadResult.Completed);
 					},
 					(ex) => {
 						closeStreams();
 						if (createdFile) deleteFile();
 						if (ex is HTTP304Exception) {
 							// Page not modified, skip
-							endTryDownload(false);
+							endTryDownload(DownloadResult.Skipped);
 						}
 						else if (ex is HTTP404Exception) {
 							// Page not found, stop
 							Stop(StopReason.PageNotFound);
-							endTryDownload(false);
+							endTryDownload(DownloadResult.Skipped);
 						}
 						else if (ex is DirectoryNotFoundException || ex is PathTooLongException || ex is UnauthorizedAccessException) {
 							// Fatal IO error, stop
 							Stop(StopReason.IOError);
-							endTryDownload(false);
+							endTryDownload(DownloadResult.Skipped);
 						}
 						else {
 							// Other error, retry
@@ -545,21 +675,21 @@ namespace ChanThreadWatch {
 
 		private void DownloadFileAsync(string path, string url, string auth, string referer, HashType hashType, byte[] correctHash, DownloadFileEndCallback onDownloadEnd) {
 			ConnectionManager connectionManager = ConnectionManager.GetInstance(url);
-			string connectionName = connectionManager.ObtainConnection();
+			string connectionName = connectionManager.ObtainConnectionGroupName();
 
 			int tryNumber = 0;
 			byte[] prevHash = null;
 
 			Action tryDownload = null;
 			tryDownload = () => {
-				Action<bool> endTryDownload = (completed) => {
-					connectionManager.ReleaseConnection(connectionName);
-					onDownloadEnd(completed);
+				Action<DownloadResult> endTryDownload = (result) => {
+					connectionManager.ReleaseConnectionGroupName(connectionName);
+					onDownloadEnd(result);
 				};
 
 				tryNumber++;
 				if (IsStopping || tryNumber > _maxDownloadTries) {
-					endTryDownload(false);
+					endTryDownload(DownloadResult.RetryLater);
 					return;
 				}
 
@@ -598,19 +728,19 @@ namespace ChanThreadWatch {
 							tryDownload();
 							return;
 						}
-						endTryDownload(true);
+						endTryDownload(DownloadResult.Completed);
 					},
 					(ex) => {
 						closeStreams();
 						if (createdFile) deleteFile();
 						if (ex is HTTP404Exception || ex is PathTooLongException) {
-							// Fatal problem with this file, skip and mark as complete to prevent future retries
-							endTryDownload(true);
+							// Fatal problem with this file, skip
+							endTryDownload(DownloadResult.Skipped);
 						}
 						else if (ex is DirectoryNotFoundException || ex is UnauthorizedAccessException) {
 							// Fatal IO error, stop
 							Stop(StopReason.IOError);
-							endTryDownload(false);
+							endTryDownload(DownloadResult.Skipped);
 						}
 						else {
 							// Other error, retry

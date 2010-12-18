@@ -20,7 +20,7 @@ namespace ChanThreadWatch {
 
 		public static string ReleaseDate {
 			get {
-				return "2010-Dec-05";
+				return "2010-Dec-18";
 			}
 		}
 
@@ -418,6 +418,20 @@ namespace ChanThreadWatch {
 				filePath = Path.GetFullPath(Path.Combine(baseDir, filePath));
 			}
 			return filePath;
+		}
+
+		public static string GetLastDirectory(string dir) {
+			char[] separators = new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar };
+			dir = dir.TrimEnd(separators);
+			int pos = dir.LastIndexOfAny(separators);
+			return (pos == -1) ? dir : dir.Substring(pos + 1);
+		}
+
+		public static string RemoveLastDirectory(string dir) {
+			char[] separators = new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar };
+			dir = dir.TrimEnd(separators);
+			int pos = dir.LastIndexOfAny(separators);
+			return (pos == -1) ? String.Empty : dir.Substring(0, pos);
 		}
 
 		public static int GetMaximumFileNameLength(string dir) {

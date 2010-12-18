@@ -6,38 +6,47 @@ using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
+using System.Windows.Forms;
 
 namespace ChanThreadWatch {
+	public class WatcherExtraData {
+		public ListViewItem ListViewItem { get; set; }
+		public DateTime AddedOn { get; set; }
+		public DateTime? LastImageOn { get; set; }
+		public bool HasDownloadedPage { get; set; }
+		public bool PreviousDownloadWasPage { get; set; }
+	}
+
 	public class ElementInfo {
-		public int Offset;
-		public int Length;
-		public string Name;
-		public List<AttributeInfo> Attributes;
-		public string InnerHTML;
+		public int Offset { get; set; }
+		public int Length { get; set; }
+		public string Name { get; set; }
+		public List<AttributeInfo> Attributes { get; set; }
+		public string InnerHTML { get; set; }
 	}
 
 	public class AttributeInfo {
-		public string Name;
-		public string Value;
-		public int Offset;
-		public int Length;
+		public string Name { get; set; }
+		public string Value { get; set; }
+		public int Offset { get; set; }
+		public int Length { get; set; }
 	}
 
 	public class ReplaceInfo {
-		public int Offset;
-		public int Length;
-		public string Value;
-		public ReplaceType Type;
-		public string Tag;
+		public int Offset { get; set; }
+		public int Length { get; set; }
+		public string Value { get; set; }
+		public ReplaceType Type { get; set; }
+		public string Tag { get; set; }
 	}
 
 	public class PageInfo {
-		public string URL;
-		public DateTime? CacheTime;
-		public bool IsFresh;
-		public string Path;
-		public Encoding Encoding;
-		public List<ReplaceInfo> ReplaceList;
+		public string URL { get; set; }
+		public DateTime? CacheTime { get; set; }
+		public bool IsFresh { get; set; }
+		public string Path { get; set; }
+		public Encoding Encoding { get; set; }
+		public List<ReplaceInfo> ReplaceList { get; set; }
 	}
 
 	public class ImageInfo {
@@ -52,6 +61,11 @@ namespace ChanThreadWatch {
 				return General.CleanFileName(General.URLFileName(URL));
 			}
 		}
+	}
+
+	public class DownloadInfo {
+		public string Path { get; set; }
+		public bool Skipped { get; set; }
 	}
 
 	public class ThumbnailInfo {
@@ -99,13 +113,8 @@ namespace ChanThreadWatch {
 
 		private static Dictionary<string, ConnectionManager> _connectionManagers = new Dictionary<string, ConnectionManager>(StringComparer.OrdinalIgnoreCase);
 
-		private Stack<Guid> _groupNames;
-		private FIFOSemaphore _semaphore;
-
-		public ConnectionManager() {
-			_semaphore = new FIFOSemaphore(_maxConnectionsPerHost, _maxConnectionsPerHost);
-			_groupNames = new Stack<Guid>();
-		}
+		private FIFOSemaphore _semaphore = new FIFOSemaphore(_maxConnectionsPerHost, _maxConnectionsPerHost);
+		private Stack<string> _groupNames = new Stack<string>();
 
 		public static ConnectionManager GetInstance(string url) {
 			string host = (new Uri(url)).Host;
@@ -119,27 +128,14 @@ namespace ChanThreadWatch {
 			return manager;
 		}
 
-		public string ObtainConnection() {
-			return ObtainConnection(false);
+		public string ObtainConnectionGroupName() {
+			_semaphore.WaitOne();
+			return GetConnectionGroupName();
 		}
 
-		private string ObtainConnection(bool alreadyInSemaphore) {
-			if (!alreadyInSemaphore) {
-				_semaphore.WaitOne();
-			}
+		public void ReleaseConnectionGroupName(string name) {
 			lock (_groupNames) {
-				if (_groupNames.Count != 0) {
-					return _groupNames.Pop().ToString();
-				}
-				else {
-					return Guid.NewGuid().ToString();
-				}
-			}
-		}
-
-		public void ReleaseConnection(string name) {
-			lock (_groupNames) {
-				_groupNames.Push(new Guid(name));
+				_groupNames.Push(name);
 			}
 			_semaphore.Release();
 		}
@@ -147,7 +143,13 @@ namespace ChanThreadWatch {
 		public string SwapForFreshConnection(string name, string url) {
 			ServicePoint servicePoint = ServicePointManager.FindServicePoint(new Uri(url));
 			servicePoint.CloseConnectionGroup(name);
-			return ObtainConnection(true);
+			return GetConnectionGroupName();
+		}
+
+		private string GetConnectionGroupName() {
+			lock (_groupNames) {
+				return _groupNames.Count != 0 ? _groupNames.Pop() : Guid.NewGuid().ToString();
+			}
 		}
 	}
 
@@ -155,7 +157,7 @@ namespace ChanThreadWatch {
 		private int _currentCount;
 		private int _maximumCount;
 		private object _mainSync = new object();
-		private Queue<object> _queueSyncs = new Queue<object>();
+		private Queue<QueueSync> _queueSyncs = new Queue<QueueSync>();
 
 		public FIFOSemaphore(int initialCount, int maximumCount) {
 			if (initialCount > maximumCount) {
@@ -169,19 +171,29 @@ namespace ChanThreadWatch {
 		}
 
 		public void WaitOne() {
-			object queueSync = null;
+			WaitOne(Timeout.Infinite);
+		}
+
+		public bool WaitOne(int timeout) {
+			QueueSync queueSync = null;
 			lock (_mainSync) {
 				if (_currentCount > 0) {
 					_currentCount--;
-					return;
+					return true;
 				}
 				else {
-					queueSync = new object();
+					queueSync = new QueueSync();
 					_queueSyncs.Enqueue(queueSync);
 				}
 			}
 			lock (queueSync) {
-				Monitor.Wait(queueSync);
+				if (queueSync.IsSignaled || Monitor.Wait(queueSync, timeout)) {
+					return true;
+				}
+				else {
+					queueSync.IsAbandoned = true;
+					return false;
+				}
 			}
 		}
 
@@ -190,13 +202,300 @@ namespace ChanThreadWatch {
 				if (_currentCount >= _maximumCount) {
 					throw new SemaphoreFullException();
 				}
+			CheckQueue:
 				if (_queueSyncs.Count == 0) {
 					_currentCount++;
 				}
 				else {
-					object queueSync = _queueSyncs.Dequeue();
+					QueueSync queueSync = _queueSyncs.Dequeue();
 					lock (queueSync) {
+						if (queueSync.IsAbandoned) {
+							goto CheckQueue;
+						}
+						// Backup signal in case we acquired the lock before the waiter
+						queueSync.IsSignaled = true;
 						Monitor.Pulse(queueSync);
+					}
+				}
+			}
+		}
+
+		private class QueueSync {
+			public bool IsSignaled { get; set; }
+			public bool IsAbandoned { get; set; }
+		}
+	}
+
+	public class WorkScheduler {
+		private const int _maxThreadIdleTime = 15000;
+
+		private object _sync = new object();
+		private LinkedList<WorkItem> _workItems = new LinkedList<WorkItem>();
+		private ManualResetEvent _scheduleChanged = new ManualResetEvent(false);
+		private Thread _schedulerThread;
+
+		public WorkItem AddItem(long runAtTicks, Action action) {
+			return AddItem(runAtTicks, action, String.Empty);
+		}
+
+		public WorkItem AddItem(long runAtTicks, Action action, string group) {
+			WorkItem item = new WorkItem(this, runAtTicks, action, group);
+			AddItem(item);
+			return item;
+		}
+
+		private void AddItem(WorkItem item) {
+			lock (_sync) {
+				LinkedListNode<WorkItem> nextNode = null;
+				foreach (LinkedListNode<WorkItem> node in EnumerateNodes()) {
+					if (node.Value.RunAtTicks > item.RunAtTicks) {
+						nextNode = node;
+						break;
+					}
+				}
+				if (nextNode == null) {
+					_workItems.AddLast(item);
+				}
+				else {
+					_workItems.AddBefore(nextNode, item);
+				}
+				_scheduleChanged.Set();
+				if (_schedulerThread == null) {
+					_schedulerThread = new Thread(SchedulerThread);
+					_schedulerThread.IsBackground = true;
+					_schedulerThread.Start();
+				}
+			}
+		}
+
+		public bool RemoveItem(WorkItem item) {
+			lock (_sync) {
+				if (_workItems.Remove(item)) {
+					_scheduleChanged.Set();
+					return true;
+				}
+				else {
+					return false;
+				}
+			}
+		}
+
+		private void ReAddItem(WorkItem item) {
+			lock (_sync) {
+				if (RemoveItem(item)) {
+					AddItem(item);
+				}
+			}
+		}
+
+		private void SchedulerThread() {
+			while (true) {
+				int? firstWaitTime = null;
+
+				lock (_sync) {
+					_scheduleChanged.Reset();
+					if (_workItems.Count != 0) {
+						firstWaitTime = (int)(_workItems.First.Value.RunAtTicks - TickCount.Now);
+					}
+				}
+
+				if (!(firstWaitTime <= 0)) {
+					if (_scheduleChanged.WaitOne(firstWaitTime ?? _maxThreadIdleTime, false)) {
+						continue;
+					}
+					if (firstWaitTime == null) {
+						lock (_sync) {
+							if (_workItems.Count != 0) {
+								continue;
+							}
+							else {
+								_schedulerThread = null;
+								return;
+							}
+						}
+					}
+				}
+
+				lock (_sync) {
+					while (_workItems.Count != 0 && _workItems.First.Value.RunAtTicks <= TickCount.Now) {
+						_workItems.First.Value.StartRunning();
+						_workItems.RemoveFirst();
+					}
+				}
+			}
+		}
+
+		private IEnumerable<LinkedListNode<WorkItem>> EnumerateNodes() {
+			LinkedListNode<WorkItem> node = _workItems.First;
+			while (node != null) {
+				yield return node;
+				node = node.Next;
+			}
+		}
+
+		public class WorkItem {
+			private bool _hasStarted;
+			private WorkScheduler _scheduler;
+			private long _runAtTicks;
+			private Action _action;
+			private string _group;
+
+			public WorkItem(WorkScheduler scheduler, long runAtTicks, Action action, string group) {
+				_scheduler = scheduler;
+				_runAtTicks = runAtTicks;
+				_action = action;
+				_group = group;
+			}
+
+			public long RunAtTicks {
+				get { lock (_scheduler._sync) { return _runAtTicks; } }
+				set {
+					lock (_scheduler._sync) {
+						if (_hasStarted) return;
+						_runAtTicks = value;
+						_scheduler.ReAddItem(this);
+					}
+				}
+			}
+
+			public void StartRunning() {
+				lock (_scheduler._sync) {
+					if (_hasStarted) {
+						throw new Exception("Work item has already started.");
+					}
+					_hasStarted = true;
+					ThreadPoolManager.QueueWorkItem(_group, _action);
+				}
+			}
+		}
+	}
+
+	public class ThreadPoolManager {
+		private const int _minThreadCount = 4;
+		private const int _threadCreationDelay = 500;
+		private const int _maxThreadIdleTime = 15000;
+
+		private static Dictionary<string, ThreadPoolManager> _threadPoolManagers = new Dictionary<string, ThreadPoolManager>(StringComparer.OrdinalIgnoreCase);
+
+		private object _sync = new object();
+		private FIFOSemaphore _semaphore = new FIFOSemaphore(0, Int32.MaxValue);
+		private Stack<ThreadPoolThread> _idleThreads = new Stack<ThreadPoolThread>();
+		private ThreadPoolThread _schedulerThread = new ThreadPoolThread(null);
+
+		public ThreadPoolManager() {
+			lock (_sync) {
+				for (int i = 0; i < _minThreadCount; i++) {
+					_idleThreads.Push(new ThreadPoolThread(this));
+					_semaphore.Release();
+				}
+			}
+		}
+
+		public static void QueueWorkItem(string group, Action action) {
+			ThreadPoolManager manager;
+			lock (_threadPoolManagers) {
+				if (!_threadPoolManagers.TryGetValue(group, out manager)) {
+					manager = new ThreadPoolManager();
+					_threadPoolManagers[group] = manager;
+				}
+			}
+			manager.QueueWorkItem(action);
+		}
+
+		public void QueueWorkItem(Action action) {
+			_schedulerThread.QueueWorkItem(() => {
+				ThreadPoolThread thread = null;
+				if (_semaphore.WaitOne(_threadCreationDelay)) {
+					lock (_sync) {
+						thread = _idleThreads.Pop();
+					}
+				}
+				else {
+					thread = new ThreadPoolThread(this);
+				}
+				thread.QueueWorkItem(action);
+				thread.QueueWorkItem(() => {
+					lock (_sync) {
+						_idleThreads.Push(thread);
+						_semaphore.Release();
+					}
+				});
+			});
+		}
+
+		private void OnThreadPoolThreadExit(ThreadPoolThread exitedThread) {
+			lock (_sync) {
+				if (_idleThreads.Count <= _minThreadCount) return;
+				Stack<ThreadPoolThread> threads = new Stack<ThreadPoolThread>();
+				while (_idleThreads.Count != 0) {
+					ThreadPoolThread thread = _idleThreads.Pop();
+					if (thread == exitedThread) {
+						if (!_semaphore.WaitOne(0)) {
+							throw new Exception("Semaphore count is invalid.");
+						}
+						break;
+					}
+					threads.Push(thread);
+				}
+				while (threads.Count != 0) {
+					_idleThreads.Push(threads.Pop());
+				}
+			}
+		}
+
+		private class ThreadPoolThread {
+			private object _sync = new object();
+			private ThreadPoolManager _manager;
+			private Thread _thread;
+			private ManualResetEvent _newWorkItem = new ManualResetEvent(false);
+			private Queue<Action> _workItems = new Queue<Action>();
+
+			public ThreadPoolThread(ThreadPoolManager manager) {
+				_manager = manager;
+			}
+
+			public void QueueWorkItem(Action action) {
+				lock (_sync) {
+					if (_thread == null) {
+						_thread = new Thread(WorkThread);
+						_thread.IsBackground = true;
+						_thread.Start();
+					}
+					_workItems.Enqueue(action);
+					_newWorkItem.Set();
+				}
+			}
+
+			private void WorkThread() {
+				while (_newWorkItem.WaitOne(_maxThreadIdleTime, false) || !ReleaseThread()) {
+					Action workItem = null;
+					lock (_sync) {
+						if (_workItems.Count != 0) {
+							workItem = _workItems.Dequeue();
+						}
+						else {
+							_newWorkItem.Reset();
+						}
+					}
+					if (workItem != null) {
+						Thread.MemoryBarrier();
+						workItem();
+						Thread.MemoryBarrier();
+					}
+				}
+				if (_manager != null) {
+					_manager.OnThreadPoolThreadExit(this);
+				}
+			}
+
+			private bool ReleaseThread() {
+				lock (_sync) {
+					if (_workItems.Count == 0) {
+						_thread = null;
+						return true;
+					}
+					else {
+						return false;
 					}
 				}
 			}
@@ -340,9 +639,9 @@ namespace ChanThreadWatch {
 
 	public delegate void EventHandler<TSender, TArgs>(TSender sender, TArgs e) where TArgs : EventArgs;
 
-	public delegate void DownloadFileEndCallback(bool completed);
+	public delegate void DownloadFileEndCallback(DownloadResult result);
 
-	public delegate void DownloadPageEndCallback(bool completed, string content, DateTime? lastModifiedTime, Encoding encoding, List<ReplaceInfo> replaceList);
+	public delegate void DownloadPageEndCallback(DownloadResult result, string content, DateTime? lastModifiedTime, Encoding encoding, List<ReplaceInfo> replaceList);
 
 	public delegate void Action();
 
@@ -364,7 +663,8 @@ namespace ChanThreadWatch {
 
 	public enum ThreadDoubleClickAction {
 		OpenFolder = 1,
-		OpenURL = 2
+		OpenURL = 2,
+		EditDescription = 3
 	}
 
 	public enum HashType {
@@ -384,6 +684,12 @@ namespace ChanThreadWatch {
 		Page = 1,
 		Image = 2,
 		Thumbnail = 3
+	}
+
+	public enum DownloadResult {
+		Completed = 1,
+		Skipped = 2,
+		RetryLater = 3
 	}
 
 	public enum StopReason {

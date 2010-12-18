@@ -61,6 +61,11 @@ namespace ChanThreadWatch {
 			set { Set("DownloadFolder", value); }
 		}
 
+		public static bool? RenameDownloadFolderWithDescription {
+			get { return GetBool("RenameDownloadFolderWithDescription"); }
+			set { SetBool("RenameDownloadFolderWithDescription", value); }
+		}
+
 		public static bool? SaveThumbnails {
 			get { return GetBool("SaveThumbnails"); }
 			set { SetBool("SaveThumbnails", value); }

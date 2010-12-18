@@ -9,15 +9,18 @@ namespace ChanThreadWatch {
 		protected string _url = String.Empty;
 		protected string _html = String.Empty;
 
-		public static SiteHelper GetInstance(string url) {
-			string ns = (typeof(SiteHelper)).Namespace;
-			string[] hostSplit = (new Uri(url)).Host.ToLower(CultureInfo.InvariantCulture).Split('.');
+		public static SiteHelper GetInstance(string host) {
 			Type type = null;
-			for (int i = 0; i < hostSplit.Length - 1; i++) {
-				type = Assembly.GetExecutingAssembly().GetType(ns +	".SiteHelper_" +
-					String.Join("_", hostSplit, i, hostSplit.Length - i));
-				if (type != null) break;
+			try {
+				string ns = (typeof(SiteHelper)).Namespace;
+				string[] hostSplit = host.ToLower(CultureInfo.InvariantCulture).Split('.');
+				for (int i = 0; i < hostSplit.Length - 1; i++) {
+					type = Assembly.GetExecutingAssembly().GetType(ns +	".SiteHelper_" +
+						String.Join("_", hostSplit, i, hostSplit.Length - i));
+					if (type != null) break;
+				}
 			}
+			catch { }
 			if (type == null) type = typeof(SiteHelper);
 			return (SiteHelper)Activator.CreateInstance(type);
 		}
