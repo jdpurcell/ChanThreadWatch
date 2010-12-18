@@ -130,7 +130,12 @@ namespace ChanThreadWatch {
 			if (e.Data.GetDataPresent("UniformResourceLocatorW") ||
 				e.Data.GetDataPresent("UniformResourceLocator"))
 			{
-				e.Effect = DragDropEffects.Copy;
+				if ((e.AllowedEffect & DragDropEffects.Copy) != 0) {
+					e.Effect = DragDropEffects.Copy;
+				}
+				else if ((e.AllowedEffect & DragDropEffects.Link) != 0) {
+					e.Effect = DragDropEffects.Link;
+				}
 			}
 		}
 
@@ -529,6 +534,7 @@ namespace ChanThreadWatch {
 			{
 				url = "http://" + url;
 			}
+			if (url.IndexOf('/', url.IndexOf("//") + 2) == -1) return null;
 			return General.ProperURL(HttpUtility.HtmlDecode(url));
 		}
 
