@@ -35,7 +35,7 @@ namespace ChanThreadWatch {
 			}
 			General.EnableDoubleBuffering(lvThreads);
 
-			// Souldn't matter since the limit is supposed to be per connection group
+			// Shouldn't matter since the limit is supposed to be per connection group
 			ServicePointManager.DefaultConnectionLimit = Int32.MaxValue;
 
 			Settings.Load();
@@ -160,6 +160,7 @@ namespace ChanThreadWatch {
 		private void txtPageURL_KeyDown(object sender, KeyEventArgs e) {
 			if (e.KeyCode == Keys.Enter) {
 				btnAdd_Click(txtPageURL, null);
+				e.SuppressKeyPress = true;
 			}
 		}
 
