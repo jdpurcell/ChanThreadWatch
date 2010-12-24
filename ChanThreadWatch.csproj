@@ -48,6 +48,12 @@
     <Compile Include="frmChanThreadWatch.Designer.cs">
       <DependentUpon>frmChanThreadWatch.cs</DependentUpon>
     </Compile>
+    <Compile Include="frmDownloads.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="frmDownloads.Designer.cs">
+      <DependentUpon>frmDownloads.cs</DependentUpon>
+    </Compile>
     <Compile Include="frmSettings.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -65,6 +71,9 @@
     <EmbeddedResource Include="frmChanThreadWatch.resx">
       <SubType>Designer</SubType>
       <DependentUpon>frmChanThreadWatch.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="frmDownloads.resx">
+      <DependentUpon>frmDownloads.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="frmSettings.resx">
       <DependentUpon>frmSettings.cs</DependentUpon>

@@ -390,7 +390,14 @@ namespace ChanThreadWatch {
 			if (dir.Length != 0 && Path.IsPathRooted(dir)) {
 				Uri baseDirUri = new Uri(Path.Combine(baseDir, "dummy.txt"));
 				Uri targetDirUri = new Uri(Path.Combine(dir, "dummy.txt"));
-				dir = Uri.UnescapeDataString(baseDirUri.MakeRelativeUri(targetDirUri).ToString());
+				try {
+					dir = Uri.UnescapeDataString(baseDirUri.MakeRelativeUri(targetDirUri).ToString());
+				}
+				catch (UriFormatException) {
+					// Work-around for Mono when determining the relative URI of directories
+					// on different drives in Windows.
+					return dir;
+				}
 				dir = (dir.Length == 0) ? "." : Path.GetDirectoryName(dir.Replace('/', Path.DirectorySeparatorChar));
 			}
 			return dir;
@@ -457,6 +464,7 @@ namespace ChanThreadWatch {
 		}
 
 		public static bool IsFileNameTooLong(string dir, int fileNameLength) {
+			if (!Directory.Exists(dir)) throw new DirectoryNotFoundException();
 			string path = null;
 			bool foundFreeFileName = false;
 			for (char c = 'a'; c <= 'z'; c++) {
@@ -478,6 +486,10 @@ namespace ChanThreadWatch {
 				return false;
 			}
 			catch (PathTooLongException) {
+				return true;
+			}
+			catch (DirectoryNotFoundException) {
+				// Work-around for Mono
 				return true;
 			}
 		}

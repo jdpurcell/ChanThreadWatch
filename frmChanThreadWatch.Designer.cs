@@ -418,6 +418,7 @@
 			this.Controls.Add(this.lvThreads);
 			this.MinimumSize = new System.Drawing.Size(644, 300);
 			this.Name = "frmChanThreadWatch";
+			this.SizeGripStyle = System.Windows.Forms.SizeGripStyle.Hide;
 			this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
 			this.Text = "Chan Thread Watch";
 			this.Shown += new System.EventHandler(this.frmChanThreadWatch_Shown);

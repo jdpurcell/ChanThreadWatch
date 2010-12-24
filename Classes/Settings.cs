@@ -6,10 +6,10 @@ using System.Reflection;
 using System.Text;
 
 namespace ChanThreadWatch {
-	static class Settings {
-		const string _appName = "Chan Thread Watch";
+	public static class Settings {
+		private const string _appName = "Chan Thread Watch";
 
-		static Dictionary<string, string> _settings;
+		private static Dictionary<string, string> _settings;
 
 		public static bool? UseCustomUserAgent {
 			get { return GetBool("UseCustomUserAgent"); }

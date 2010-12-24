@@ -191,6 +191,8 @@ namespace ChanThreadWatch {
 
 		public event EventHandler<ThreadWatcher, EventArgs> ThreadDownloadDirectoryRename;
 
+		public event EventHandler<ThreadWatcher, DownloadProgressEventArgs> DownloadProgress;
+
 		private void OnDownloadStatus(DownloadStatusEventArgs e) {
 			var evt = DownloadStatus;
 			if (evt != null) try { evt(this, e); } catch { }
@@ -208,6 +210,11 @@ namespace ChanThreadWatch {
 
 		private void OnThreadDownloadDirectoryRename(EventArgs e) {
 			var evt = ThreadDownloadDirectoryRename;
+			if (evt != null) try { evt(this, e); } catch { }
+		}
+
+		private void OnDownloadProgress(DownloadProgressEventArgs e) {
+			var evt = DownloadProgress;
 			if (evt != null) try { evt(this, e); } catch { }
 		}
 
@@ -585,6 +592,7 @@ namespace ChanThreadWatch {
 
 			string backupPath = path + ".bak";
 			int tryNumber = 0;
+			long? prevDownloadedFileSize = null;
 
 			Action tryDownload = null;
 			tryDownload = () => {
@@ -606,6 +614,8 @@ namespace ChanThreadWatch {
 				}
 
 				FileStream fileStream = null;
+				long? totalFileSize = null;
+				long downloadedFileSize = 0;
 				bool createdFile = false;
 				MemoryStream memoryStream = null;
 				Action closeStreams = () => {
@@ -628,6 +638,10 @@ namespace ChanThreadWatch {
 							try { File.Move(path, backupPath); } catch { }
 						}
 						fileStream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read);
+						if (response.ContentLength != -1) {
+							totalFileSize = response.ContentLength;
+							fileStream.SetLength(totalFileSize.Value);
+						}
 						createdFile = true;
 						memoryStream = new MemoryStream();
 						httpCharSet = General.GetCharSetFromContentType(response.ContentType);
@@ -636,10 +650,23 @@ namespace ChanThreadWatch {
 					(data, dataLength) => {
 						fileStream.Write(data, 0, dataLength);
 						memoryStream.Write(data, 0, dataLength);
+						downloadedFileSize += dataLength;
 					},
 					() => {
 						byte[] pageBytes = memoryStream.ToArray();
+						if (totalFileSize != null && downloadedFileSize != totalFileSize) {
+							fileStream.SetLength(downloadedFileSize);
+						}
 						closeStreams();
+						bool incompleteDownload = totalFileSize != null && downloadedFileSize != totalFileSize &&
+							(prevDownloadedFileSize == null || downloadedFileSize != prevDownloadedFileSize);
+						if (incompleteDownload) {
+							// Corrupt download, retry
+							prevDownloadedFileSize = downloadedFileSize;
+							deleteFile();
+							tryDownload();
+							return;
+						}
 						encoding = General.DetectHTMLEncoding(pageBytes, httpCharSet);
 						replaceList = (Settings.SaveThumbnails == true) ? new List<ReplaceInfo>() : null;
 						content = General.HTMLBytesToString(pageBytes, encoding, replaceList);
@@ -679,6 +706,7 @@ namespace ChanThreadWatch {
 
 			int tryNumber = 0;
 			byte[] prevHash = null;
+			long? prevDownloadedFileSize = null;
 
 			Action tryDownload = null;
 			tryDownload = () => {
@@ -694,6 +722,8 @@ namespace ChanThreadWatch {
 				}
 
 				FileStream fileStream = null;
+				long? totalFileSize = null;
+				long downloadedFileSize = 0;
 				bool createdFile = false;
 				HashGeneratorStream hashStream = null;
 				Action closeStreams = () => {
@@ -707,6 +737,10 @@ namespace ChanThreadWatch {
 				General.DownloadAsync(url, auth, referer, connectionName, null,
 					(response) => {
 						fileStream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read);
+						if (response.ContentLength != -1) {
+							totalFileSize = response.ContentLength;
+							fileStream.SetLength(totalFileSize.Value);
+						}
 						createdFile = true;
 						if (hashType != HashType.None) {
 							hashStream = new HashGeneratorStream(hashType);
@@ -715,19 +749,28 @@ namespace ChanThreadWatch {
 					(data, dataLength) => {
 						fileStream.Write(data, 0, dataLength);
 						if (hashStream != null) hashStream.Write(data, 0, dataLength);
+						downloadedFileSize += dataLength;
+						OnDownloadProgress(new DownloadProgressEventArgs(url, totalFileSize, downloadedFileSize));
 					},
 					() => {
 						byte[] hash = (hashType != HashType.None) ? hashStream.GetDataHash() : null;
+						if (totalFileSize != null && downloadedFileSize != totalFileSize) {
+							fileStream.SetLength(downloadedFileSize);
+						}
 						closeStreams();
-						if (hashType != HashType.None && !General.ArraysAreEqual(hash, correctHash) &&
-							(prevHash == null || !General.ArraysAreEqual(hash, prevHash)))
-						{
-							// Incorrect hash, retry
+						bool incorrectHash = hashType != HashType.None && !General.ArraysAreEqual(hash, correctHash) &&
+							(prevHash == null || !General.ArraysAreEqual(hash, prevHash));
+						bool incompleteDownload = totalFileSize != null && downloadedFileSize != totalFileSize &&
+							(prevDownloadedFileSize == null || downloadedFileSize != prevDownloadedFileSize);
+						if (incorrectHash || incompleteDownload) {
+							// Corrupt download, retry
 							prevHash = hash;
+							prevDownloadedFileSize = downloadedFileSize;
 							deleteFile();
 							tryDownload();
 							return;
 						}
+						OnDownloadProgress(new DownloadProgressEventArgs(url, downloadedFileSize, downloadedFileSize));
 						endTryDownload(DownloadResult.Completed);
 					},
 					(ex) => {

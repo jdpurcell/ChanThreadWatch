@@ -38,6 +38,9 @@ namespace ChanThreadWatch {
 			// Shouldn't matter since the limit is supposed to be per connection group
 			ServicePointManager.DefaultConnectionLimit = Int32.MaxValue;
 
+			// Ignore invalid certificates
+			ServicePointManager.ServerCertificateValidationCallback = (s, cert, chain, errors) => true;
+
 			Settings.Load();
 
 			BuildCheckEverySubMenu();
@@ -225,7 +228,7 @@ namespace ChanThreadWatch {
 			foreach (ThreadWatcher watcher in SelectedThreadWatchers) {
 				using (frmThreadDescription descriptionForm = new frmThreadDescription()) {
 					descriptionForm.Description = watcher.Description;
-					if (descriptionForm.ShowDialog() == DialogResult.OK) {
+					if (descriptionForm.ShowDialog(this) == DialogResult.OK) {
 						watcher.Description = descriptionForm.Description;
 						DisplayDescription(watcher);
 						_saveThreadList = true;
@@ -236,20 +239,38 @@ namespace ChanThreadWatch {
 		}
 
 		private void miOpenFolder_Click(object sender, EventArgs e) {
+			int selectedCount = lvThreads.SelectedItems.Count;
+			if (selectedCount > 5 && MessageBox.Show("Do you want to open the folders of all " + selectedCount + " selected items?",
+				"Open Folders", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+			{
+				return;
+			}
 			foreach (ThreadWatcher watcher in SelectedThreadWatchers) {
-				try {
-					Process.Start(watcher.ThreadDownloadDirectory);
-				}
-				catch { }
+				string dir = watcher.ThreadDownloadDirectory;
+				ThreadPool.QueueUserWorkItem((s) => {
+					try {
+						Process.Start(dir);
+					}
+					catch { }
+				});
 			}
 		}
 
 		private void miOpenURL_Click(object sender, EventArgs e) {
+			int selectedCount = lvThreads.SelectedItems.Count;
+			if (selectedCount > 5 && MessageBox.Show("Do you want to open the URLs of all " + selectedCount + " selected items?",
+				"Open URLs", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+			{
+				return;
+			}
 			foreach (ThreadWatcher watcher in SelectedThreadWatchers) {
-				try {
-					Process.Start(watcher.PageURL);
-				}
-				catch { }
+				string url = watcher.PageURL;
+				ThreadPool.QueueUserWorkItem((s) => {
+					try {
+						Process.Start(url);
+					}
+					catch { }
+				});
 			}
 		}
 
@@ -307,7 +328,7 @@ namespace ChanThreadWatch {
 
 		private void btnSettings_Click(object sender, EventArgs e) {
 			using (frmSettings settingsForm = new frmSettings()) {
-				settingsForm.ShowDialog();
+				settingsForm.ShowDialog(this);
 			}
 		}
 

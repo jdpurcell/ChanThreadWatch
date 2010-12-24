@@ -90,9 +90,9 @@ namespace ChanThreadWatch {
 	}
 
 	public static class TickCount {
-		static object _sync = new object();
-		static int _lastTickCount = Environment.TickCount;
-		static long _correction;
+		private static object _sync = new object();
+		private static int _lastTickCount = Environment.TickCount;
+		private static long _correction;
 
 		public static long Now {
 			get {
@@ -503,7 +503,7 @@ namespace ChanThreadWatch {
 	}
 
 	public class HashSet<T> : IEnumerable<T> {
-		Dictionary<T, int> _dict;
+		private Dictionary<T, int> _dict;
 
 		public HashSet() {
 			_dict = new Dictionary<T, int>();
@@ -551,8 +551,8 @@ namespace ChanThreadWatch {
 	}
 
 	public class HashGeneratorStream : Stream {
-		HashAlgorithm _hashAlgo;
-		byte[] _dataHash;
+		private HashAlgorithm _hashAlgo;
+		private byte[] _dataHash;
 
 		public HashGeneratorStream(HashType hashType) {
 			switch (hashType) {
@@ -634,6 +634,18 @@ namespace ChanThreadWatch {
 
 		public StopStatusEventArgs(StopReason stopReason) {
 			StopReason = stopReason;
+		}
+	}
+
+	public class DownloadProgressEventArgs : EventArgs {
+		public string URL { get; private set; }
+		public long? TotalSize { get; private set; }
+		public long DownloadedSize { get; private set; }
+
+		public DownloadProgressEventArgs(string url, long? totalSize, long downloadedSize) {
+			URL = url;
+			TotalSize = totalSize;
+			DownloadedSize = downloadedSize;
 		}
 	}
 
