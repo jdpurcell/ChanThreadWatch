@@ -5,6 +5,7 @@ using System.Globalization;
 using System.IO;
 using System.Net;
 using System.Reflection;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Windows.Forms;
@@ -479,10 +480,7 @@ namespace ChanThreadWatch {
 			}
 			try {
 				using (File.Create(path)) { }
-				try {
-					File.Delete(path);
-				}
-				catch { }
+				try { File.Delete(path); } catch { }
 				return false;
 			}
 			catch (PathTooLongException) {
@@ -492,6 +490,16 @@ namespace ChanThreadWatch {
 				// Work-around for Mono
 				return true;
 			}
+		}
+
+		public static ulong Calculate64BitMD5(byte[] bytes) {
+			MD5CryptoServiceProvider hashAlgo = new MD5CryptoServiceProvider();
+			byte[] hashBytes = hashAlgo.ComputeHash(bytes);
+			ulong hash = 0;
+			for (int i = 0; i < hashBytes.Length; i++) {
+				hash ^= (ulong)hashBytes[i] << ((7 - (i % 8)) * 8);
+			}
+			return hash;
 		}
 
 		public static void WriteReplacedString(string str, List<ReplaceInfo> replaceList, TextWriter outStream) {

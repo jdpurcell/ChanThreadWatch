@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Security.AccessControl;
 using System.Security.Principal;
+using System.Text;
 using System.Threading;
 using System.Windows.Forms;
 
@@ -19,7 +20,11 @@ namespace ChanThreadWatch {
 			Application.Run(new frmChanThreadWatch());
 		}
 
-		private static bool ObtainMutex() {
+		public static bool ObtainMutex() {
+			return ObtainMutex(Settings.GetSettingsDir());
+		}
+
+		public static bool ObtainMutex(string settingsFolder) {
 			SecurityIdentifier sid = new SecurityIdentifier(WellKnownSidType.WorldSid, null);
 			MutexSecurity security = new MutexSecurity();
 			bool createdNew;
@@ -33,13 +38,17 @@ namespace ChanThreadWatch {
 				// work properly even with with default security.
 				return true;
 			}
-			_mutex = new Mutex(false, @"Global\ChanThreadWatch", out createdNew, security);
+			string name = @"Global\ChanThreadWatch_" + General.Calculate64BitMD5(Encoding.UTF8.GetBytes(
+				settingsFolder.ToUpperInvariant())).ToString("X16");
+			Mutex mutex = new Mutex(false, name, out createdNew, security);
 			try {
-				if (!_mutex.WaitOne(0, false)) {
+				if (!mutex.WaitOne(0, false)) {
 					return false;
 				}
 			}
 			catch (AbandonedMutexException) { }
+			ReleaseMutex();
+			_mutex = mutex;
 			return true;
 		}
 

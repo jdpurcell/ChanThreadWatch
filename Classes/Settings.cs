@@ -111,15 +111,11 @@ namespace ChanThreadWatch {
 		}
 
 		public static string SettingsFileName {
-			get {
-				return "settings.txt";
-			}
+			get { return "settings.txt"; }
 		}
 
 		public static string ThreadsFileName {
-			get {
-				return "threads.txt";
-			}
+			get { return "threads.txt"; }
 		}
 
 		public static ThreadDoubleClickAction? OnThreadDoubleClick {
@@ -137,8 +133,11 @@ namespace ChanThreadWatch {
 			if (UseExeDirForSettings == null) {
 				UseExeDirForSettings = File.Exists(Path.Combine(ExeDir, SettingsFileName));
 			}
+			return GetSettingsDir(UseExeDirForSettings.Value);
+		}
 
-			if (UseExeDirForSettings == true) {
+		public static string GetSettingsDir(bool useExeDirForSettings) {
+			if (useExeDirForSettings) {
 				return ExeDir;
 			}
 			else {
@@ -239,21 +238,7 @@ namespace ChanThreadWatch {
 		}
 
 		public static void Save() {
-			string path;
-
-			if (UseExeDirForSettings != true) {
-				foreach (string fileName in new[] { SettingsFileName, ThreadsFileName }) {
-					path = Path.Combine(ExeDir, fileName);
-					if (File.Exists(path)) {
-						try {
-							File.Delete(path);
-						}
-						catch { }
-					}
-				}
-			}
-
-			path = Path.Combine(GetSettingsDir(), SettingsFileName);
+			string path = Path.Combine(GetSettingsDir(), SettingsFileName);
 			using (StreamWriter sw = new StreamWriter(path, false, Encoding.UTF8)) {
 				lock (_settings) {
 					foreach (KeyValuePair<string, string> kvp in _settings) {

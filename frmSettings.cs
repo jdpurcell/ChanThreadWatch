@@ -43,6 +43,31 @@ namespace ChanThreadWatch {
 					}
 				}
 
+				string oldSettingsFolder = Settings.GetSettingsDir();
+				string newSettingsFolder = Settings.GetSettingsDir(rbSettingsInExeFolder.Checked);
+				if (!String.Equals(newSettingsFolder, oldSettingsFolder, StringComparison.OrdinalIgnoreCase)) {
+					if (!Program.ObtainMutex(newSettingsFolder)) {
+						MessageBox.Show("Another instance of this program is using the same settings folder.",
+							"Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+						return;
+					}
+					try {
+						foreach (string fileName in new[] { Settings.SettingsFileName, Settings.ThreadsFileName }) {
+							string oldPath = Path.Combine(oldSettingsFolder, fileName);
+							string newPath = Path.Combine(newSettingsFolder, fileName);
+							if (!File.Exists(oldPath)) continue;
+							byte[] contents = File.ReadAllBytes(oldPath);
+							File.WriteAllBytes(newPath, contents);
+							try { File.Delete(oldPath); } catch { }
+						}
+					}
+					catch {
+						MessageBox.Show("Unable to move the settings files.",
+							"Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+						return;
+					}
+				}
+
 				string oldAbsoluteDownloadFolder = Settings.AbsoluteDownloadDir;
 
 				Settings.DownloadFolder = downloadFolder;
@@ -55,14 +80,15 @@ namespace ChanThreadWatch {
 				Settings.VerifyImageHashes = chkVerifyImageHashes.Checked;
 				Settings.CheckForUpdates = chkCheckForUpdates.Checked;
 				Settings.UseExeDirForSettings = rbSettingsInExeFolder.Checked;
+
 				try {
 					Settings.Save();
 				}
 				catch { }
 
-				if (Settings.AbsoluteDownloadDir != oldAbsoluteDownloadFolder) {
+				if (!String.Equals(Settings.AbsoluteDownloadDir, oldAbsoluteDownloadFolder, StringComparison.OrdinalIgnoreCase)) {
 					MessageBox.Show("The new download folder will not affect threads currently being watched until the program is restared.  " +
-						"If you are still watching the threads at next run, make sure you have moved their download folders into the new download folder, otherwise they will be redownloaded.",
+						"If you are still watching the threads at next run, make sure you have moved their download folders into the new download folder.",
 						"Download Folder Changed", MessageBoxButtons.OK, MessageBoxIcon.Information);
 				}
 

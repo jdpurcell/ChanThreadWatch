@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Net;
 using System.Text;
 using System.Threading;
 using System.Web;
@@ -29,6 +30,14 @@ namespace ChanThreadWatch {
 		private string _description = String.Empty;
 		private bool _renameThreadDownloadDir;
 		private object _tag;
+
+		static ThreadWatcher() {
+			// Shouldn't matter since the limit is supposed to be per connection group
+			ServicePointManager.DefaultConnectionLimit = Int32.MaxValue;
+
+			// Ignore invalid certificates
+			ServicePointManager.ServerCertificateValidationCallback = (s, cert, chain, errors) => true;
+		}
 
 		public ThreadWatcher(string pageURL) {
 			_pageURL = pageURL;

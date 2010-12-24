@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
-using System.Net;
 using System.Text;
 using System.Threading;
 using System.Web;
@@ -34,12 +33,6 @@ namespace ChanThreadWatch {
 				_columnWidths[iColumn] = column.Width;
 			}
 			General.EnableDoubleBuffering(lvThreads);
-
-			// Shouldn't matter since the limit is supposed to be per connection group
-			ServicePointManager.DefaultConnectionLimit = Int32.MaxValue;
-
-			// Ignore invalid certificates
-			ServicePointManager.ServerCertificateValidationCallback = (s, cert, chain, errors) => true;
 
 			Settings.Load();
 
