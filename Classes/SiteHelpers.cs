@@ -49,6 +49,10 @@ namespace ChanThreadWatch {
 			return (urlSplit.Length > 2) ? urlSplit[1] : String.Empty;
 		}
 
+		public virtual bool IsBoardHighTurnover() {
+			return false;
+		}
+
 		public virtual string GetThreadName() {
 			string[] urlSplit = SplitURL();
 			if (urlSplit.Length >= 3) {
@@ -235,6 +239,10 @@ namespace ChanThreadWatch {
 			}
 
 			return imageList;
+		}
+
+		public override bool IsBoardHighTurnover() {
+			return String.Equals(GetBoardName(), "b", StringComparison.OrdinalIgnoreCase);
 		}
 	}
 }

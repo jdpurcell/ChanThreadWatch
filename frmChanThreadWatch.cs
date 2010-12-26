@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -12,6 +11,8 @@ using ChanThreadWatch.Properties;
 
 namespace ChanThreadWatch {
 	public partial class frmChanThreadWatch : Form {
+		private Dictionary<long, DownloadProgressInfo> _downloadProgresses = new Dictionary<long, DownloadProgressInfo>();
+		private frmDownloads _downloadForm;
 		private object _startupPromptSync = new object();
 		private bool _isExiting;
 		private bool _saveThreadList;
@@ -24,7 +25,7 @@ namespace ChanThreadWatch {
 			InitializeComponent();
 			Icon = Resources.ChanThreadWatchIcon;
 			int initialWidth = ClientSize.Width;
-			General.SetFontAndScaling(this);
+			GUI.SetFontAndScaling(this);
 			float scaleFactorX = (float)ClientSize.Width / initialWidth;
 			_columnWidths = new int[lvThreads.Columns.Count];
 			for (int iColumn = 0; iColumn < lvThreads.Columns.Count; iColumn++) {
@@ -32,10 +33,11 @@ namespace ChanThreadWatch {
 				column.Width = Convert.ToInt32(column.Width * scaleFactorX);
 				_columnWidths[iColumn] = column.Width;
 			}
-			General.EnableDoubleBuffering(lvThreads);
+			GUI.EnableDoubleBuffering(lvThreads);
 
 			Settings.Load();
 
+			BindCheckEveryList();
 			BuildCheckEverySubMenu();
 			BuildColumnHeaderMenu();
 
@@ -56,12 +58,16 @@ namespace ChanThreadWatch {
 			chkImageAuth.Checked = Settings.UseImageAuth ?? false;
 			txtImageAuth.Text = Settings.ImageAuth ?? String.Empty;
 			chkOneTime.Checked = Settings.OneTimeDownload ?? false;
-			cboCheckEvery.SelectedItem = (Settings.CheckEvery ?? 3).ToString();
+			cboCheckEvery.SelectedValue = Settings.CheckEvery ?? 3;
 			OnThreadDoubleClick = Settings.OnThreadDoubleClick.Value;
 
 			if ((Settings.CheckForUpdates == true) && (Settings.LastUpdateCheck ?? DateTime.MinValue) < DateTime.Now.Date) {
 				CheckForUpdates();
 			}
+		}
+
+		public Dictionary<long, DownloadProgressInfo> DownloadProgresses {
+			get { return _downloadProgresses; }
 		}
 
 		private ThreadDoubleClickAction OnThreadDoubleClick {
@@ -97,7 +103,7 @@ namespace ChanThreadWatch {
 			Settings.UseImageAuth = chkImageAuth.Checked;
 			Settings.ImageAuth = txtImageAuth.Text;
 			Settings.OneTimeDownload = chkOneTime.Checked;
-			Settings.CheckEvery = Int32.Parse((string)cboCheckEvery.SelectedItem);
+			Settings.CheckEvery = (int)cboCheckEvery.SelectedValue;
 			Settings.OnThreadDoubleClick = OnThreadDoubleClick;
 			try {
 				Settings.Save();
@@ -319,6 +325,17 @@ namespace ChanThreadWatch {
 			_saveThreadList = true;
 		}
 
+		private void btnDownloads_Click(object sender, EventArgs e) {
+			if (_downloadForm != null && !_downloadForm.IsDisposed) {
+				_downloadForm.Activate();
+			}
+			else {
+				_downloadForm = new frmDownloads(this);
+				GUI.CenterChildForm(this, _downloadForm);
+				_downloadForm.Show(this);
+			}
+		}
+
 		private void btnSettings_Click(object sender, EventArgs e) {
 			using (frmSettings settingsForm = new frmSettings()) {
 				settingsForm.ShowDialog(this);
@@ -421,6 +438,22 @@ namespace ChanThreadWatch {
 			UpdateWaitingWatcherStatuses();
 		}
 
+		private void tmrMaintenance_Tick(object sender, EventArgs e) {
+			lock (_downloadProgresses) {
+				if (_downloadProgresses.Count == 0) return;
+				List<long> oldDownloadIDs = new List<long>();
+				long ticksNow = TickCount.Now;
+				foreach (DownloadProgressInfo info in _downloadProgresses.Values) {
+					if (info.EndTicks != null && ticksNow - info.EndTicks.Value > 5000) {
+						oldDownloadIDs.Add(info.DownloadID);
+					}
+				}
+				foreach (long downloadID in oldDownloadIDs) {
+					_downloadProgresses.Remove(downloadID);
+				}
+			}
+		}
+
 		private void ThreadWatcher_DownloadStatus(ThreadWatcher watcher, DownloadStatusEventArgs args) {
 			WatcherExtraData extraData = (WatcherExtraData)watcher.Tag;
 			bool isInitialPageDownload = false;
@@ -474,11 +507,43 @@ namespace ChanThreadWatch {
 			});
 		}
 
+		private void ThreadWatcher_DownloadStart(ThreadWatcher watcher, DownloadStartEventArgs args) {
+			DownloadProgressInfo info = new DownloadProgressInfo();
+			info.DownloadID = args.DownloadID;
+			info.URL = args.URL;
+			info.TryNumber = args.TryNumber;
+			info.StartTicks = TickCount.Now;
+			info.TotalSize = args.TotalSize;
+			lock (_downloadProgresses) {
+				_downloadProgresses[args.DownloadID] = info;
+			}
+		}
+
+		private void ThreadWatcher_DownloadProgress(ThreadWatcher watcher, DownloadProgressEventArgs args) {
+			lock (_downloadProgresses) {
+				DownloadProgressInfo info;
+				if (!_downloadProgresses.TryGetValue(args.DownloadID, out info)) return;
+				info.DownloadedSize = args.DownloadedSize;
+				_downloadProgresses[args.DownloadID] = info;
+			}
+		}
+
+		private void ThreadWatcher_DownloadEnd(ThreadWatcher watcher, DownloadEndEventArgs args) {
+			lock (_downloadProgresses) {
+				DownloadProgressInfo info;
+				if (!_downloadProgresses.TryGetValue(args.DownloadID, out info)) return;
+				info.EndTicks = TickCount.Now;
+				info.DownloadedSize = args.TotalSize;
+				info.TotalSize = args.TotalSize;
+				_downloadProgresses[args.DownloadID] = info;
+			}
+		}
+
 		private bool AddThread(string pageURL) {
 			string pageAuth = (chkPageAuth.Checked && (txtPageAuth.Text.IndexOf(':') != -1)) ? txtPageAuth.Text : String.Empty;
 			string imageAuth = (chkImageAuth.Checked && (txtImageAuth.Text.IndexOf(':') != -1)) ? txtImageAuth.Text : String.Empty;
-			int waitSeconds = Int32.Parse((string)cboCheckEvery.SelectedItem) * 60;
-			return AddThread(pageURL, pageAuth, imageAuth, waitSeconds, chkOneTime.Checked, null, String.Empty, null, null);
+			int checkInterval = (int)cboCheckEvery.SelectedValue * 60;
+			return AddThread(pageURL, pageAuth, imageAuth, checkInterval, chkOneTime.Checked, null, String.Empty, null, null);
 		}
 
 		private bool AddThread(string pageURL, string pageAuth, string imageAuth, int checkInterval, bool oneTime, string saveDir, string description, StopReason? stopReason, WatcherExtraData extraData) {
@@ -501,6 +566,9 @@ namespace ChanThreadWatch {
 				watcher.WaitStatus += ThreadWatcher_WaitStatus;
 				watcher.StopStatus += ThreadWatcher_StopStatus;
 				watcher.ThreadDownloadDirectoryRename += ThreadWatcher_ThreadDownloadDirectoryRename;
+				watcher.DownloadStart += ThreadWatcher_DownloadStart;
+				watcher.DownloadProgress += ThreadWatcher_DownloadProgress;
+				watcher.DownloadEnd += ThreadWatcher_DownloadEnd;
 
 				newListViewItem = new ListViewItem(String.Empty);
 				for (int i = 1; i < lvThreads.Columns.Count; i++) {
@@ -575,13 +643,26 @@ namespace ChanThreadWatch {
 			_saveThreadList = true;
 		}
 
+		private void BindCheckEveryList() {
+			cboCheckEvery.ValueMember = "Value";
+			cboCheckEvery.DisplayMember = "Text";
+			cboCheckEvery.DataSource = new[] {
+				new ListItemInt32(0, "1 or <"),
+				new ListItemInt32(2, "2"),
+				new ListItemInt32(3, "3"),
+				new ListItemInt32(5, "5"),
+				new ListItemInt32(10, "10"),
+				new ListItemInt32(60, "60"),
+			};
+		}
+
 		private void BuildCheckEverySubMenu() {
 			for (int i = 0; i < cboCheckEvery.Items.Count; i++) {
-				int minutes = Int32.Parse((string)cboCheckEvery.Items[i]);
+				int minutes = ((ListItemInt32)cboCheckEvery.Items[i]).Value;
 				MenuItem menuItem = new MenuItem {
 					Index = i,
 					Tag = minutes,
-					Text = minutes + " Minute" + ((minutes != 1) ? "s" : String.Empty)
+					Text = minutes > 0 ? minutes + " Minutes" : "1 Minute or <"
 				};
 				menuItem.Click += miCheckEvery_Click;
 				miCheckEvery.MenuItems.Add(menuItem);
@@ -768,7 +849,7 @@ namespace ChanThreadWatch {
 					string pageURL = lines[i++];
 					string pageAuth = lines[i++];
 					string imageAuth = lines[i++];
-					int checkIntervalSeconds = Math.Max(Int32.Parse(lines[i++]), 60);
+					int checkIntervalSeconds = Int32.Parse(lines[i++]);
 					bool oneTimeDownload = lines[i++] == "1";
 					string saveDir = lines[i++];
 					saveDir = saveDir.Length != 0 ? General.GetAbsoluteDirectoryPath(saveDir, Settings.AbsoluteDownloadDir) : null;
@@ -879,21 +960,6 @@ namespace ChanThreadWatch {
 				foreach (ListViewItem item in lvThreads.SelectedItems) {
 					yield return (ThreadWatcher)item.Tag;
 				}
-			}
-		}
-
-		private class ListViewItemSorter : IComparer {
-			public int Column { get; set; }
-			public bool Ascending { get; set; }
-
-			public ListViewItemSorter(int column) {
-				Column = column;
-				Ascending = true;
-			}
-
-			public int Compare(object x, object y) {
-				int cmp = String.Compare(((ListViewItem)x).SubItems[Column].Text, ((ListViewItem)y).SubItems[Column].Text);
-				return Ascending ? cmp : -cmp;
 			}
 		}
 

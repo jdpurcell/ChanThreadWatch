@@ -5,7 +5,7 @@ namespace ChanThreadWatch {
 	public partial class frmThreadDescription : Form {
 		public frmThreadDescription() {
 			InitializeComponent();
-			General.SetFontAndScaling(this);
+			GUI.SetFontAndScaling(this);
 		}
 
 		public string Description {

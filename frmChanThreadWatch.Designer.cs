@@ -61,6 +61,8 @@
 			this.tmrUpdateWaitStatus = new System.Windows.Forms.Timer(this.components);
 			this.btnAddFromClipboard = new System.Windows.Forms.Button();
 			this.tmrSaveThreadList = new System.Windows.Forms.Timer(this.components);
+			this.btnDownloads = new System.Windows.Forms.Button();
+			this.tmrMaintenance = new System.Windows.Forms.Timer(this.components);
 			this.grpAddThread.SuspendLayout();
 			this.grpDoubleClick.SuspendLayout();
 			this.SuspendLayout();
@@ -142,16 +144,9 @@
 			// 
 			this.cboCheckEvery.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
 			this.cboCheckEvery.FormattingEnabled = true;
-			this.cboCheckEvery.Items.AddRange(new object[] {
-            "1",
-            "2",
-            "3",
-            "5",
-            "10",
-            "60"});
 			this.cboCheckEvery.Location = new System.Drawing.Point(140, 124);
 			this.cboCheckEvery.Name = "cboCheckEvery";
-			this.cboCheckEvery.Size = new System.Drawing.Size(52, 21);
+			this.cboCheckEvery.Size = new System.Drawing.Size(64, 21);
 			this.cboCheckEvery.TabIndex = 8;
 			// 
 			// txtImageAuth
@@ -247,7 +242,7 @@
 			this.btnAbout.Location = new System.Drawing.Point(568, 342);
 			this.btnAbout.Name = "btnAbout";
 			this.btnAbout.Size = new System.Drawing.Size(60, 23);
-			this.btnAbout.TabIndex = 6;
+			this.btnAbout.TabIndex = 7;
 			this.btnAbout.Text = "About";
 			this.btnAbout.UseVisualStyleBackColor = true;
 			this.btnAbout.Click += new System.EventHandler(this.btnAbout_Click);
@@ -258,7 +253,7 @@
 			this.btnSettings.Location = new System.Drawing.Point(492, 342);
 			this.btnSettings.Name = "btnSettings";
 			this.btnSettings.Size = new System.Drawing.Size(67, 23);
-			this.btnSettings.TabIndex = 5;
+			this.btnSettings.TabIndex = 6;
 			this.btnSettings.Text = "Settings";
 			this.btnSettings.UseVisualStyleBackColor = true;
 			this.btnSettings.Click += new System.EventHandler(this.btnSettings_Click);
@@ -351,10 +346,9 @@
 			// 
 			// rbEditDescription
 			// 
-			this.rbEditDescription.AutoSize = true;
 			this.rbEditDescription.Location = new System.Drawing.Point(12, 58);
 			this.rbEditDescription.Name = "rbEditDescription";
-			this.rbEditDescription.Size = new System.Drawing.Size(99, 17);
+			this.rbEditDescription.Size = new System.Drawing.Size(100, 17);
 			this.rbEditDescription.TabIndex = 2;
 			this.rbEditDescription.TabStop = true;
 			this.rbEditDescription.Text = "Edit Description";
@@ -362,10 +356,9 @@
 			// 
 			// rbOpenURL
 			// 
-			this.rbOpenURL.AutoSize = true;
 			this.rbOpenURL.Location = new System.Drawing.Point(12, 38);
 			this.rbOpenURL.Name = "rbOpenURL";
-			this.rbOpenURL.Size = new System.Drawing.Size(76, 17);
+			this.rbOpenURL.Size = new System.Drawing.Size(100, 17);
 			this.rbOpenURL.TabIndex = 1;
 			this.rbOpenURL.TabStop = true;
 			this.rbOpenURL.Text = "Open URL";
@@ -373,10 +366,9 @@
 			// 
 			// rbOpenFolder
 			// 
-			this.rbOpenFolder.AutoSize = true;
 			this.rbOpenFolder.Location = new System.Drawing.Point(12, 18);
 			this.rbOpenFolder.Name = "rbOpenFolder";
-			this.rbOpenFolder.Size = new System.Drawing.Size(83, 17);
+			this.rbOpenFolder.Size = new System.Drawing.Size(100, 17);
 			this.rbOpenFolder.TabIndex = 0;
 			this.rbOpenFolder.TabStop = true;
 			this.rbOpenFolder.Text = "Open Folder";
@@ -404,11 +396,29 @@
 			this.tmrSaveThreadList.Interval = 60000;
 			this.tmrSaveThreadList.Tick += new System.EventHandler(this.tmrSaveThreadList_Tick);
 			// 
+			// btnDownloads
+			// 
+			this.btnDownloads.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
+			this.btnDownloads.Location = new System.Drawing.Point(400, 342);
+			this.btnDownloads.Name = "btnDownloads";
+			this.btnDownloads.Size = new System.Drawing.Size(84, 23);
+			this.btnDownloads.TabIndex = 5;
+			this.btnDownloads.Text = "Downloads";
+			this.btnDownloads.UseVisualStyleBackColor = true;
+			this.btnDownloads.Click += new System.EventHandler(this.btnDownloads_Click);
+			// 
+			// tmrMaintenance
+			// 
+			this.tmrMaintenance.Enabled = true;
+			this.tmrMaintenance.Interval = 1000;
+			this.tmrMaintenance.Tick += new System.EventHandler(this.tmrMaintenance_Tick);
+			// 
 			// frmChanThreadWatch
 			// 
 			this.AllowDrop = true;
 			this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
 			this.ClientSize = new System.Drawing.Size(636, 373);
+			this.Controls.Add(this.btnDownloads);
 			this.Controls.Add(this.btnAddFromClipboard);
 			this.Controls.Add(this.grpDoubleClick);
 			this.Controls.Add(this.btnSettings);
@@ -428,7 +438,6 @@
 			this.grpAddThread.ResumeLayout(false);
 			this.grpAddThread.PerformLayout();
 			this.grpDoubleClick.ResumeLayout(false);
-			this.grpDoubleClick.PerformLayout();
 			this.ResumeLayout(false);
 
 		}
@@ -472,6 +481,8 @@
 		private System.Windows.Forms.MenuItem miEditDescription;
 		private System.Windows.Forms.RadioButton rbEditDescription;
 		private System.Windows.Forms.Timer tmrSaveThreadList;
+		private System.Windows.Forms.Button btnDownloads;
+		private System.Windows.Forms.Timer tmrMaintenance;
 	}
 }
 

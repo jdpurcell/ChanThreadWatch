@@ -70,8 +70,10 @@ namespace ChanThreadWatch {
 			get { lock (_settingsSync) { return _checkIntervalSeconds; } }
 			set {
 				lock (_settingsSync) {
-					int changeAmount = value - _checkIntervalSeconds;
-					_checkIntervalSeconds = value;
+					int newCheckIntervalSeconds = (_hasInitialized && value < _minCheckIntervalSeconds) ?
+						_minCheckIntervalSeconds : value;
+					int changeAmount = newCheckIntervalSeconds - _checkIntervalSeconds;
+					_checkIntervalSeconds = newCheckIntervalSeconds;
 					NextCheckTicks += changeAmount * 1000;
 				}
 			}
@@ -200,7 +202,11 @@ namespace ChanThreadWatch {
 
 		public event EventHandler<ThreadWatcher, EventArgs> ThreadDownloadDirectoryRename;
 
+		public event EventHandler<ThreadWatcher, DownloadStartEventArgs> DownloadStart;
+
 		public event EventHandler<ThreadWatcher, DownloadProgressEventArgs> DownloadProgress;
+
+		public event EventHandler<ThreadWatcher, DownloadEndEventArgs> DownloadEnd;
 
 		private void OnDownloadStatus(DownloadStatusEventArgs e) {
 			var evt = DownloadStatus;
@@ -222,8 +228,18 @@ namespace ChanThreadWatch {
 			if (evt != null) try { evt(this, e); } catch { }
 		}
 
+		private void OnDownloadStart(DownloadStartEventArgs e) {
+			var evt = DownloadStart;
+			if (evt != null) try { evt(this, e); } catch { }
+		}
+
 		private void OnDownloadProgress(DownloadProgressEventArgs e) {
 			var evt = DownloadProgress;
+			if (evt != null) try { evt(this, e); } catch { }
+		}
+
+		private void OnDownloadEnd(DownloadEndEventArgs e) {
+			var evt = DownloadEnd;
 			if (evt != null) try { evt(this, e); } catch { }
 		}
 
@@ -234,6 +250,7 @@ namespace ChanThreadWatch {
 		private Dictionary<string, DownloadInfo> _completedThumbs;
 		private int _maxFileNameLength;
 		private string _threadName;
+		private int _minCheckIntervalSeconds;
 
 		private void Check() {
 			try {
@@ -257,6 +274,7 @@ namespace ChanThreadWatch {
 					_completedThumbs = new Dictionary<string, DownloadInfo>(StringComparer.OrdinalIgnoreCase);
 					_maxFileNameLength = 0;
 					_threadName = siteHelper.GetThreadName();
+					_minCheckIntervalSeconds = siteHelper.IsBoardHighTurnover() ? 30 : 60;
 
 					if (String.IsNullOrEmpty(ThreadDownloadDirectory)) {
 						lock (_settingsSync) {
@@ -394,7 +412,7 @@ namespace ChanThreadWatch {
 					OnDownloadStatus(new DownloadStatusEventArgs(DownloadType.Page, pageIndex, _pageList.Count));
 				}
 
-				MillisecondsUntilNextCheck = (CheckIntervalSeconds * 1000);
+				MillisecondsUntilNextCheck = Math.Max(CheckIntervalSeconds, _minCheckIntervalSeconds) * 1000;
 
 				if (pendingImages.Count != 0 && !IsStopping) {
 					if (_maxFileNameLength == 0) {
@@ -622,6 +640,8 @@ namespace ChanThreadWatch {
 					return;
 				}
 
+				long downloadID = (long)(General.Calculate64BitMD5(Encoding.UTF8.GetBytes(String.Join(" ",
+					new[] { url, TickCount.Now.ToString(), tryNumber.ToString() }))) & 0x7FFFFFFFFFFFFFFFUL);
 				FileStream fileStream = null;
 				long? totalFileSize = null;
 				long downloadedFileSize = 0;
@@ -655,11 +675,13 @@ namespace ChanThreadWatch {
 						memoryStream = new MemoryStream();
 						httpCharSet = General.GetCharSetFromContentType(response.ContentType);
 						lastModifiedTime = General.GetResponseLastModifiedTime(response);
+						OnDownloadStart(new DownloadStartEventArgs(downloadID, url, tryNumber, totalFileSize));
 					},
 					(data, dataLength) => {
 						fileStream.Write(data, 0, dataLength);
 						memoryStream.Write(data, 0, dataLength);
 						downloadedFileSize += dataLength;
+						OnDownloadProgress(new DownloadProgressEventArgs(downloadID, downloadedFileSize));
 					},
 					() => {
 						byte[] pageBytes = memoryStream.ToArray();
@@ -679,6 +701,7 @@ namespace ChanThreadWatch {
 						encoding = General.DetectHTMLEncoding(pageBytes, httpCharSet);
 						replaceList = (Settings.SaveThumbnails == true) ? new List<ReplaceInfo>() : null;
 						content = General.HTMLBytesToString(pageBytes, encoding, replaceList);
+						OnDownloadEnd(new DownloadEndEventArgs(downloadID, downloadedFileSize));
 						endTryDownload(DownloadResult.Completed);
 					},
 					(ex) => {
@@ -730,6 +753,8 @@ namespace ChanThreadWatch {
 					return;
 				}
 
+				long downloadID = (long)(General.Calculate64BitMD5(Encoding.UTF8.GetBytes(String.Join(" ",
+					new[] { url, TickCount.Now.ToString(), tryNumber.ToString() }))) & 0x7FFFFFFFFFFFFFFFUL);
 				FileStream fileStream = null;
 				long? totalFileSize = null;
 				long downloadedFileSize = 0;
@@ -754,12 +779,13 @@ namespace ChanThreadWatch {
 						if (hashType != HashType.None) {
 							hashStream = new HashGeneratorStream(hashType);
 						}
+						OnDownloadStart(new DownloadStartEventArgs(downloadID, url, tryNumber, totalFileSize));
 					},
 					(data, dataLength) => {
 						fileStream.Write(data, 0, dataLength);
 						if (hashStream != null) hashStream.Write(data, 0, dataLength);
 						downloadedFileSize += dataLength;
-						OnDownloadProgress(new DownloadProgressEventArgs(url, totalFileSize, downloadedFileSize));
+						OnDownloadProgress(new DownloadProgressEventArgs(downloadID, downloadedFileSize));
 					},
 					() => {
 						byte[] hash = (hashType != HashType.None) ? hashStream.GetDataHash() : null;
@@ -779,7 +805,7 @@ namespace ChanThreadWatch {
 							tryDownload();
 							return;
 						}
-						OnDownloadProgress(new DownloadProgressEventArgs(url, downloadedFileSize, downloadedFileSize));
+						OnDownloadEnd(new DownloadEndEventArgs(downloadID, downloadedFileSize));
 						endTryDownload(DownloadResult.Completed);
 					},
 					(ex) => {

@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Drawing;
 using System.Globalization;
 using System.IO;
 using System.Net;
@@ -8,7 +7,6 @@ using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
-using System.Windows.Forms;
 
 namespace ChanThreadWatch {
 	public static class General {
@@ -21,7 +19,7 @@ namespace ChanThreadWatch {
 
 		public static string ReleaseDate {
 			get {
-				return "2010-Dec-18";
+				return "2010-Dec-25";
 			}
 		}
 
@@ -702,24 +700,6 @@ namespace ChanThreadWatch {
 				if (bytes[i] == 0 && bytes[i + 1] == 0) return i / 2;
 			}
 			return bytes.Length / 2;
-		}
-
-		public static void EnableDoubleBuffering<T>(T control) where T : Control {
-			typeof(T).InvokeMember(
-			"DoubleBuffered", 
-			BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.SetProperty,
-			null, 
-			control, 
-			new object[] { true });
-		}
-
-		public static void SetFontAndScaling(Form form) {
-			form.SuspendLayout();
-			form.Font = new Font("Tahoma", 8.25f);
-			if (form.Font.Name != "Tahoma") form.Font = new Font("Arial", 8.25f);
-			form.AutoScaleMode = AutoScaleMode.Font;
-			form.AutoScaleDimensions = new SizeF(6f, 13f);
-			form.ResumeLayout(false);
 		}
 	}
 }

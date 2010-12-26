@@ -6,17 +6,8 @@ using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
-using System.Windows.Forms;
 
 namespace ChanThreadWatch {
-	public class WatcherExtraData {
-		public ListViewItem ListViewItem { get; set; }
-		public DateTime AddedOn { get; set; }
-		public DateTime? LastImageOn { get; set; }
-		public bool HasDownloadedPage { get; set; }
-		public bool PreviousDownloadWasPage { get; set; }
-	}
-
 	public class ElementInfo {
 		public int Offset { get; set; }
 		public int Length { get; set; }
@@ -91,7 +82,7 @@ namespace ChanThreadWatch {
 
 	public static class TickCount {
 		private static object _sync = new object();
-		private static int _lastTickCount = Environment.TickCount;
+		private static int _lastTickCount;
 		private static long _correction;
 
 		public static long Now {
@@ -142,7 +133,12 @@ namespace ChanThreadWatch {
 
 		public string SwapForFreshConnection(string name, string url) {
 			ServicePoint servicePoint = ServicePointManager.FindServicePoint(new Uri(url));
-			servicePoint.CloseConnectionGroup(name);
+			try {
+				servicePoint.CloseConnectionGroup(name);
+			}
+			catch (NotImplementedException) {
+				// Work-around for Mono
+			}
 			return GetConnectionGroupName();
 		}
 
@@ -513,6 +509,18 @@ namespace ChanThreadWatch {
 			_dict = new Dictionary<T, int>(comparer);
 		}
 
+		public HashSet(IEnumerable<T> collection) :
+			this()
+		{
+			AddRange(collection);
+		}
+
+		public HashSet(IEnumerable<T> collection, IEqualityComparer<T> comparer) :
+			this(comparer)
+		{
+			AddRange(collection);
+		}
+
 		public int Count {
 			get { return _dict.Count; }
 		}
@@ -524,6 +532,12 @@ namespace ChanThreadWatch {
 			}
 			else {
 				return true;
+			}
+		}
+
+		private void AddRange(IEnumerable<T> collection) {
+			foreach (T item in collection) {
+				Add(item);
 			}
 		}
 
@@ -637,15 +651,37 @@ namespace ChanThreadWatch {
 		}
 	}
 
-	public class DownloadProgressEventArgs : EventArgs {
+	public class DownloadStartEventArgs : EventArgs {
+		public long DownloadID { get; private set; }
 		public string URL { get; private set; }
+		public int TryNumber { get; private set; }
 		public long? TotalSize { get; private set; }
+
+		public DownloadStartEventArgs(long downloadID, string url, int tryNumber, long? totalSize) {
+			DownloadID = downloadID;
+			URL = url;
+			TryNumber = tryNumber;
+			TotalSize = totalSize;
+		}
+	}
+
+	public class DownloadProgressEventArgs : EventArgs {
+		public long DownloadID { get; private set; }
 		public long DownloadedSize { get; private set; }
 
-		public DownloadProgressEventArgs(string url, long? totalSize, long downloadedSize) {
-			URL = url;
-			TotalSize = totalSize;
+		public DownloadProgressEventArgs(long downloadID, long downloadedSize) {
+			DownloadID = downloadID;
 			DownloadedSize = downloadedSize;
+		}
+	}
+
+	public class DownloadEndEventArgs : EventArgs {
+		public long DownloadID { get; private set; }
+		public long TotalSize { get; private set; }
+
+		public DownloadEndEventArgs(long downloadID, long totalSize) {
+			DownloadID = downloadID;
+			TotalSize = totalSize;
 		}
 	}
 
