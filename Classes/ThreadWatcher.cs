@@ -701,12 +701,13 @@ namespace ChanThreadWatch {
 						encoding = General.DetectHTMLEncoding(pageBytes, httpCharSet);
 						replaceList = (Settings.SaveThumbnails == true) ? new List<ReplaceInfo>() : null;
 						content = General.HTMLBytesToString(pageBytes, encoding, replaceList);
-						OnDownloadEnd(new DownloadEndEventArgs(downloadID, downloadedFileSize));
+						OnDownloadEnd(new DownloadEndEventArgs(downloadID, downloadedFileSize, true));
 						endTryDownload(DownloadResult.Completed);
 					},
 					(ex) => {
 						closeStreams();
 						if (createdFile) deleteFile();
+						OnDownloadEnd(new DownloadEndEventArgs(downloadID, downloadedFileSize, false));
 						if (ex is HTTP304Exception) {
 							// Page not modified, skip
 							endTryDownload(DownloadResult.Skipped);
@@ -805,12 +806,13 @@ namespace ChanThreadWatch {
 							tryDownload();
 							return;
 						}
-						OnDownloadEnd(new DownloadEndEventArgs(downloadID, downloadedFileSize));
+						OnDownloadEnd(new DownloadEndEventArgs(downloadID, downloadedFileSize, true));
 						endTryDownload(DownloadResult.Completed);
 					},
 					(ex) => {
 						closeStreams();
 						if (createdFile) deleteFile();
+						OnDownloadEnd(new DownloadEndEventArgs(downloadID, downloadedFileSize, false));
 						if (ex is HTTP404Exception || ex is PathTooLongException) {
 							// Fatal problem with this file, skip
 							endTryDownload(DownloadResult.Skipped);

@@ -677,11 +677,13 @@ namespace ChanThreadWatch {
 
 	public class DownloadEndEventArgs : EventArgs {
 		public long DownloadID { get; private set; }
-		public long TotalSize { get; private set; }
+		public long DownloadedSize { get; private set; }
+		public bool IsSuccessful { get; private set; }
 
-		public DownloadEndEventArgs(long downloadID, long totalSize) {
+		public DownloadEndEventArgs(long downloadID, long downloadedSize, bool isSuccessful) {
 			DownloadID = downloadID;
-			TotalSize = totalSize;
+			DownloadedSize = downloadedSize;
+			IsSuccessful = isSuccessful;
 		}
 	}
 

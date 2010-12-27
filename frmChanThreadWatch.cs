@@ -533,8 +533,8 @@ namespace ChanThreadWatch {
 				DownloadProgressInfo info;
 				if (!_downloadProgresses.TryGetValue(args.DownloadID, out info)) return;
 				info.EndTicks = TickCount.Now;
-				info.DownloadedSize = args.TotalSize;
-				info.TotalSize = args.TotalSize;
+				info.DownloadedSize = args.DownloadedSize;
+				info.TotalSize = args.DownloadedSize;
 				_downloadProgresses[args.DownloadID] = info;
 			}
 		}
