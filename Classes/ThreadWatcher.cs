@@ -489,7 +489,7 @@ namespace ChanThreadWatch {
 					}
 				}
 
-				if (Settings.SaveThumbnails == true) {
+				if (Settings.SaveThumbnails != false) {
 					if (pendingThumbs.Count != 0 && !IsStopping) {
 						if (!Directory.Exists(thumbDir)) {
 							try {
@@ -699,7 +699,7 @@ namespace ChanThreadWatch {
 							return;
 						}
 						encoding = General.DetectHTMLEncoding(pageBytes, httpCharSet);
-						replaceList = (Settings.SaveThumbnails == true) ? new List<ReplaceInfo>() : null;
+						replaceList = (Settings.SaveThumbnails != false) ? new List<ReplaceInfo>() : null;
 						content = General.HTMLBytesToString(pageBytes, encoding, replaceList);
 						OnDownloadEnd(new DownloadEndEventArgs(downloadID, downloadedFileSize, true));
 						endTryDownload(DownloadResult.Completed);

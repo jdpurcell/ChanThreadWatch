@@ -46,11 +46,8 @@ namespace ChanThreadWatch {
 					Environment.SpecialFolder.MyDocuments), "Watched Threads");
 				Settings.DownloadFolderIsRelative = false;
 			}
-			if (Settings.OnThreadDoubleClick == null) {
-				Settings.OnThreadDoubleClick = ThreadDoubleClickAction.OpenFolder;
-			}
-			if (Settings.SaveThumbnails == null) {
-				Settings.SaveThumbnails = true;
+			if (Settings.CheckEvery == 1) {
+				Settings.CheckEvery = 0;
 			}
 
 			chkPageAuth.Checked = Settings.UsePageAuth ?? false;
@@ -59,7 +56,7 @@ namespace ChanThreadWatch {
 			txtImageAuth.Text = Settings.ImageAuth ?? String.Empty;
 			chkOneTime.Checked = Settings.OneTimeDownload ?? false;
 			cboCheckEvery.SelectedValue = Settings.CheckEvery ?? 3;
-			OnThreadDoubleClick = Settings.OnThreadDoubleClick.Value;
+			OnThreadDoubleClick = Settings.OnThreadDoubleClick ?? ThreadDoubleClickAction.OpenFolder;
 
 			if ((Settings.CheckForUpdates == true) && (Settings.LastUpdateCheck ?? DateTime.MinValue) < DateTime.Now.Date) {
 				CheckForUpdates();
