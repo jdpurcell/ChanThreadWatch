@@ -27,20 +27,27 @@ namespace ChanThreadWatch {
 		public static bool ObtainMutex(string settingsFolder) {
 			SecurityIdentifier sid = new SecurityIdentifier(WellKnownSidType.WorldSid, null);
 			MutexSecurity security = new MutexSecurity();
+			bool useDefaultSecurity = false;
 			bool createdNew;
 			try {
 				security.AddAccessRule(new MutexAccessRule(sid, MutexRights.FullControl, AccessControlType.Allow));
 				security.AddAccessRule(new MutexAccessRule(sid, MutexRights.ChangePermissions, AccessControlType.Deny));
 				security.AddAccessRule(new MutexAccessRule(sid, MutexRights.Delete, AccessControlType.Deny));
 			}
-			catch (ArgumentOutOfRangeException) {
-				// Work-around for Mono.  Just return here since Mutexes in Mono don't
-				// work properly even with with default security.
-				return true;
+			catch (Exception ex) {
+				if (ex is ArgumentOutOfRangeException || ex is NotImplementedException) {
+					// Work-around for Mono.
+					useDefaultSecurity = true;
+				}
+				else {
+					throw;
+				}
 			}
 			string name = @"Global\ChanThreadWatch_" + General.Calculate64BitMD5(Encoding.UTF8.GetBytes(
 				settingsFolder.ToUpperInvariant())).ToString("X16");
-			Mutex mutex = new Mutex(false, name, out createdNew, security);
+			Mutex mutex = !useDefaultSecurity ?
+				new Mutex(false, name, out createdNew, security) :
+				new Mutex(false, name);
 			try {
 				if (!mutex.WaitOne(0, false)) {
 					return false;
@@ -54,7 +61,10 @@ namespace ChanThreadWatch {
 
 		public static void ReleaseMutex() {
 			if (_mutex == null) return;
-			_mutex.ReleaseMutex();
+			try {
+				_mutex.ReleaseMutex();
+			}
+			catch { }
 			_mutex = null;
 		}
 	}

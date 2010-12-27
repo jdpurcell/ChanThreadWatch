@@ -56,6 +56,7 @@ namespace ChanThreadWatch {
 			txtImageAuth.Text = Settings.ImageAuth ?? String.Empty;
 			chkOneTime.Checked = Settings.OneTimeDownload ?? false;
 			cboCheckEvery.SelectedValue = Settings.CheckEvery ?? 3;
+			if (cboCheckEvery.SelectedIndex == -1) cboCheckEvery.SelectedValue = 3;
 			OnThreadDoubleClick = Settings.OnThreadDoubleClick ?? ThreadDoubleClickAction.OpenFolder;
 
 			if ((Settings.CheckForUpdates == true) && (Settings.LastUpdateCheck ?? DateTime.MinValue) < DateTime.Now.Date) {
