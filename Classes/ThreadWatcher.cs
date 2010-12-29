@@ -363,7 +363,7 @@ namespace ChanThreadWatch {
 									if (File.Exists(path)) {
 										_imageDiskFileNames.Add(fileName);
 										_completedImages[image.FileName] = new DownloadInfo {
-											Path = path,
+											FileName = fileName,
 											Skipped = false
 										};
 										break;
@@ -374,7 +374,7 @@ namespace ChanThreadWatch {
 								string path = Path.Combine(thumbDir, thumb.FileName);
 								if (File.Exists(path)) {
 									_completedThumbs[thumb.FileName] = new DownloadInfo {
-										Path = path,
+										FileName = thumb.FileName,
 										Skipped = false
 									};
 								}
@@ -467,7 +467,7 @@ namespace ChanThreadWatch {
 							if (result == DownloadResult.Completed || result == DownloadResult.Skipped) {
 								lock (_completedImages) {
 									_completedImages[image.FileName] = new DownloadInfo {
-										Path = savePath,
+										FileName = saveFileName,
 										Skipped = (result == DownloadResult.Skipped)
 									};
 									if (result != DownloadResult.Skipped) {
@@ -516,7 +516,7 @@ namespace ChanThreadWatch {
 								if (result == DownloadResult.Completed || result == DownloadResult.Skipped) {
 									lock (_completedThumbs) {
 										_completedThumbs[thumb.FileName] = new DownloadInfo {
-											Path = savePath,
+											FileName = thumb.FileName,
 											Skipped = (result == DownloadResult.Skipped)
 										};
 										if (result != DownloadResult.Skipped) {
@@ -545,14 +545,15 @@ namespace ChanThreadWatch {
 							for (int i = 0; i < pageInfo.ReplaceList.Count; i++) {
 								ReplaceInfo replace = pageInfo.ReplaceList[i];
 								DownloadInfo downloadInfo = null;
-								Func<string> getRelativeDownloadPath = () => {
-									return General.GetRelativeFilePath(downloadInfo.Path, threadDir).Replace(Path.DirectorySeparatorChar, '/');
+								Func<string, string> getRelativeDownloadPath = (fileDownloadDir) => {
+									return General.GetRelativeFilePath(Path.Combine(fileDownloadDir, downloadInfo.FileName),
+										threadDir).Replace(Path.DirectorySeparatorChar, '/');
 								};
 								if (replace.Type == ReplaceType.ImageLinkHref && _completedImages.TryGetValue(replace.Tag, out downloadInfo)) {
-									replace.Value = "href=\"" + HttpUtility.HtmlAttributeEncode(getRelativeDownloadPath()) + "\"";
+									replace.Value = "href=\"" + HttpUtility.HtmlAttributeEncode(getRelativeDownloadPath(imageDir)) + "\"";
 								}
 								if (replace.Type == ReplaceType.ImageSrc && _completedThumbs.TryGetValue(replace.Tag, out downloadInfo)) {
-									replace.Value = "src=\"" + HttpUtility.HtmlAttributeEncode(getRelativeDownloadPath()) + "\"";
+									replace.Value = "src=\"" + HttpUtility.HtmlAttributeEncode(getRelativeDownloadPath(thumbDir)) + "\"";
 								}
 							}
 							General.AddOtherReplaces(pageContent, pageInfo.ReplaceList);
