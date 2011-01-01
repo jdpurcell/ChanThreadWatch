@@ -33,6 +33,9 @@ namespace ChanThreadWatch {
 		private object _tag;
 
 		static ThreadWatcher() {
+			// HttpWebRequest uses ThreadPool for asynchronous calls
+			General.EnsureThreadPoolMaxThreads(500, 1000);
+
 			// Shouldn't matter since the limit is supposed to be per connection group
 			ServicePointManager.DefaultConnectionLimit = Int32.MaxValue;
 

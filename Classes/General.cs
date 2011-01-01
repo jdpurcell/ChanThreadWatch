@@ -500,6 +500,15 @@ namespace ChanThreadWatch {
 			}
 		}
 
+		public static void EnsureThreadPoolMaxThreads(int minWorkerThreads, int minCompletionPortThreads) {
+			int workerThreads;
+			int completionPortThreads;
+			ThreadPool.GetMaxThreads(out workerThreads, out completionPortThreads);
+			if (workerThreads < minWorkerThreads || completionPortThreads < minCompletionPortThreads) {
+				ThreadPool.SetMaxThreads(Math.Max(workerThreads, minWorkerThreads), Math.Max(completionPortThreads, minCompletionPortThreads));
+			}
+		}
+
 		public static ulong Calculate64BitMD5(byte[] bytes) {
 			MD5CryptoServiceProvider hashAlgo = new MD5CryptoServiceProvider();
 			return BytesTo64BitXor(hashAlgo.ComputeHash(bytes));
