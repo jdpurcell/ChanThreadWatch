@@ -19,7 +19,7 @@ namespace ChanThreadWatch {
 
 		public static string ReleaseDate {
 			get {
-				return "2010-Dec-25";
+				return "2011-Jan-01";
 			}
 		}
 
@@ -29,110 +29,120 @@ namespace ChanThreadWatch {
 			}
 		}
 
-		public static void DownloadAsync(string url, string auth, string referer, string connectionName, DateTime? cacheLastModifiedTime, Action<HttpWebResponse> onResponse, Action<byte[], int> onDownloadChunk, Action onComplete, Action<Exception> onException) {
+		public static Action DownloadAsync(string url, string auth, string referer, string connectionGroupName, DateTime? cacheLastModifiedTime, Action<HttpWebResponse> onResponse, Action<byte[], int> onDownloadChunk, Action onComplete, Action<Exception> onException) {
 			const int readBufferSize = 8192;
 			const int requestTimeoutMS = 60000;
 			const int readTimeoutMS = 60000;
-			object timedOutSync = new object();
-			bool timedOutFlag = false;
-			try {
-				HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
-				if (connectionName != null) {
-					request.ConnectionGroupName = connectionName;
+			object sync = new object();
+			bool aborting = false;
+			HttpWebRequest request = null;
+			HttpWebResponse response = null;
+			Stream responseStream = null;
+			Action cleanupResponse = () => {
+				if (responseStream != null) {
+					try { responseStream.Close(); } catch { }
+					responseStream = null;
 				}
-				request.UserAgent = (Settings.UseCustomUserAgent == true) ? Settings.CustomUserAgent : ("Chan Thread Watch " + Version);
-				request.Referer = referer;
-				if (cacheLastModifiedTime != null) {
-					request.IfModifiedSince = cacheLastModifiedTime.Value;
+				if (response != null) {
+					try { response.Close(); } catch { }
+					response = null;
 				}
-				if (!String.IsNullOrEmpty(auth)) {
-					Encoding encoding = Encoding.GetEncoding("iso-8859-1");
-					request.Headers.Add("Authorization", "Basic " + Convert.ToBase64String(encoding.GetBytes(auth)));
-				}
-				IAsyncResult requestResult = request.BeginGetResponse((requestResultParam) => {
-					lock (timedOutSync) {
-						if (timedOutFlag) return;
+			};
+			Action<Exception> abortDownloadCustom = (ex) => {
+				lock (sync) {
+					if (aborting) return;
+					aborting = true;
+					if (request != null && response == null) {
+						request.Abort();
 					}
-					HttpWebResponse response = null;
-					Stream responseStream = null;
-					Action cleanupResponse = () => {
-						if (responseStream != null) {
-							try { responseStream.Close(); } catch { }
-							responseStream = null;
-						}
-						if (response != null) {
-							try { response.Close(); } catch { }
-							response = null;
-						}
-					};
-					try {
-						response = (HttpWebResponse)request.EndGetResponse(requestResultParam);
-						onResponse(response);
-						responseStream = response.GetResponseStream();
-						byte[] buff = new byte[readBufferSize];
-						AsyncCallback readCallback = null;
-						readCallback = (readResultParam) => {
-							lock (timedOutSync) {
-								if (timedOutFlag) return;
-							}
+					cleanupResponse();
+					onException(ex);
+				}
+			};
+			Action abortDownload = () => {
+				abortDownloadCustom(new Exception("Download has been aborted."));
+			};
+			lock (sync) {
+				try {
+					request = (HttpWebRequest)WebRequest.Create(url);
+					if (connectionGroupName != null) {
+						request.ConnectionGroupName = connectionGroupName;
+					}
+					request.UserAgent = (Settings.UseCustomUserAgent == true) ? Settings.CustomUserAgent : ("Chan Thread Watch " + Version);
+					request.Referer = referer;
+					if (cacheLastModifiedTime != null) {
+						request.IfModifiedSince = cacheLastModifiedTime.Value;
+					}
+					if (!String.IsNullOrEmpty(auth)) {
+						Encoding encoding = Encoding.GetEncoding("iso-8859-1");
+						request.Headers.Add("Authorization", "Basic " + Convert.ToBase64String(encoding.GetBytes(auth)));
+					}
+					// Unfortunately BeginGetResponse blocks until the DNS lookup has finished
+					IAsyncResult requestResult = request.BeginGetResponse((requestResultParam) => {
+						lock (sync) {
 							try {
-								if (readResultParam != null) {
-									int bytesRead = responseStream.EndRead(readResultParam);
-									if (bytesRead == 0) {
-										cleanupResponse();
-										onComplete();
-										return;
-									}
-									onDownloadChunk(buff, bytesRead);
-								}
-								IAsyncResult readResult = responseStream.BeginRead(buff, 0, buff.Length, readCallback, null);
-								ThreadPool.RegisterWaitForSingleObject(readResult.AsyncWaitHandle,
-									(state, timedOut) => {
-										if (!timedOut) return;
-										lock (timedOutSync) {
-											timedOutFlag = true;
+								if (aborting) return;
+								response = (HttpWebResponse)request.EndGetResponse(requestResultParam);
+								responseStream = response.GetResponseStream();
+								onResponse(response);
+								byte[] buff = new byte[readBufferSize];
+								AsyncCallback readCallback = null;
+								readCallback = (readResultParam) => {
+									lock (sync) {
+										try {
+											if (readResultParam != null) {
+												int bytesRead = responseStream.EndRead(readResultParam);
+												if (aborting) return;
+												if (bytesRead == 0) {
+													aborting = true;
+													cleanupResponse();
+													onComplete();
+													return;
+												}
+												onDownloadChunk(buff, bytesRead);
+											}
+											IAsyncResult readResult = responseStream.BeginRead(buff, 0, buff.Length, readCallback, null);
+											ThreadPool.RegisterWaitForSingleObject(readResult.AsyncWaitHandle,
+												(state, timedOut) => {
+													if (!timedOut) return;
+													abortDownloadCustom(new Exception("Timed out while reading response."));
+												}, null, readTimeoutMS, true);
 										}
-										cleanupResponse();
-										onException(new Exception("Timed out while reading response."));
-									}, null, readTimeoutMS, true);
+										catch (Exception ex) {
+											abortDownloadCustom(ex);
+										}
+									}
+								};
+								readCallback(null);
 							}
 							catch (Exception ex) {
-								cleanupResponse();
-								onException(ex);
-							}
-						};
-						readCallback(null);
-					}
-					catch (Exception ex) {
-						cleanupResponse();
-						if (ex is WebException) {
-							WebException webEx = (WebException)ex;
-							if (webEx.Status == WebExceptionStatus.ProtocolError) {
-								HttpStatusCode code = ((HttpWebResponse)webEx.Response).StatusCode;
-								if (code == HttpStatusCode.NotFound) {
-									ex = new HTTP404Exception();
+								if (ex is WebException) {
+									WebException webEx = (WebException)ex;
+									if (webEx.Status == WebExceptionStatus.ProtocolError) {
+										HttpStatusCode code = ((HttpWebResponse)webEx.Response).StatusCode;
+										if (code == HttpStatusCode.NotFound) {
+											ex = new HTTP404Exception();
+										}
+										else if (code == HttpStatusCode.NotModified) {
+											ex = new HTTP304Exception();
+										}
+									}
 								}
-								else if (code == HttpStatusCode.NotModified) {
-									ex = new HTTP304Exception();
-								}
+								abortDownloadCustom(ex);
 							}
 						}
-						onException(ex);
-					}
-				}, null);
-				ThreadPool.RegisterWaitForSingleObject(requestResult.AsyncWaitHandle,
-					(state, timedOut) => {
-						if (!timedOut) return;
-						lock (timedOutSync) {
-							timedOutFlag = true;
-						}
-						request.Abort();
-						onException(new Exception("Timed out while waiting for response."));
-					}, null, requestTimeoutMS, true);
+					}, null);
+					ThreadPool.RegisterWaitForSingleObject(requestResult.AsyncWaitHandle,
+						(state, timedOut) => {
+							if (!timedOut) return;
+							abortDownloadCustom(new Exception("Timed out while waiting for response."));
+						}, null, requestTimeoutMS, true);
+				}
+				catch (Exception ex) {
+					abortDownloadCustom(ex);
+				}
 			}
-			catch (Exception ex) {
-				onException(ex);
-			}
+			return abortDownload;
 		}
 
 		public static string DownloadPageToString(string url) {
@@ -492,12 +502,15 @@ namespace ChanThreadWatch {
 
 		public static ulong Calculate64BitMD5(byte[] bytes) {
 			MD5CryptoServiceProvider hashAlgo = new MD5CryptoServiceProvider();
-			byte[] hashBytes = hashAlgo.ComputeHash(bytes);
-			ulong hash = 0;
-			for (int i = 0; i < hashBytes.Length; i++) {
-				hash ^= (ulong)hashBytes[i] << ((7 - (i % 8)) * 8);
+			return BytesTo64BitXor(hashAlgo.ComputeHash(bytes));
+		}
+
+		public static ulong BytesTo64BitXor(byte[] bytes) {
+			ulong result = 0;
+			for (int i = 0; i < bytes.Length; i++) {
+				result ^= (ulong)bytes[i] << ((7 - (i % 8)) * 8);
 			}
-			return hash;
+			return result;
 		}
 
 		public static void WriteReplacedString(string str, List<ReplaceInfo> replaceList, TextWriter outStream) {

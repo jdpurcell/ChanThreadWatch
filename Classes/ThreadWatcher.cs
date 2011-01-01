@@ -16,6 +16,7 @@ namespace ChanThreadWatch {
 		private object _settingsSync = new object();
 		private ManualResetEvent _stopEvent = new ManualResetEvent(false);
 		private StopReason _stopReason;
+		private Dictionary<long, Action> _downloadAborters = new Dictionary<long, Action>();
 		private bool _hasRun;
 		private ManualResetEvent _checkFinishedEvent = new ManualResetEvent(true);
 		private bool _isWaiting;
@@ -157,6 +158,13 @@ namespace ChanThreadWatch {
 					if (_nextCheckWorkItem != null) {
 						_workScheduler.RemoveItem(_nextCheckWorkItem);
 						_nextCheckWorkItem = null;
+					}
+					List<Action> downloadAborters;
+					lock (_downloadAborters) {
+						downloadAborters = new List<Action>(_downloadAborters.Values);
+					}
+					foreach (Action abortDownload in downloadAborters) {
+						abortDownload();
 					}
 					if (_checkFinishedEvent.WaitOne(0, false)) {
 						_isWaiting = false;
@@ -616,7 +624,7 @@ namespace ChanThreadWatch {
 
 		private void DownloadPageAsync(string path, string url, string auth, DateTime? cacheLastModifiedTime, DownloadPageEndCallback onDownloadEnd) {
 			ConnectionManager connectionManager = ConnectionManager.GetInstance(url);
-			string connectionName = connectionManager.ObtainConnectionGroupName();
+			string connectionGroupName = connectionManager.ObtainConnectionGroupName();
 
 			string backupPath = path + ".bak";
 			int tryNumber = 0;
@@ -631,7 +639,7 @@ namespace ChanThreadWatch {
 				string content = null;
 
 				Action<DownloadResult> endTryDownload = (result) => {
-					connectionManager.ReleaseConnectionGroupName(connectionName);
+					connectionManager.ReleaseConnectionGroupName(connectionGroupName);
 					onDownloadEnd(result, content, lastModifiedTime, encoding, replaceList);
 				};
 
@@ -641,25 +649,29 @@ namespace ChanThreadWatch {
 					return;
 				}
 
-				long downloadID = (long)(General.Calculate64BitMD5(Encoding.UTF8.GetBytes(String.Join(" ",
-					new[] { url, TickCount.Now.ToString(), tryNumber.ToString() }))) & 0x7FFFFFFFFFFFFFFFUL);
+				long downloadID = (long)(General.BytesTo64BitXor(Guid.NewGuid().ToByteArray()) & 0x7FFFFFFFFFFFFFFFUL);
 				FileStream fileStream = null;
 				long? totalFileSize = null;
 				long downloadedFileSize = 0;
 				bool createdFile = false;
 				MemoryStream memoryStream = null;
-				Action closeStreams = () => {
+				bool removedDownloadAborter = false;
+				Action<bool> cleanup = (successful) => {
 					if (fileStream != null) try { fileStream.Close(); } catch { }
 					if (memoryStream != null) try { memoryStream.Close(); } catch { }
-				};
-				Action deleteFile = () => {
-					try { File.Delete(path); } catch { }
-					if (File.Exists(backupPath)) {
-						try { File.Move(backupPath, path); } catch { }
+					if (!successful && createdFile) {
+						try { File.Delete(path); } catch { }
+						if (File.Exists(backupPath)) {
+							try { File.Move(backupPath, path); } catch { }
+						}
+					}
+					lock (_downloadAborters) {
+						_downloadAborters.Remove(downloadID);
+						removedDownloadAborter = true;
 					}
 				};
 
-				General.DownloadAsync(url, auth, null, connectionName, cacheLastModifiedTime,
+				Action abortDownload = General.DownloadAsync(url, auth, null, connectionGroupName, cacheLastModifiedTime,
 					(response) => {
 						if (File.Exists(path)) {
 							if (File.Exists(backupPath)) {
@@ -689,25 +701,22 @@ namespace ChanThreadWatch {
 						if (totalFileSize != null && downloadedFileSize != totalFileSize) {
 							fileStream.SetLength(downloadedFileSize);
 						}
-						closeStreams();
 						bool incompleteDownload = totalFileSize != null && downloadedFileSize != totalFileSize &&
 							(prevDownloadedFileSize == null || downloadedFileSize != prevDownloadedFileSize);
 						if (incompleteDownload) {
 							// Corrupt download, retry
 							prevDownloadedFileSize = downloadedFileSize;
-							deleteFile();
-							tryDownload();
-							return;
+							throw new Exception("Download is corrupt.");
 						}
+						cleanup(true);
+						OnDownloadEnd(new DownloadEndEventArgs(downloadID, downloadedFileSize, true));
 						encoding = General.DetectHTMLEncoding(pageBytes, httpCharSet);
 						replaceList = (Settings.SaveThumbnails != false) ? new List<ReplaceInfo>() : null;
 						content = General.HTMLBytesToString(pageBytes, encoding, replaceList);
-						OnDownloadEnd(new DownloadEndEventArgs(downloadID, downloadedFileSize, true));
 						endTryDownload(DownloadResult.Completed);
 					},
 					(ex) => {
-						closeStreams();
-						if (createdFile) deleteFile();
+						cleanup(false);
 						OnDownloadEnd(new DownloadEndEventArgs(downloadID, downloadedFileSize, false));
 						if (ex is HTTP304Exception) {
 							// Page not modified, skip
@@ -725,10 +734,16 @@ namespace ChanThreadWatch {
 						}
 						else {
 							// Other error, retry
-							connectionName = connectionManager.SwapForFreshConnection(connectionName, url);
+							connectionGroupName = connectionManager.SwapForFreshConnection(connectionGroupName, url);
 							tryDownload();
 						}
 					});
+
+				lock (_downloadAborters) {
+					if (!removedDownloadAborter) {
+						_downloadAborters[downloadID] = abortDownload;
+					}
+				}
 			};
 
 			tryDownload();
@@ -736,7 +751,7 @@ namespace ChanThreadWatch {
 
 		private void DownloadFileAsync(string path, string url, string auth, string referer, HashType hashType, byte[] correctHash, DownloadFileEndCallback onDownloadEnd) {
 			ConnectionManager connectionManager = ConnectionManager.GetInstance(url);
-			string connectionName = connectionManager.ObtainConnectionGroupName();
+			string connectionGroupName = connectionManager.ObtainConnectionGroupName();
 
 			int tryNumber = 0;
 			byte[] prevHash = null;
@@ -745,7 +760,7 @@ namespace ChanThreadWatch {
 			Action tryDownload = null;
 			tryDownload = () => {
 				Action<DownloadResult> endTryDownload = (result) => {
-					connectionManager.ReleaseConnectionGroupName(connectionName);
+					connectionManager.ReleaseConnectionGroupName(connectionGroupName);
 					onDownloadEnd(result);
 				};
 
@@ -755,22 +770,26 @@ namespace ChanThreadWatch {
 					return;
 				}
 
-				long downloadID = (long)(General.Calculate64BitMD5(Encoding.UTF8.GetBytes(String.Join(" ",
-					new[] { url, TickCount.Now.ToString(), tryNumber.ToString() }))) & 0x7FFFFFFFFFFFFFFFUL);
+				long downloadID = (long)(General.BytesTo64BitXor(Guid.NewGuid().ToByteArray()) & 0x7FFFFFFFFFFFFFFFUL);
 				FileStream fileStream = null;
 				long? totalFileSize = null;
 				long downloadedFileSize = 0;
 				bool createdFile = false;
 				HashGeneratorStream hashStream = null;
-				Action closeStreams = () => {
+				bool removedDownloadAborter = false;
+				Action<bool> cleanup = (successful) => {
 					if (fileStream != null) try { fileStream.Close(); } catch { }
 					if (hashStream != null) try { hashStream.Close(); } catch { }
-				};
-				Action deleteFile = () => {
-					try { File.Delete(path); } catch { }
+					if (!successful && createdFile) {
+						try { File.Delete(path); } catch { }
+					}
+					lock (_downloadAborters) {
+						_downloadAborters.Remove(downloadID);
+						removedDownloadAborter = true;
+					}
 				};
 
-				General.DownloadAsync(url, auth, referer, connectionName, null,
+				Action abortDownload = General.DownloadAsync(url, auth, referer, connectionGroupName, null,
 					(response) => {
 						fileStream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read);
 						if (response.ContentLength != -1) {
@@ -794,7 +813,6 @@ namespace ChanThreadWatch {
 						if (totalFileSize != null && downloadedFileSize != totalFileSize) {
 							fileStream.SetLength(downloadedFileSize);
 						}
-						closeStreams();
 						bool incorrectHash = hashType != HashType.None && !General.ArraysAreEqual(hash, correctHash) &&
 							(prevHash == null || !General.ArraysAreEqual(hash, prevHash));
 						bool incompleteDownload = totalFileSize != null && downloadedFileSize != totalFileSize &&
@@ -803,16 +821,14 @@ namespace ChanThreadWatch {
 							// Corrupt download, retry
 							prevHash = hash;
 							prevDownloadedFileSize = downloadedFileSize;
-							deleteFile();
-							tryDownload();
-							return;
+							throw new Exception("Download is corrupt.");
 						}
+						cleanup(true);
 						OnDownloadEnd(new DownloadEndEventArgs(downloadID, downloadedFileSize, true));
 						endTryDownload(DownloadResult.Completed);
 					},
 					(ex) => {
-						closeStreams();
-						if (createdFile) deleteFile();
+						cleanup(false);
 						OnDownloadEnd(new DownloadEndEventArgs(downloadID, downloadedFileSize, false));
 						if (ex is HTTP404Exception || ex is PathTooLongException) {
 							// Fatal problem with this file, skip
@@ -825,10 +841,16 @@ namespace ChanThreadWatch {
 						}
 						else {
 							// Other error, retry
-							connectionName = connectionManager.SwapForFreshConnection(connectionName, url);
+							connectionGroupName = connectionManager.SwapForFreshConnection(connectionGroupName, url);
 							tryDownload();
 						}
 					});
+
+				lock (_downloadAborters) {
+					if (!removedDownloadAborter) {
+						_downloadAborters[downloadID] = abortDownload;
+					}
+				}
 			};
 
 			tryDownload();
