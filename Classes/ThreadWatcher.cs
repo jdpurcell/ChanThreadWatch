@@ -18,6 +18,7 @@ namespace ChanThreadWatch {
 		private StopReason _stopReason;
 		private Dictionary<long, Action> _downloadAborters = new Dictionary<long, Action>();
 		private bool _hasRun;
+		private bool _hasInitialized;
 		private ManualResetEvent _checkFinishedEvent = new ManualResetEvent(true);
 		private bool _isWaiting;
 		private string _pageURL;
@@ -25,11 +26,11 @@ namespace ChanThreadWatch {
 		private string _imageAuth;
 		private bool _oneTimeDownload;
 		private int _checkIntervalSeconds;
+		private int _minCheckIntervalSeconds;
 		private string _mainDownloadDir = Settings.AbsoluteDownloadDir;
 		private string _threadDownloadDir;
 		private long _nextCheckTicks;
 		private string _description = String.Empty;
-		private bool _renameThreadDownloadDir;
 		private object _tag;
 
 		static ThreadWatcher() {
@@ -92,6 +93,17 @@ namespace ChanThreadWatch {
 			set { SetSetting(out _threadDownloadDir, value, false, false); }
 		}
 
+		private bool ThreadDownloadDirectoryPendingRename {
+			get {
+				lock (_settingsSync) {
+					return Settings.RenameDownloadFolderWithDescription == true &&
+						!String.IsNullOrEmpty(_threadDownloadDir) &&
+						!String.IsNullOrEmpty(_description) &&
+						!String.Equals(General.GetLastDirectory(_threadDownloadDir), General.CleanFileName(_description), StringComparison.Ordinal);
+				}
+			}
+		}
+
 		public int MillisecondsUntilNextCheck {
 			get { return Math.Max((int)(NextCheckTicks - TickCount.Now), 0); }
 			set { NextCheckTicks = TickCount.Now + value; }
@@ -114,10 +126,9 @@ namespace ChanThreadWatch {
 			set {
 				lock (_settingsSync) {
 					_description = value;
-					if (_hasRun && Settings.RenameDownloadFolderWithDescription == true) {
-						_renameThreadDownloadDir = true;
-						TryRenameThreadDownloadDir();
-					}
+				}
+				if (ThreadDownloadDirectoryPendingRename) {
+					TryRenameThreadDownloadDir(false);
 				}
 			}
 		}
@@ -266,14 +277,12 @@ namespace ChanThreadWatch {
 			if (evt != null) try { evt(this, e); } catch { }
 		}
 
-		private bool _hasInitialized;
 		private List<PageInfo> _pageList;
 		private HashSet<string> _imageDiskFileNames;
 		private Dictionary<string, DownloadInfo> _completedImages;
 		private Dictionary<string, DownloadInfo> _completedThumbs;
 		private int _maxFileNameLength;
 		private string _threadName;
-		private int _minCheckIntervalSeconds;
 
 		private void Check() {
 			try {
@@ -282,48 +291,48 @@ namespace ChanThreadWatch {
 				string imageDir;
 				string thumbDir;
 
-				lock (_settingsSync) {
-					_nextCheckWorkItem = null;
-					_checkFinishedEvent.Reset();
-					_isWaiting = false;
+				try {
+					lock (_settingsSync) {
+						_nextCheckWorkItem = null;
+						_checkFinishedEvent.Reset();
+						_isWaiting = false;
+
+						if (!_hasInitialized) {
+							siteHelper.SetURL(_pageURL);
+
+							_pageList = new List<PageInfo> {
+								new PageInfo {
+									URL = _pageURL
+								}
+							};
+							_imageDiskFileNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+							_completedImages = new Dictionary<string, DownloadInfo>(StringComparer.OrdinalIgnoreCase);
+							_completedThumbs = new Dictionary<string, DownloadInfo>(StringComparer.OrdinalIgnoreCase);
+							_maxFileNameLength = 0;
+							_threadName = siteHelper.GetThreadName();
+
+							if (String.IsNullOrEmpty(_threadDownloadDir)) {
+								_threadDownloadDir = Path.Combine(_mainDownloadDir, General.CleanFileName(String.Format(
+									"{0}_{1}_{2}", siteHelper.GetSiteName(), siteHelper.GetBoardName(), _threadName)));
+								if (!Directory.Exists(_threadDownloadDir)) {
+									Directory.CreateDirectory(_threadDownloadDir);
+								}
+							}
+							if (String.IsNullOrEmpty(_description)) {
+								_description = General.GetLastDirectory(_threadDownloadDir);
+							}
+							_minCheckIntervalSeconds = siteHelper.IsBoardHighTurnover() ? 30 : 60;
+							_checkIntervalSeconds = Math.Max(_checkIntervalSeconds, _minCheckIntervalSeconds);
+
+							_hasInitialized = true;
+						}
+					}
 				}
-
-				if (!_hasInitialized) {
-					siteHelper.SetURL(PageURL);
-
-					_pageList = new List<PageInfo>();
-					_imageDiskFileNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-					_completedImages = new Dictionary<string, DownloadInfo>(StringComparer.OrdinalIgnoreCase);
-					_completedThumbs = new Dictionary<string, DownloadInfo>(StringComparer.OrdinalIgnoreCase);
-					_maxFileNameLength = 0;
-					_threadName = siteHelper.GetThreadName();
-					_minCheckIntervalSeconds = siteHelper.IsBoardHighTurnover() ? 30 : 60;
-
-					if (String.IsNullOrEmpty(ThreadDownloadDirectory)) {
-						lock (_settingsSync) {
-							_threadDownloadDir = Path.Combine(MainDownloadDirectory, General.CleanFileName(String.Format(
-								"{0}_{1}_{2}", siteHelper.GetSiteName(), siteHelper.GetBoardName(), _threadName)));
-						}
-						if (!Directory.Exists(ThreadDownloadDirectory)) {
-							try {
-								Directory.CreateDirectory(ThreadDownloadDirectory);
-							}
-							catch {
-								Stop(StopReason.IOError);
-							}
-						}
+				catch (Exception ex) {
+					if (ex is IOException || ex is UnauthorizedAccessException) {
+						Stop(StopReason.IOError);
 					}
-					if (String.IsNullOrEmpty(Description)) {
-						lock (_settingsSync) {
-							_description = General.GetLastDirectory(_threadDownloadDir);
-						}
-					}
-
-					_pageList.Add(new PageInfo {
-						URL = PageURL
-					});
-
-					_hasInitialized = true;
+					else throw;
 				}
 
 				threadDir = ThreadDownloadDirectory;
@@ -435,7 +444,7 @@ namespace ChanThreadWatch {
 					OnDownloadStatus(new DownloadStatusEventArgs(DownloadType.Page, pageIndex, _pageList.Count));
 				}
 
-				MillisecondsUntilNextCheck = Math.Max(CheckIntervalSeconds, _minCheckIntervalSeconds) * 1000;
+				MillisecondsUntilNextCheck = CheckIntervalSeconds * 1000;
 
 				if (pendingImages.Count != 0 && !IsStopping) {
 					if (_maxFileNameLength == 0) {
@@ -599,11 +608,11 @@ namespace ChanThreadWatch {
 				Stop(StopReason.Other);
 			}
 
+			if (ThreadDownloadDirectoryPendingRename) {
+				TryRenameThreadDownloadDir(true);
+			}
 			lock (_settingsSync) {
 				_checkFinishedEvent.Set();
-				if (_renameThreadDownloadDir) {
-					TryRenameThreadDownloadDir();
-				}
 				if (!IsStopping) {
 					_nextCheckWorkItem = _workScheduler.AddItem(NextCheckTicks, Check, PageHost);
 					_isWaiting = MillisecondsUntilNextCheck > 0;
@@ -617,23 +626,32 @@ namespace ChanThreadWatch {
 			}
 		}
 
-		private void TryRenameThreadDownloadDir() {
+		private void TryRenameThreadDownloadDir(bool calledFromCheck) {
+			bool renamedDir = false;
 			lock (_settingsSync) {
-				if (!_checkFinishedEvent.WaitOne(0, false) || String.IsNullOrEmpty(_threadDownloadDir) ||
+				if ((!calledFromCheck && !_checkFinishedEvent.WaitOne(0, false)) ||
+					String.IsNullOrEmpty(_threadDownloadDir) ||
+					String.IsNullOrEmpty(_description) ||
 					(IsStopping && (StopReason == StopReason.IOError || StopReason == StopReason.Exiting)))
 				{
 					return;
 				}
 				try {
 					string destDir = Path.Combine(General.RemoveLastDirectory(_threadDownloadDir), General.CleanFileName(_description));
-					if (!destDir.Equals(_threadDownloadDir, StringComparison.OrdinalIgnoreCase)) {
-						Directory.Move(_threadDownloadDir, destDir);
-						_threadDownloadDir = destDir;
-						OnThreadDownloadDirectoryRename(EventArgs.Empty);
+					if (String.Equals(destDir, _threadDownloadDir, StringComparison.Ordinal)) return;
+					if (String.Equals(destDir, _threadDownloadDir, StringComparison.OrdinalIgnoreCase)) {
+						Directory.Move(_threadDownloadDir, destDir + " Temp");
+						_threadDownloadDir = destDir + " Temp";
+						renamedDir = true;
 					}
-					_renameThreadDownloadDir = false;
+					Directory.Move(_threadDownloadDir, destDir);
+					_threadDownloadDir = destDir;
+					renamedDir = true;
 				}
 				catch { }
+			}
+			if (renamedDir) {
+				OnThreadDownloadDirectoryRename(EventArgs.Empty);
 			}
 		}
 
@@ -742,7 +760,7 @@ namespace ChanThreadWatch {
 							Stop(StopReason.PageNotFound);
 							endTryDownload(DownloadResult.Skipped);
 						}
-						else if (ex is DirectoryNotFoundException || ex is PathTooLongException || ex is UnauthorizedAccessException) {
+						else if (ex is IOException || ex is UnauthorizedAccessException) {
 							// Fatal IO error, stop
 							Stop(StopReason.IOError);
 							endTryDownload(DownloadResult.Skipped);
@@ -845,13 +863,13 @@ namespace ChanThreadWatch {
 					(ex) => {
 						cleanup(false);
 						OnDownloadEnd(new DownloadEndEventArgs(downloadID, downloadedFileSize, false));
-						if (ex is HTTP404Exception || ex is PathTooLongException) {
-							// Fatal problem with this file, skip
-							endTryDownload(DownloadResult.Skipped);
-						}
-						else if (ex is DirectoryNotFoundException || ex is UnauthorizedAccessException) {
+						if (ex is DirectoryNotFoundException || ex is UnauthorizedAccessException) {
 							// Fatal IO error, stop
 							Stop(StopReason.IOError);
+							endTryDownload(DownloadResult.Skipped);
+						}
+						else if (ex is HTTP404Exception || ex is IOException) {
+							// Fatal problem with this file, skip
 							endTryDownload(DownloadResult.Skipped);
 						}
 						else {

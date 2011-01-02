@@ -108,12 +108,11 @@ namespace ChanThreadWatch {
 			}
 			catch { }
 
-			// Send the stop notifications before the final save of the thread list so that
-			// the watchers know not to change anything (e.g. rename thread download folder)
 			foreach (ThreadWatcher watcher in ThreadWatchers) {
 				watcher.Stop(StopReason.Exiting);
 			}
 
+			// Save before waiting in addition to after in case the wait hangs or is interrupted
 			SaveThreadList();
 
 			_isExiting = true;
@@ -122,6 +121,8 @@ namespace ChanThreadWatch {
 					Application.DoEvents();
 				}
 			}
+
+			SaveThreadList();
 
 			Program.ReleaseMutex();
 		}
@@ -222,6 +223,7 @@ namespace ChanThreadWatch {
 		}
 
 		private void miEditDescription_Click(object sender, EventArgs e) {
+			if (_isExiting) return;
 			foreach (ThreadWatcher watcher in SelectedThreadWatchers) {
 				using (frmThreadDescription descriptionForm = new frmThreadDescription()) {
 					descriptionForm.Description = watcher.Description;
@@ -335,6 +337,7 @@ namespace ChanThreadWatch {
 		}
 
 		private void btnSettings_Click(object sender, EventArgs e) {
+			if (_isExiting) return;
 			using (frmSettings settingsForm = new frmSettings()) {
 				settingsForm.ShowDialog(this);
 			}
@@ -426,7 +429,7 @@ namespace ChanThreadWatch {
 		}
 
 		private void tmrSaveThreadList_Tick(object sender, EventArgs e) {
-			if (_saveThreadList) {
+			if (_saveThreadList && !_isExiting) {
 				SaveThreadList();
 				_saveThreadList = false;
 			}
