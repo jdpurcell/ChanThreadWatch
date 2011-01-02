@@ -25,5 +25,5 @@ namespace ChanThreadWatch {
 			}
 			DialogResult = DialogResult.OK;
 		}
-	}	
+	}
 }
