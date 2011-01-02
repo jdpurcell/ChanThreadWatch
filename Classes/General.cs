@@ -19,7 +19,7 @@ namespace ChanThreadWatch {
 
 		public static string ReleaseDate {
 			get {
-				return "2011-Jan-01";
+				return "2011-Jan-02";
 			}
 		}
 
@@ -38,7 +38,11 @@ namespace ChanThreadWatch {
 			HttpWebRequest request = null;
 			HttpWebResponse response = null;
 			Stream responseStream = null;
-			Action cleanupResponse = () => {
+			Action cleanup = () => {
+				if (request != null) {
+					request.Abort();
+					request = null;
+				}
 				if (responseStream != null) {
 					try { responseStream.Close(); } catch { }
 					responseStream = null;
@@ -48,19 +52,18 @@ namespace ChanThreadWatch {
 					response = null;
 				}
 			};
-			Action<Exception> abortDownloadCustom = (ex) => {
+			Action<Exception> abortDownloadInternal = (ex) => {
 				lock (sync) {
 					if (aborting) return;
 					aborting = true;
-					if (request != null && response == null) {
-						request.Abort();
-					}
-					cleanupResponse();
+					cleanup();
 					onException(ex);
 				}
 			};
 			Action abortDownload = () => {
-				abortDownloadCustom(new Exception("Download has been aborted."));
+				ThreadPool.QueueUserWorkItem((s) => {
+					abortDownloadInternal(new Exception("Download has been aborted."));
+				});
 			};
 			lock (sync) {
 				try {
@@ -90,13 +93,14 @@ namespace ChanThreadWatch {
 								readCallback = (readResultParam) => {
 									lock (sync) {
 										try {
+											if (aborting) return;
 											if (readResultParam != null) {
 												int bytesRead = responseStream.EndRead(readResultParam);
-												if (aborting) return;
 												if (bytesRead == 0) {
-													aborting = true;
-													cleanupResponse();
+													request = null;
 													onComplete();
+													aborting = true;
+													cleanup();
 													return;
 												}
 												onDownloadChunk(buff, bytesRead);
@@ -105,11 +109,11 @@ namespace ChanThreadWatch {
 											ThreadPool.RegisterWaitForSingleObject(readResult.AsyncWaitHandle,
 												(state, timedOut) => {
 													if (!timedOut) return;
-													abortDownloadCustom(new Exception("Timed out while reading response."));
+													abortDownloadInternal(new Exception("Timed out while reading response."));
 												}, null, readTimeoutMS, true);
 										}
 										catch (Exception ex) {
-											abortDownloadCustom(ex);
+											abortDownloadInternal(ex);
 										}
 									}
 								};
@@ -128,18 +132,18 @@ namespace ChanThreadWatch {
 										}
 									}
 								}
-								abortDownloadCustom(ex);
+								abortDownloadInternal(ex);
 							}
 						}
 					}, null);
 					ThreadPool.RegisterWaitForSingleObject(requestResult.AsyncWaitHandle,
 						(state, timedOut) => {
 							if (!timedOut) return;
-							abortDownloadCustom(new Exception("Timed out while waiting for response."));
+							abortDownloadInternal(new Exception("Timed out while waiting for response."));
 						}, null, requestTimeoutMS, true);
 				}
 				catch (Exception ex) {
-					abortDownloadCustom(ex);
+					abortDownloadInternal(ex);
 				}
 			}
 			return abortDownload;

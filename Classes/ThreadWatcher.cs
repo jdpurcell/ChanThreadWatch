@@ -153,8 +153,12 @@ namespace ChanThreadWatch {
 		}
 
 		public void Stop(StopReason reason) {
+			bool stoppingNow = false;
+			bool checkFinished = false;
+			List<Action> downloadAborters = null;
 			lock (_settingsSync) {
 				if (!IsStopping) {
+					stoppingNow = true;
 					_stopEvent.Set();
 					_stopReason = reason;
 					_hasRun = true;
@@ -162,16 +166,24 @@ namespace ChanThreadWatch {
 						_workScheduler.RemoveItem(_nextCheckWorkItem);
 						_nextCheckWorkItem = null;
 					}
-					List<Action> downloadAborters;
-					lock (_downloadAborters) {
-						downloadAborters = new List<Action>(_downloadAborters.Values);
+					checkFinished = _checkFinishedEvent.WaitOne(0, false);
+					if (checkFinished) {
+						_isWaiting = false;
 					}
+					else {
+						lock (_downloadAborters) {
+							downloadAborters = new List<Action>(_downloadAborters.Values);
+						}
+					}
+				}
+			}
+			if (stoppingNow) {
+				if (checkFinished) {
+					OnStopStatus(new StopStatusEventArgs(reason));
+				}
+				else {
 					foreach (Action abortDownload in downloadAborters) {
 						abortDownload();
-					}
-					if (_checkFinishedEvent.WaitOne(0, false)) {
-						_isWaiting = false;
-						OnStopStatus(new StopStatusEventArgs(reason));
 					}
 				}
 			}
