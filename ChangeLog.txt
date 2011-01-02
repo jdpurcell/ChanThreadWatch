@@ -1,3 +1,12 @@
+1.7.0 (2011-Jan-02):
+  * Added download progress window.
+  * Fixed broken image paths in HTML with folder renaming.
+  * Allows 30 second check interval on /b/.
+  * Allows multiple instances using different settings folders.
+  * Aborts downloads when stopping thread.
+  * Detects truncated downloads (hash check already caught this on 4chan).
+  * Prompts before opening more than 5 folders or URLs.
+  * Workarounds for several issues in Mono.
 1.6.0 (2010-Dec-18):
   * Replaced URL column with user customizable description.
   * Added "Last Image On" and "Added On" columns.
