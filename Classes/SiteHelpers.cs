@@ -46,11 +46,7 @@ namespace ChanThreadWatch {
 
 		public virtual string GetBoardName() {
 			string[] urlSplit = SplitURL();
-			return (urlSplit.Length > 2) ? urlSplit[1] : String.Empty;
-		}
-
-		public virtual bool IsBoardHighTurnover() {
-			return false;
+			return (urlSplit.Length >= 3) ? urlSplit[1] : String.Empty;
 		}
 
 		public virtual string GetThreadName() {
@@ -64,6 +60,14 @@ namespace ChanThreadWatch {
 				return page;
 			}
 			return String.Empty;
+		}
+
+		public virtual bool IsBoardHighTurnover() {
+			return false;
+		}
+
+		protected virtual string ImageURLKeyword {
+			get { return "/src/"; }
 		}
 
 		public virtual List<ImageInfo> GetImages(List<ReplaceInfo> replaceList, List<ThumbnailInfo> thumbnailList) {
@@ -81,7 +85,7 @@ namespace ChanThreadWatch {
 				attr = General.GetAttribute(elem, "href");
 				if (attr == null || String.IsNullOrEmpty(attr.Value)) continue;
 				url = General.ProperURL(_url, HttpUtility.HtmlDecode(attr.Value));
-				if (url == null || url.IndexOf("/src/", StringComparison.OrdinalIgnoreCase) == -1) continue;
+				if (url == null || url.IndexOf(ImageURLKeyword, StringComparison.OrdinalIgnoreCase) == -1) continue;
 
 				int linkEnd = General.FindElementClose(_html, "a", elem.Offset + 1);
 				if (linkEnd == -1) break;
@@ -243,6 +247,20 @@ namespace ChanThreadWatch {
 
 		public override bool IsBoardHighTurnover() {
 			return String.Equals(GetBoardName(), "b", StringComparison.OrdinalIgnoreCase);
+		}
+	}
+
+	public class SiteHelper_krautchan_net : SiteHelper {
+		public override string GetThreadName() {
+			string threadName = base.GetThreadName();
+			if (threadName.StartsWith("thread-", StringComparison.OrdinalIgnoreCase)) {
+				threadName = threadName.Substring(7);
+			}
+			return threadName;
+		}
+
+		protected override string ImageURLKeyword {
+			get { return "/files/"; }
 		}
 	}
 }
