@@ -13,7 +13,6 @@ namespace ChanThreadWatch {
 		public int Length { get; set; }
 		public string Name { get; set; }
 		public List<AttributeInfo> Attributes { get; set; }
-		public string InnerHTML { get; set; }
 	}
 
 	public class AttributeInfo {
@@ -71,13 +70,9 @@ namespace ChanThreadWatch {
 	}
 
 	public class HTTP404Exception : Exception {
-		public HTTP404Exception() {
-		}
 	}
 
 	public class HTTP304Exception : Exception {
-		public HTTP304Exception() {
-		}
 	}
 
 	public static class TickCount {
