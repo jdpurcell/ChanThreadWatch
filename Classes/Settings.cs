@@ -118,6 +118,10 @@ namespace ChanThreadWatch {
 			get { return "threads.txt"; }
 		}
 
+		public static string ThreadsFileNameNew {
+			get { return "threads.new.txt"; }
+		}
+
 		public static ThreadDoubleClickAction? OnThreadDoubleClick {
 			get {
 				int x = GetInt("OnThreadDoubleClick") ?? -1;

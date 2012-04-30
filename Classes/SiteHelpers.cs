@@ -80,14 +80,14 @@ namespace ChanThreadWatch {
 			string url;
 			int pos;
 
-			while ((elem = General.FindElement(_html, "a", offset)) != null) {
+			while ((elem = General.FindElement(_html, offset, "a")) != null) {
 				offset = elem.Offset + 1;
-				attr = General.GetAttribute(elem, "href");
+				attr = elem.GetAttribute("href");
 				if (attr == null || String.IsNullOrEmpty(attr.Value)) continue;
 				url = General.ProperURL(_url, HttpUtility.HtmlDecode(attr.Value));
 				if (url == null || url.IndexOf(ImageURLKeyword, StringComparison.OrdinalIgnoreCase) == -1) continue;
 
-				int linkEnd = General.FindElementClose(_html, "a", elem.Offset + 1);
+				int linkEnd = General.FindElementClose(_html, elem.Offset + 1, "a");
 				if (linkEnd == -1) break;
 
 				ImageInfo image = new ImageInfo();
@@ -115,9 +115,9 @@ namespace ChanThreadWatch {
 						});
 				}
 
-				elem = General.FindElement(_html, "img", elem.Offset + 1, linkEnd);
+				elem = General.FindElement(_html, elem.Offset + 1, linkEnd, "img");
 				if (elem != null) {
-					attr = General.GetAttribute(elem, "src");
+					attr = elem.GetAttribute("src");
 					if (attr != null && !String.IsNullOrEmpty(attr.Value)) {
 						url = General.ProperURL(_url, HttpUtility.HtmlDecode(attr.Value));
 						if (url != null) {
@@ -163,23 +163,28 @@ namespace ChanThreadWatch {
 			int offset = 0;
 			string value;
 
-			while ((elem = General.FindElement(_html, "span", offset)) != null) {
+			while ((elem = General.FindElement(_html, offset, "span", "div")) != null) {
 				offset = elem.Offset + 1;
-				value = General.GetAttributeValue(elem, "class");
-				if (value == null || !String.Equals(value, "filesize", StringComparison.OrdinalIgnoreCase)) {
-					continue;
+				value = elem.GetAttributeValue("class");
+				if (value == null) continue;
+				bool isNewHTML = elem.Name.Equals("div", StringComparison.OrdinalIgnoreCase) &&
+					value.Equals("fileInfo", StringComparison.OrdinalIgnoreCase);
+				if (!isNewHTML) {
+					bool isOldHTML = elem.Name.Equals("span", StringComparison.OrdinalIgnoreCase) &&
+						value.Equals("filesize", StringComparison.OrdinalIgnoreCase);
+					if (!isOldHTML) continue;
 				}
 
-				int postEnd = General.FindElementClose(_html, "blockquote", elem.Offset + 1);
+				int postEnd = General.FindElementClose(_html, elem.Offset + 1, "blockquote");
 				if (postEnd == -1) break;
 				offset = postEnd + 1;
 
 				ImageInfo image = new ImageInfo();
 				ThumbnailInfo thumb = new ThumbnailInfo();
 
-				elem = General.FindElement(_html, "a", elem.Offset + 1, postEnd);
+				elem = General.FindElement(_html, elem.Offset + 1, postEnd, "a");
 				if (elem == null) continue;
-				attr = General.GetAttribute(elem, "href");
+				attr = elem.GetAttribute("href");
 				if (attr == null || String.IsNullOrEmpty(attr.Value)) continue;
 				image.URL = General.ProperURL(_url, HttpUtility.HtmlDecode(attr.Value));
 				if (image.URL == null || image.FileName.Length == 0) continue;
@@ -194,15 +199,15 @@ namespace ChanThreadWatch {
 						});
 				}
 
-				elem = General.FindElement(_html, "span", elem.Offset + 1, postEnd);
+				elem = General.FindElement(_html, elem.Offset + 1, postEnd, "span");
 				if (elem == null) continue;
-				value = General.GetAttributeValue(elem, "title");
+				value = elem.GetAttributeValue("title");
 				if (String.IsNullOrEmpty(value)) continue;
 				image.OriginalFileName = General.CleanFileName(HttpUtility.HtmlDecode(value));
 
-				elem = General.FindElement(_html, "a", elem.Offset + 1, postEnd);
+				elem = General.FindElement(_html, elem.Offset + 1, postEnd, "a");
 				if (elem == null) continue;
-				attr = General.GetAttribute(elem, "href");
+				attr = elem.GetAttribute("href");
 				if (attr == null || String.IsNullOrEmpty(attr.Value)) continue;
 				if (replaceList != null) {
 					replaceList.Add(
@@ -214,9 +219,9 @@ namespace ChanThreadWatch {
 						});
 				}
 
-				elem = General.FindElement(_html, "img", elem.Offset + 1, postEnd);
+				elem = General.FindElement(_html, elem.Offset + 1, postEnd, "img");
 				if (elem == null) continue;
-				attr = General.GetAttribute(elem, "src");
+				attr = elem.GetAttribute("src");
 				if (attr == null || String.IsNullOrEmpty(attr.Value)) continue;
 				thumb.URL = General.ProperURL(_url, HttpUtility.HtmlDecode(attr.Value));
 				if (thumb.URL == null) continue;
@@ -230,7 +235,7 @@ namespace ChanThreadWatch {
 							Tag = thumb.FileName
 						});
 				}
-				value = General.GetAttributeValue(elem, "md5");
+				value = elem.GetAttributeValue(isNewHTML ? "data-md5" : "md5");
 				if (String.IsNullOrEmpty(value)) continue;
 				try {
 					image.Hash = Convert.FromBase64String(value);

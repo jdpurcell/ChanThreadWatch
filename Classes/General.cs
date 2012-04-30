@@ -7,6 +7,7 @@ using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
+using System.Web;
 
 namespace ChanThreadWatch {
 	public static class General {
@@ -284,22 +285,22 @@ namespace ChanThreadWatch {
 			ElementInfo elem;
 			string value;
 			int headClose;
-			elem = FindElement(html, "?xml", 0);
+			elem = FindElement(html, 0, "?xml");
 			if (elem != null && elem.Offset <= 4) { // Allow for 3 byte BOM and 1 space preceding
-				value = General.GetAttributeValue(elem, "encoding");
+				value = elem.GetAttributeValue("encoding");
 				if (!String.IsNullOrEmpty(value)) {
 					return value;
 				}
 			}
-			headClose = FindElementClose(html, "head", 0);
+			headClose = FindElementClose(html, 0, "head");
 			if (headClose != -1) {
 				int offset = 0;
-				while ((elem = FindElement(html, "meta", offset, headClose)) != null) {
+				while ((elem = FindElement(html, offset, headClose, "meta")) != null) {
 					offset = elem.Offset + 1;
-					value = GetAttributeValue(elem, "http-equiv");
+					value = elem.GetAttributeValue("http-equiv");
 					if (String.IsNullOrEmpty(value)) continue;
 					if (!value.Trim().Equals("Content-Type", StringComparison.OrdinalIgnoreCase)) continue;
-					value = GetAttributeValue(elem, "content");
+					value = elem.GetAttributeValue("content");
 					if (!String.IsNullOrEmpty(value)) {
 						value = GetCharSetFromContentType(value);
 						if (value != null) {
@@ -546,24 +547,38 @@ namespace ChanThreadWatch {
 			}
 		}
 
-		public static void AddOtherReplaces(string html, List<ReplaceInfo> replaceList) {
+		public static void AddOtherReplaces(string html, string url, List<ReplaceInfo> replaceList) {
 			ElementInfo elem;
 			int offset;
 
 			offset = 0;
-			while ((elem = FindElement(html, "base", offset)) != null) {
+			while ((elem = FindElement(html, offset, "base", "link")) != null) {
 				offset = elem.Offset + 1;
-				replaceList.Add(
-					new ReplaceInfo {
-						Offset = elem.Offset,
-						Length = elem.Length,
-						Type = ReplaceType.Other,
-						Value = String.Empty
-					});
+				if (elem.Name.Equals("base", StringComparison.OrdinalIgnoreCase)) {
+					replaceList.Add(
+						new ReplaceInfo {
+							Offset = elem.Offset,
+							Length = elem.Length,
+							Type = ReplaceType.Other,
+							Value = String.Empty
+						});
+				}
+				else if (elem.Name.Equals("link", StringComparison.OrdinalIgnoreCase)) {
+					AttributeInfo hrefAttr = elem.GetAttribute("href");
+					if (hrefAttr != null) {
+						replaceList.Add(
+							new ReplaceInfo {
+								Offset = hrefAttr.Offset,
+								Length = hrefAttr.Length,
+								Type = ReplaceType.Other,
+								Value = "href=\"" + General.ProperURL(url, HttpUtility.HtmlDecode(hrefAttr.Value)) + "\""
+							});
+					}
+				}
 			}
 		}
 
-		public static ElementInfo FindElement(string html, string name, int offset, int htmlLen) {
+		public static ElementInfo FindElement(string html, int offset, int htmlLen, params string[] names) {
 			ElementInfo elem = new ElementInfo();
 
 			elem.Attributes = new List<AttributeInfo>();
@@ -577,7 +592,11 @@ namespace ChanThreadWatch {
 				pos = elementStart + 1;
 				if (pos < htmlLen && html[pos] == ' ') pos++;
 				int nameEnd = html.IndexOfAny(new[] { ' ', '>' }, pos);
-				if (nameEnd == -1 || nameEnd - pos != name.Length || String.Compare(html, pos, name, 0, name.Length, StringComparison.OrdinalIgnoreCase) != 0) goto NextElement;
+				if (nameEnd == -1) goto NextElement;
+				int nameLength = nameEnd - pos;
+				bool nameIsMatch = Array.Exists(names, n => n.Length == nameLength &&
+					String.Compare(html, pos, n, 0, n.Length, StringComparison.OrdinalIgnoreCase) == 0);
+				if (!nameIsMatch) goto NextElement;
 
 				elem.Offset = elementStart;
 				elem.Name = html.Substring(pos, nameEnd - pos);
@@ -637,11 +656,11 @@ namespace ChanThreadWatch {
 			return null;
 		}
 
-		public static ElementInfo FindElement(string html, string name, int offset) {
-			return FindElement(html, name, offset, html.Length);
+		public static ElementInfo FindElement(string html, int offset, params string[] names) {
+			return FindElement(html, offset, html.Length, names);
 		}
 
-		public static int FindElementClose(string html, string name, int offset, int htmlLen) {
+		public static int FindElementClose(string html, int offset, int htmlLen, string name) {
 			while (offset < htmlLen) {
 				int pos;
 
@@ -672,22 +691,8 @@ namespace ChanThreadWatch {
 			return -1;
 		}
 
-		public static int FindElementClose(string html, string name, int offset) {
-			return FindElementClose(html, name, offset, html.Length);
-		}
-
-		public static AttributeInfo GetAttribute(ElementInfo element, string attributeName) {
-			foreach (AttributeInfo attr in element.Attributes) {
-				if (attr.Name.Equals(attributeName, StringComparison.OrdinalIgnoreCase)) {
-					return attr;
-				}
-			}
-			return null;
-		}
-
-		public static string GetAttributeValue(ElementInfo element, string attributeName) {
-			AttributeInfo attr = GetAttribute(element, attributeName);
-			return (attr != null) ? attr.Value : null;
+		public static int FindElementClose(string html, int offset, string name) {
+			return FindElementClose(html, offset, html.Length, name);
 		}
 
 		public static string URLFileName(string url) {

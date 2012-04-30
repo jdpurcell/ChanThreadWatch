@@ -810,7 +810,9 @@ namespace ChanThreadWatch {
 
 		private void SaveThreadList() {
 			try {
-				using (StreamWriter sw = new StreamWriter(Path.Combine(Settings.GetSettingsDir(), Settings.ThreadsFileName))) {
+				string threadsPath = Path.Combine(Settings.GetSettingsDir(), Settings.ThreadsFileName);
+				string threadsPathNew = Path.Combine(Settings.GetSettingsDir(), Settings.ThreadsFileNameNew);
+				using (StreamWriter sw = new StreamWriter(threadsPathNew)) {
 					sw.WriteLine("3"); // File version
 					foreach (ThreadWatcher watcher in ThreadWatchers) {
 						WatcherExtraData extraData = (WatcherExtraData)watcher.Tag;
@@ -826,6 +828,8 @@ namespace ChanThreadWatch {
 						sw.WriteLine(extraData.LastImageOn != null ? extraData.LastImageOn.Value.ToUniversalTime().Ticks.ToString() : String.Empty);
 					}
 				}
+				File.Delete(threadsPath);
+				File.Move(threadsPathNew, threadsPath);
 			}
 			catch { }
 		}

@@ -13,6 +13,20 @@ namespace ChanThreadWatch {
 		public int Length { get; set; }
 		public string Name { get; set; }
 		public List<AttributeInfo> Attributes { get; set; }
+
+		public AttributeInfo GetAttribute(string attributeName) {
+			foreach (AttributeInfo attr in Attributes) {
+				if (attr.Name.Equals(attributeName, StringComparison.OrdinalIgnoreCase)) {
+					return attr;
+				}
+			}
+			return null;
+		}
+
+		public string GetAttributeValue(string attributeName) {
+			AttributeInfo attr = GetAttribute(attributeName);
+			return (attr != null) ? attr.Value : null;
+		}
 	}
 
 	public class AttributeInfo {

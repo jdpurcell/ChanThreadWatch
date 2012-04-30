@@ -588,11 +588,11 @@ namespace ChanThreadWatch {
 									replace.Value = "src=\"" + HttpUtility.HtmlAttributeEncode(getRelativeDownloadPath(thumbDir)) + "\"";
 								}
 							}
-							General.AddOtherReplaces(pageContent, pageInfo.ReplaceList);
+							General.AddOtherReplaces(pageContent, pageInfo.URL, pageInfo.ReplaceList);
 							using (StreamWriter sw = new StreamWriter(pageInfo.Path, false, pageInfo.Encoding)) {
 								General.WriteReplacedString(pageContent, pageInfo.ReplaceList, sw);
 							}
-							if (General.FindElementClose(pageContent, "html", 0) != -1 && File.Exists(pageInfo.Path + ".bak")) {
+							if (General.FindElementClose(pageContent, 0, "html") != -1 && File.Exists(pageInfo.Path + ".bak")) {
 								try { File.Delete(pageInfo.Path + ".bak"); }
 								catch { }
 							}
