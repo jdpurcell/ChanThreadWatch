@@ -613,13 +613,20 @@ namespace ChanThreadWatch {
 		private string FormatURLFromUser(string url) {
 			url = url.Trim();
 			if (url.Length == 0) return null;
+			url = HttpUtility.HtmlDecode(url);
 			if (!url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
 				!url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
 			{
 				url = "http://" + url;
 			}
 			if (url.IndexOf('/', url.IndexOf("//") + 2) == -1) return null;
-			return General.ProperURL(HttpUtility.HtmlDecode(url));
+			try {
+				UriBuilder ub = new UriBuilder(url);
+				ub.Fragment = String.Empty;
+				url = ub.Uri.AbsoluteUri;
+			}
+			catch { return null; }
+			return url;
 		}
 
 		private void RemoveThreads(bool removeCompleted, bool removeSelected) {
@@ -810,26 +817,25 @@ namespace ChanThreadWatch {
 
 		private void SaveThreadList() {
 			try {
-				string threadsPath = Path.Combine(Settings.GetSettingsDir(), Settings.ThreadsFileName);
-				string threadsPathNew = Path.Combine(Settings.GetSettingsDir(), Settings.ThreadsFileNameNew);
-				using (StreamWriter sw = new StreamWriter(threadsPathNew)) {
-					sw.WriteLine("3"); // File version
-					foreach (ThreadWatcher watcher in ThreadWatchers) {
-						WatcherExtraData extraData = (WatcherExtraData)watcher.Tag;
-						sw.WriteLine(watcher.PageURL);
-						sw.WriteLine(watcher.PageAuth);
-						sw.WriteLine(watcher.ImageAuth);
-						sw.WriteLine(watcher.CheckIntervalSeconds.ToString());
-						sw.WriteLine(watcher.OneTimeDownload ? "1" : "0");
-						sw.WriteLine(watcher.ThreadDownloadDirectory != null ? General.GetRelativeDirectoryPath(watcher.ThreadDownloadDirectory, watcher.MainDownloadDirectory) : String.Empty);
-						sw.WriteLine((watcher.IsStopping && watcher.StopReason != StopReason.Exiting) ? ((int)watcher.StopReason).ToString() : String.Empty);
-						sw.WriteLine(watcher.Description);
-						sw.WriteLine(extraData.AddedOn.ToUniversalTime().Ticks.ToString());
-						sw.WriteLine(extraData.LastImageOn != null ? extraData.LastImageOn.Value.ToUniversalTime().Ticks.ToString() : String.Empty);
-					}
+				// Prepare lines before writing file so that an exception can't result
+				// in a partially written file.
+				List<string> lines = new List<string>();
+				lines.Add("3"); // File version
+				foreach (ThreadWatcher watcher in ThreadWatchers) {
+					WatcherExtraData extraData = (WatcherExtraData)watcher.Tag;
+					lines.Add(watcher.PageURL);
+					lines.Add(watcher.PageAuth);
+					lines.Add(watcher.ImageAuth);
+					lines.Add(watcher.CheckIntervalSeconds.ToString());
+					lines.Add(watcher.OneTimeDownload ? "1" : "0");
+					lines.Add(watcher.ThreadDownloadDirectory != null ? General.GetRelativeDirectoryPath(watcher.ThreadDownloadDirectory, watcher.MainDownloadDirectory) : String.Empty);
+					lines.Add((watcher.IsStopping && watcher.StopReason != StopReason.Exiting) ? ((int)watcher.StopReason).ToString() : String.Empty);
+					lines.Add(watcher.Description);
+					lines.Add(extraData.AddedOn.ToUniversalTime().Ticks.ToString());
+					lines.Add(extraData.LastImageOn != null ? extraData.LastImageOn.Value.ToUniversalTime().Ticks.ToString() : String.Empty);
 				}
-				File.Delete(threadsPath);
-				File.Move(threadsPathNew, threadsPath);
+				string path = Path.Combine(Settings.GetSettingsDir(), Settings.ThreadsFileName);
+				File.WriteAllLines(path, lines.ToArray());
 			}
 			catch { }
 		}

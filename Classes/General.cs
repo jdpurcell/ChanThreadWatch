@@ -380,24 +380,18 @@ namespace ChanThreadWatch {
 			return true;
 		}
 
-		public static string ProperURL(string absoluteURL) {
+		public static string GetAbsoluteURL(string baseURL, string relativeURL) {
 			try {
-				UriBuilder ub = new UriBuilder(absoluteURL);
-				ub.Fragment = String.Empty;
-				return Uri.UnescapeDataString(ub.Uri.ToString());
+				return new Uri(new Uri(baseURL), relativeURL).AbsoluteUri;
 			}
 			catch {
 				return null;
 			}
 		}
 
-		public static string ProperURL(string baseURL, string relativeURL) {
-			try {
-				return ProperURL(new Uri(new Uri(baseURL), relativeURL).AbsoluteUri);
-			}
-			catch {
-				return null;
-			}
+		public static string MakeAttributeURLAbsolute(string baseURL, string attributeValue) {
+			string absoluteURL = GetAbsoluteURL(baseURL, HttpUtility.HtmlDecode(attributeValue));
+			return absoluteURL != null ? HttpUtility.HtmlAttributeEncode(absoluteURL) : attributeValue;
 		}
 
 		public static string GetRelativeDirectoryPath(string dir, string baseDir) {
@@ -548,11 +542,16 @@ namespace ChanThreadWatch {
 		}
 
 		public static void AddOtherReplaces(string html, string url, List<ReplaceInfo> replaceList) {
+			HashSet<int> existingOffsets = new HashSet<int>();
 			ElementInfo elem;
 			int offset;
 
+			foreach (ReplaceInfo replace in replaceList) {
+				existingOffsets.Add(replace.Offset);
+			}
+
 			offset = 0;
-			while ((elem = FindElement(html, offset, "base", "link")) != null) {
+			while ((elem = FindElement(html, offset, "base", "a", "img", "script", "link")) != null) {
 				offset = elem.Offset + 1;
 				if (elem.Name.Equals("base", StringComparison.OrdinalIgnoreCase)) {
 					replaceList.Add(
@@ -563,16 +562,22 @@ namespace ChanThreadWatch {
 							Value = String.Empty
 						});
 				}
-				else if (elem.Name.Equals("link", StringComparison.OrdinalIgnoreCase)) {
-					AttributeInfo hrefAttr = elem.GetAttribute("href");
-					if (hrefAttr != null) {
-						replaceList.Add(
-							new ReplaceInfo {
-								Offset = hrefAttr.Offset,
-								Length = hrefAttr.Length,
-								Type = ReplaceType.Other,
-								Value = "href=\"" + General.ProperURL(url, HttpUtility.HtmlDecode(hrefAttr.Value)) + "\""
-							});
+				else {
+					bool usesHRefAttr = elem.Name.Equals("a", StringComparison.OrdinalIgnoreCase) ||
+						elem.Name.Equals("link", StringComparison.OrdinalIgnoreCase);
+					bool usesSrcAttr = elem.Name.Equals("img", StringComparison.OrdinalIgnoreCase) ||
+						elem.Name.Equals("script", StringComparison.OrdinalIgnoreCase);
+					if (usesHRefAttr || usesSrcAttr) {
+						AttributeInfo attrInfo = elem.GetAttribute(usesHRefAttr ? "href" : usesSrcAttr ? "src" : null);
+						if (attrInfo != null && !existingOffsets.Contains(attrInfo.Offset)) {
+							replaceList.Add(
+								new ReplaceInfo {
+									Offset = attrInfo.Offset,
+									Length = attrInfo.Length,
+									Type = ReplaceType.Other,
+									Value = attrInfo.Name + "=\"" + General.MakeAttributeURLAbsolute(url, attrInfo.Value) + "\""
+								});
+						}
 					}
 				}
 			}

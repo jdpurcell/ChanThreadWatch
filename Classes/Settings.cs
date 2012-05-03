@@ -118,10 +118,6 @@ namespace ChanThreadWatch {
 			get { return "threads.txt"; }
 		}
 
-		public static string ThreadsFileNameNew {
-			get { return "threads.new.txt"; }
-		}
-
 		public static ThreadDoubleClickAction? OnThreadDoubleClick {
 			get {
 				int x = GetInt("OnThreadDoubleClick") ?? -1;
@@ -223,7 +219,7 @@ namespace ChanThreadWatch {
 				return;
 			}
 
-			using (StreamReader sr = new StreamReader(path, Encoding.UTF8)) {
+			using (StreamReader sr = File.OpenText(path)) {
 				string line, name, val;
 				int pos;
 
@@ -243,7 +239,7 @@ namespace ChanThreadWatch {
 
 		public static void Save() {
 			string path = Path.Combine(GetSettingsDir(), SettingsFileName);
-			using (StreamWriter sw = new StreamWriter(path, false, Encoding.UTF8)) {
+			using (StreamWriter sw = File.CreateText(path)) {
 				lock (_settings) {
 					foreach (KeyValuePair<string, string> kvp in _settings) {
 						sw.WriteLine(kvp.Key + "=" + kvp.Value);

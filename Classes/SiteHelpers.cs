@@ -84,7 +84,7 @@ namespace ChanThreadWatch {
 				offset = elem.Offset + 1;
 				attr = elem.GetAttribute("href");
 				if (attr == null || String.IsNullOrEmpty(attr.Value)) continue;
-				url = General.ProperURL(_url, HttpUtility.HtmlDecode(attr.Value));
+				url = General.GetAbsoluteURL(_url, HttpUtility.HtmlDecode(attr.Value));
 				if (url == null || url.IndexOf(ImageURLKeyword, StringComparison.OrdinalIgnoreCase) == -1) continue;
 
 				int linkEnd = General.FindElementClose(_html, elem.Offset + 1, "a");
@@ -119,7 +119,7 @@ namespace ChanThreadWatch {
 				if (elem != null) {
 					attr = elem.GetAttribute("src");
 					if (attr != null && !String.IsNullOrEmpty(attr.Value)) {
-						url = General.ProperURL(_url, HttpUtility.HtmlDecode(attr.Value));
+						url = General.GetAbsoluteURL(_url, HttpUtility.HtmlDecode(attr.Value));
 						if (url != null) {
 							thumb = new ThumbnailInfo();
 							thumb.URL = url;
@@ -186,7 +186,7 @@ namespace ChanThreadWatch {
 				if (elem == null) continue;
 				attr = elem.GetAttribute("href");
 				if (attr == null || String.IsNullOrEmpty(attr.Value)) continue;
-				image.URL = General.ProperURL(_url, HttpUtility.HtmlDecode(attr.Value));
+				image.URL = General.GetAbsoluteURL(_url, HttpUtility.HtmlDecode(attr.Value));
 				if (image.URL == null || image.FileName.Length == 0) continue;
 				image.Referer = _url;
 				if (replaceList != null) {
@@ -223,7 +223,7 @@ namespace ChanThreadWatch {
 				if (elem == null) continue;
 				attr = elem.GetAttribute("src");
 				if (attr == null || String.IsNullOrEmpty(attr.Value)) continue;
-				thumb.URL = General.ProperURL(_url, HttpUtility.HtmlDecode(attr.Value));
+				thumb.URL = General.GetAbsoluteURL(_url, HttpUtility.HtmlDecode(attr.Value));
 				if (thumb.URL == null) continue;
 				thumb.Referer = _url;
 				if (replaceList != null) {
