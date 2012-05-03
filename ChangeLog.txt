@@ -1,3 +1,8 @@
+1.7.1 (2012-May-03):
+  * Supports 4chan's new HTML.
+  * HTML post-processing makes most URLs absolute for better display and
+    functionality of saved HTML (e.g. external stylesheet/scripts).
+  * Supports Krautchan.
 1.7.0 (2011-Jan-02):
   * Added download progress window.
   * Fixed broken image paths in HTML with folder renaming.
