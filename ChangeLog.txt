@@ -3,6 +3,7 @@
   * HTML post-processing makes most URLs absolute for better display and
     functionality of saved HTML (e.g. external stylesheet/scripts).
   * Supports Krautchan.
+  * Supports loading on .NET 4.0 runtime (not required; still 2.0 compatible).
 1.7.0 (2011-Jan-02):
   * Added download progress window.
   * Fixed broken image paths in HTML with folder renaming.
