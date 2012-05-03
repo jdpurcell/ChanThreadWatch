@@ -621,9 +621,8 @@ namespace ChanThreadWatch {
 			}
 			if (url.IndexOf('/', url.IndexOf("//") + 2) == -1) return null;
 			try {
-				UriBuilder ub = new UriBuilder(url);
-				ub.Fragment = String.Empty;
-				url = ub.Uri.AbsoluteUri;
+				// Strip fragment
+				url = new Uri(url).GetLeftPart(UriPartial.Query);
 			}
 			catch { return null; }
 			return url;

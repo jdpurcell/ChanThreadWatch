@@ -20,7 +20,7 @@ namespace ChanThreadWatch {
 
 		public static string ReleaseDate {
 			get {
-				return "2011-Jan-02";
+				return "2012-May-03";
 			}
 		}
 
@@ -384,14 +384,7 @@ namespace ChanThreadWatch {
 			try {
 				return new Uri(new Uri(baseURL), relativeURL).AbsoluteUri;
 			}
-			catch {
-				return null;
-			}
-		}
-
-		public static string MakeAttributeURLAbsolute(string baseURL, string attributeValue) {
-			string absoluteURL = GetAbsoluteURL(baseURL, HttpUtility.HtmlDecode(attributeValue));
-			return absoluteURL != null ? HttpUtility.HtmlAttributeEncode(absoluteURL) : attributeValue;
+			catch { return null; }
 		}
 
 		public static string GetRelativeDirectoryPath(string dir, string baseDir) {
@@ -541,7 +534,7 @@ namespace ChanThreadWatch {
 			}
 		}
 
-		public static void AddOtherReplaces(string html, string url, List<ReplaceInfo> replaceList) {
+		public static void AddOtherReplaces(string html, string pageURL, List<ReplaceInfo> replaceList) {
 			HashSet<int> existingOffsets = new HashSet<int>();
 			ElementInfo elem;
 			int offset;
@@ -563,20 +556,32 @@ namespace ChanThreadWatch {
 						});
 				}
 				else {
-					bool usesHRefAttr = elem.Name.Equals("a", StringComparison.OrdinalIgnoreCase) ||
-						elem.Name.Equals("link", StringComparison.OrdinalIgnoreCase);
-					bool usesSrcAttr = elem.Name.Equals("img", StringComparison.OrdinalIgnoreCase) ||
-						elem.Name.Equals("script", StringComparison.OrdinalIgnoreCase);
+					bool isAElem = elem.Name.Equals("a", StringComparison.OrdinalIgnoreCase);
+					bool isImgElem = elem.Name.Equals("img", StringComparison.OrdinalIgnoreCase);
+					bool isScriptElem = elem.Name.Equals("script", StringComparison.OrdinalIgnoreCase);
+					bool isLinkElem = elem.Name.Equals("link", StringComparison.OrdinalIgnoreCase);
+					bool usesHRefAttr = isAElem || isLinkElem;
+					bool usesSrcAttr = isImgElem || isScriptElem;
 					if (usesHRefAttr || usesSrcAttr) {
 						AttributeInfo attrInfo = elem.GetAttribute(usesHRefAttr ? "href" : usesSrcAttr ? "src" : null);
 						if (attrInfo != null && !existingOffsets.Contains(attrInfo.Offset)) {
-							replaceList.Add(
-								new ReplaceInfo {
-									Offset = attrInfo.Offset,
-									Length = attrInfo.Length,
-									Type = ReplaceType.Other,
-									Value = attrInfo.Name + "=\"" + General.MakeAttributeURLAbsolute(url, attrInfo.Value) + "\""
-								});
+							// Make attribute's URL absolute
+							string newURL = GetAbsoluteURL(pageURL, HttpUtility.HtmlDecode(attrInfo.Value));
+							// For links to anchors on the current page, use just the fragment
+							if (isAElem && newURL != null && newURL.Length > pageURL.Length &&
+								newURL.StartsWith(pageURL, StringComparison.Ordinal) && newURL[pageURL.Length] == '#')
+							{
+								newURL = newURL.Substring(pageURL.Length);
+							}
+							if (newURL != null) {
+								replaceList.Add(
+									new ReplaceInfo {
+										Offset = attrInfo.Offset,
+										Length = attrInfo.Length,
+										Type = ReplaceType.Other,
+										Value = attrInfo.Name + "=\"" + HttpUtility.HtmlAttributeEncode(newURL) + "\""
+									});
+							}
 						}
 					}
 				}
