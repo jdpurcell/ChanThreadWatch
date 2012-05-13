@@ -118,10 +118,9 @@ namespace JDP {
 				return html;
 			}
 			char[] dst = new char[html.Length];
-			int iSrc = 0;
 			int iDst = 0;
-			while (iSrc < html.Length) {
-				char c = html[iSrc++];
+			for (int iSrc = 0; iSrc < html.Length; iSrc++) {
+				char c = html[iSrc];
 				if (c == '\n' && iSrc >= 1 && html[iSrc - 1] == '\r') {
 					// Skip line feed following carriage return
 					continue;
