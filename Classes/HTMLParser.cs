@@ -9,7 +9,7 @@ namespace JDP {
 
 		public HTMLParser(string html) {
 			_preprocessedHTML = Preprocess(html);
-			_tags = new List<HTMLTag>(ParseTags(html, 0, html.Length));
+			_tags = new List<HTMLTag>(ParseTags(_preprocessedHTML, 0, _preprocessedHTML.Length));
 			for (int i = 0; i < _tags.Count; i++) {
 				_offsetToIndex.Add(_tags[i].Offset, i);
 			}
