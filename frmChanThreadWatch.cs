@@ -343,7 +343,7 @@ namespace JDP {
 		}
 
 		private void btnAbout_Click(object sender, EventArgs e) {
-			MessageBox.Show(String.Format("Chan Thread Watch{0}Version {1} ({2}){0}jart1126@yahoo.com{0}{3}",
+			MessageBox.Show(String.Format("Chan Thread Watch{0}Version {1} ({2}){0}Author: JDP (jart1126@yahoo.com){0}{3}",
 				Environment.NewLine, General.Version, General.ReleaseDate, General.ProgramURL), "About",
 				MessageBoxButtons.OK, MessageBoxIcon.Information);
 		}
