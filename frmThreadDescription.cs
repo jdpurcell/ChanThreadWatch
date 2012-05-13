@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Windows.Forms;
 
-namespace ChanThreadWatch {
+namespace JDP {
 	public partial class frmThreadDescription : Form {
 		public frmThreadDescription() {
 			InitializeComponent();

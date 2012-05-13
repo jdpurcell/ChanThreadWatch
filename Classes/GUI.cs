@@ -4,7 +4,7 @@ using System.Drawing;
 using System.Reflection;
 using System.Windows.Forms;
 
-namespace ChanThreadWatch {
+namespace JDP {
 	public class WatcherExtraData {
 		public ListViewItem ListViewItem { get; set; }
 		public DateTime AddedOn { get; set; }

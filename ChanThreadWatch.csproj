@@ -8,7 +8,7 @@
     <ProjectGuid>{1DAC6953-5A72-45F4-8677-3F2B0A15F32A}</ProjectGuid>
     <OutputType>WinExe</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>ChanThreadWatch</RootNamespace>
+    <RootNamespace>JDP</RootNamespace>
     <AssemblyName>ChanThreadWatch</AssemblyName>
     <TargetFrameworkVersion>v2.0</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
@@ -39,6 +39,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Classes\GUI.cs" />
+    <Compile Include="Classes\HTMLParser.cs" />
     <Compile Include="Classes\Other.cs" />
     <Compile Include="Classes\SiteHelpers.cs" />
     <Compile Include="Classes\General.cs" />

@@ -6,7 +6,7 @@ using System.Text;
 using System.Threading;
 using System.Web;
 
-namespace ChanThreadWatch {
+namespace JDP {
 	public class ThreadWatcher {
 		private const int _maxDownloadTries = 3;
 
@@ -40,7 +40,7 @@ namespace ChanThreadWatch {
 			// Shouldn't matter since the limit is supposed to be per connection group
 			ServicePointManager.DefaultConnectionLimit = Int32.MaxValue;
 
-			// Ignore invalid certificates
+			// Ignore invalid certificates (workaround for Mono)
 			ServicePointManager.ServerCertificateValidationCallback = (s, cert, chain, errors) => true;
 		}
 
@@ -352,28 +352,28 @@ namespace ChanThreadWatch {
 				OnDownloadStatus(new DownloadStatusEventArgs(DownloadType.Page, 0, _pageList.Count));
 				while (pageIndex < _pageList.Count && !IsStopping) {
 					string saveFileName = General.CleanFileName(_threadName) + ((pageIndex == 0) ? String.Empty : ("_" + (pageIndex + 1))) + ".html";
-					string pageContent = null;
+					HTMLParser pageParser = null;
 
 					PageInfo pageInfo = _pageList[pageIndex];
 					pageInfo.Path = Path.Combine(threadDir, saveFileName);
 
 					ManualResetEvent downloadEndEvent = new ManualResetEvent(false);
-					DownloadPageEndCallback downloadEnd = (result, content, lastModifiedTime, encoding, replaceList) => {
+					DownloadPageEndCallback downloadEnd = (result, content, lastModifiedTime, encoding) => {
 						if (result == DownloadResult.Completed) {
 							pageInfo.IsFresh = true;
-							pageContent = content;
+							pageParser = new HTMLParser(content);
 							pageInfo.CacheTime = lastModifiedTime;
 							pageInfo.Encoding = encoding;
-							pageInfo.ReplaceList = replaceList;
+							pageInfo.ReplaceList = (Settings.SaveThumbnails != false) ? new List<ReplaceInfo>() : null;
 						}
 						downloadEndEvent.Set();
 					};
 					DownloadPageAsync(pageInfo.Path, pageInfo.URL, PageAuth, pageInfo.CacheTime, downloadEnd);
 					downloadEndEvent.WaitOne();
 
-					if (pageContent != null) {
+					if (pageParser != null) {
 						siteHelper.SetURL(pageInfo.URL);
-						siteHelper.SetHTML(pageContent);
+						siteHelper.SetHTMLParser(pageParser);
 
 						List<ThumbnailInfo> thumbs = new List<ThumbnailInfo>();
 						List<ImageInfo> images = siteHelper.GetImages(pageInfo.ReplaceList, thumbs);
@@ -573,7 +573,7 @@ namespace ChanThreadWatch {
 					if (!IsStopping || StopReason != StopReason.IOError) {
 						foreach (PageInfo pageInfo in _pageList) {
 							if (!pageInfo.IsFresh) continue;
-							string pageContent = General.HTMLBytesToString(File.ReadAllBytes(pageInfo.Path), pageInfo.Encoding);
+							HTMLParser htmlParser = new HTMLParser(File.ReadAllText(pageInfo.Path, pageInfo.Encoding));
 							for (int i = 0; i < pageInfo.ReplaceList.Count; i++) {
 								ReplaceInfo replace = pageInfo.ReplaceList[i];
 								DownloadInfo downloadInfo = null;
@@ -588,11 +588,11 @@ namespace ChanThreadWatch {
 									replace.Value = "src=\"" + HttpUtility.HtmlAttributeEncode(getRelativeDownloadPath(thumbDir)) + "\"";
 								}
 							}
-							General.AddOtherReplaces(pageContent, pageInfo.URL, pageInfo.ReplaceList);
+							General.AddOtherReplaces(htmlParser, pageInfo.URL, pageInfo.ReplaceList);
 							using (StreamWriter sw = new StreamWriter(pageInfo.Path, false, pageInfo.Encoding)) {
-								General.WriteReplacedString(pageContent, pageInfo.ReplaceList, sw);
+								General.WriteReplacedString(htmlParser.PreprocessedHTML, pageInfo.ReplaceList, sw);
 							}
-							if (General.FindElementClose(pageContent, 0, "html") != -1 && File.Exists(pageInfo.Path + ".bak")) {
+							if (htmlParser.FindEndTag("html") != null && File.Exists(pageInfo.Path + ".bak")) {
 								try { File.Delete(pageInfo.Path + ".bak"); }
 								catch { }
 							}
@@ -665,15 +665,14 @@ namespace ChanThreadWatch {
 
 			Action tryDownload = null;
 			tryDownload = () => {
-				string httpCharSet = null;
+				string httpContentType = null;
 				DateTime? lastModifiedTime = null;
 				Encoding encoding = null;
-				List<ReplaceInfo> replaceList = null;
 				string content = null;
 
 				Action<DownloadResult> endTryDownload = (result) => {
 					connectionManager.ReleaseConnectionGroupName(connectionGroupName);
-					onDownloadEnd(result, content, lastModifiedTime, encoding, replaceList);
+					onDownloadEnd(result, content, lastModifiedTime, encoding);
 				};
 
 				tryNumber++;
@@ -719,7 +718,7 @@ namespace ChanThreadWatch {
 						}
 						createdFile = true;
 						memoryStream = new MemoryStream();
-						httpCharSet = General.GetCharSetFromContentType(response.ContentType);
+						httpContentType = response.ContentType;
 						lastModifiedTime = General.GetResponseLastModifiedTime(response);
 						OnDownloadStart(new DownloadStartEventArgs(downloadID, url, tryNumber, totalFileSize));
 					},
@@ -743,9 +742,8 @@ namespace ChanThreadWatch {
 						}
 						cleanup(true);
 						OnDownloadEnd(new DownloadEndEventArgs(downloadID, downloadedFileSize, true));
-						encoding = General.DetectHTMLEncoding(pageBytes, httpCharSet);
-						replaceList = (Settings.SaveThumbnails != false) ? new List<ReplaceInfo>() : null;
-						content = General.HTMLBytesToString(pageBytes, encoding, replaceList);
+						encoding = General.DetectHTMLEncoding(pageBytes, httpContentType);
+						content = encoding.GetString(pageBytes);
 						endTryDownload(DownloadResult.Completed);
 					},
 					(ex) => {

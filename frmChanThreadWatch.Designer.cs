@@ -1,4 +1,4 @@
-﻿namespace ChanThreadWatch {
+﻿namespace JDP {
 	partial class frmChanThreadWatch {
 		/// <summary>
 		/// Required designer variable.
@@ -25,10 +25,10 @@
 		private void InitializeComponent() {
 			this.components = new System.ComponentModel.Container();
 			this.lvThreads = new System.Windows.Forms.ListView();
-			this.chDescription = new System.Windows.Forms.ColumnHeader();
-			this.chStatus = new System.Windows.Forms.ColumnHeader();
-			this.chLastImageOn = new System.Windows.Forms.ColumnHeader();
-			this.chAddedOn = new System.Windows.Forms.ColumnHeader();
+			this.chDescription = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
+			this.chStatus = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
+			this.chLastImageOn = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
+			this.chAddedOn = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
 			this.grpAddThread = new System.Windows.Forms.GroupBox();
 			this.lblCheckEvery = new System.Windows.Forms.Label();
 			this.cboCheckEvery = new System.Windows.Forms.ComboBox();
@@ -70,9 +70,9 @@
 			// lvThreads
 			// 
 			this.lvThreads.AllowColumnReorder = true;
-			this.lvThreads.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom)
-						| System.Windows.Forms.AnchorStyles.Left)
-						| System.Windows.Forms.AnchorStyles.Right)));
+			this.lvThreads.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
 			this.lvThreads.Columns.AddRange(new System.Windows.Forms.ColumnHeader[] {
             this.chDescription,
             this.chStatus,
@@ -86,10 +86,10 @@
 			this.lvThreads.TabIndex = 0;
 			this.lvThreads.UseCompatibleStateImageBehavior = false;
 			this.lvThreads.View = System.Windows.Forms.View.Details;
-			this.lvThreads.MouseDoubleClick += new System.Windows.Forms.MouseEventHandler(this.lvThreads_MouseDoubleClick);
-			this.lvThreads.MouseClick += new System.Windows.Forms.MouseEventHandler(this.lvThreads_MouseClick);
 			this.lvThreads.ColumnClick += new System.Windows.Forms.ColumnClickEventHandler(this.lvThreads_ColumnClick);
 			this.lvThreads.KeyDown += new System.Windows.Forms.KeyEventHandler(this.lvThreads_KeyDown);
+			this.lvThreads.MouseClick += new System.Windows.Forms.MouseEventHandler(this.lvThreads_MouseClick);
+			this.lvThreads.MouseDoubleClick += new System.Windows.Forms.MouseEventHandler(this.lvThreads_MouseDoubleClick);
 			// 
 			// chDescription
 			// 
@@ -431,9 +431,9 @@
 			this.SizeGripStyle = System.Windows.Forms.SizeGripStyle.Hide;
 			this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
 			this.Text = "Chan Thread Watch";
+			this.FormClosed += new System.Windows.Forms.FormClosedEventHandler(this.frmChanThreadWatch_FormClosed);
 			this.Shown += new System.EventHandler(this.frmChanThreadWatch_Shown);
 			this.DragDrop += new System.Windows.Forms.DragEventHandler(this.frmChanThreadWatch_DragDrop);
-			this.FormClosed += new System.Windows.Forms.FormClosedEventHandler(this.frmChanThreadWatch_FormClosed);
 			this.DragEnter += new System.Windows.Forms.DragEventHandler(this.frmChanThreadWatch_DragEnter);
 			this.grpAddThread.ResumeLayout(false);
 			this.grpAddThread.PerformLayout();

@@ -1,4 +1,4 @@
-﻿namespace ChanThreadWatch {
+﻿namespace JDP {
 	partial class frmSettings {
 		/// <summary>
 		/// Required designer variable.

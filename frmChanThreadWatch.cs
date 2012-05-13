@@ -5,11 +5,10 @@ using System.Drawing;
 using System.IO;
 using System.Text;
 using System.Threading;
-using System.Web;
 using System.Windows.Forms;
-using ChanThreadWatch.Properties;
+using JDP.Properties;
 
-namespace ChanThreadWatch {
+namespace JDP {
 	public partial class frmChanThreadWatch : Form {
 		private Dictionary<long, DownloadProgressInfo> _downloadProgresses = new Dictionary<long, DownloadProgressInfo>();
 		private frmDownloads _downloadForm;
@@ -151,7 +150,7 @@ namespace ChanThreadWatch {
 				byte[] data = ((MemoryStream)e.Data.GetData("UniformResourceLocator")).ToArray();
 				url = Encoding.Default.GetString(data, 0, General.StrLen(data));
 			}
-			url = FormatURLFromUser(url);
+			url = General.CleanPageURL(url);
 			if (url != null) {
 				AddThread(url);
 				_saveThreadList = true;
@@ -168,7 +167,7 @@ namespace ChanThreadWatch {
 		private void btnAdd_Click(object sender, EventArgs e) {
 			if (_isExiting) return;
 			if (txtPageURL.Text.Trim().Length == 0) return;
-			string pageURL = FormatURLFromUser(txtPageURL.Text);
+			string pageURL = General.CleanPageURL(txtPageURL.Text);
 			if (pageURL == null) {
 				MessageBox.Show("The specified URL is invalid.", "Invalid URL", MessageBoxButtons.OK, MessageBoxIcon.Error);
 				return;
@@ -194,7 +193,7 @@ namespace ChanThreadWatch {
 			}
 			string[] urls = text.Split(new [] { "\r\n", "\r", "\n" }, StringSplitOptions.RemoveEmptyEntries);
 			for (int iURL = 0; iURL < urls.Length; iURL++) {
-				string url = FormatURLFromUser(urls[iURL]);
+				string url = General.CleanPageURL(urls[iURL]);
 				if (url == null) continue;
 				AddThread(url);
 			}
@@ -608,24 +607,6 @@ namespace ChanThreadWatch {
 			}
 
 			return true;
-		}
-
-		private string FormatURLFromUser(string url) {
-			url = url.Trim();
-			if (url.Length == 0) return null;
-			url = HttpUtility.HtmlDecode(url);
-			if (!url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
-				!url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
-			{
-				url = "http://" + url;
-			}
-			if (url.IndexOf('/', url.IndexOf("//") + 2) == -1) return null;
-			try {
-				// Strip fragment
-				url = new Uri(url).GetLeftPart(UriPartial.Query);
-			}
-			catch { return null; }
-			return url;
 		}
 
 		private void RemoveThreads(bool removeCompleted, bool removeSelected) {

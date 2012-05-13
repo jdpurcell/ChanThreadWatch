@@ -4,7 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Reflection;
 
-namespace ChanThreadWatch {
+namespace JDP {
 	public static class Settings {
 		private const string _appName = "Chan Thread Watch";
 

@@ -9,7 +9,7 @@ using System.Text;
 using System.Threading;
 using System.Web;
 
-namespace ChanThreadWatch {
+namespace JDP {
 	public static class General {
 		public static string Version {
 			get {
@@ -20,7 +20,7 @@ namespace ChanThreadWatch {
 
 		public static string ReleaseDate {
 			get {
-				return "2012-May-03";
+				return "2012-May-13";
 			}
 		}
 
@@ -162,8 +162,8 @@ namespace ChanThreadWatch {
 				memoryStream = new MemoryStream();
 				CopyStream(responseStream, memoryStream);
 				byte[] pageBytes = memoryStream.ToArray();
-				Encoding encoding = DetectHTMLEncoding(pageBytes, GetCharSetFromContentType(response.ContentType));
-				return HTMLBytesToString(pageBytes, encoding);
+				Encoding encoding = DetectHTMLEncoding(pageBytes, response.ContentType);
+				return encoding.GetString(pageBytes);
 			}
 			finally {
 				if (responseStream != null) try { responseStream.Close(); } catch { }
@@ -185,46 +185,6 @@ namespace ChanThreadWatch {
 			}
 		}
 
-		// Converts all whitespace to regular spaces and only keeps 1 space consecutively.
-		// This simplifies parsing, e.g. in FindElement.  Also removes null characters, which
-		// helps DetectCharacterSet convert UTF16/UTF32 to an ASCII string.
-		public static string HTMLBytesToString(byte[] bytes, Encoding encoding, List<ReplaceInfo> replaceList) {
-			int preambleLen = encoding.GetPreamble().Length;
-			char[] src = encoding.GetChars(bytes, preambleLen, bytes.Length - preambleLen);
-			char[] dst = new char[src.Length];
-			int iDst = 0;
-			bool inWhiteSpace = false;
-			bool inNewLine = false;
-			for (int iSrc = 0; iSrc < src.Length; iSrc++) {
-				if (src[iSrc] == ' ' || src[iSrc] == '\r' || src[iSrc] == '\n' || src[iSrc] == '\t' || src[iSrc] == '\f') {
-					if (!inWhiteSpace) {
-						dst[iDst++] = ' ';
-					}
-					inWhiteSpace = true;
-					if ((src[iSrc] == '\r' || src[iSrc] == '\n') && !inNewLine && replaceList != null) {
-						replaceList.Add(
-							new ReplaceInfo {
-								Offset = iDst - 1,
-								Length = 1,
-								Value = Environment.NewLine,
-								Type = ReplaceType.NewLine
-							});
-						inNewLine = true;
-					}
-				}
-				else if (src[iSrc] != 0) {
-					dst[iDst++] = src[iSrc];
-					inWhiteSpace = false;
-					inNewLine = false;
-				}
-			}
-			return new string(dst, 0, iDst);
-		}
-
-		public static string HTMLBytesToString(byte[] bytes, Encoding encoding) {
-			return HTMLBytesToString(bytes, encoding, null);
-		}
-
 		public static DateTime? GetResponseLastModifiedTime(HttpWebResponse response) {
 			DateTime? lastModified = null;
 			if (response.Headers["Last-Modified"] != null) {
@@ -241,34 +201,17 @@ namespace ChanThreadWatch {
 			return lastModified;
 		}
 
-		public static Encoding DetectHTMLEncoding(byte[] bytes, string httpCharSet) {
-			string charSet = httpCharSet ?? DetectHTMLCharacterSet(bytes);
+		public static Encoding DetectHTMLEncoding(byte[] bytes, string httpContentType) {
+			string charSet =
+				GetCharSetFromContentType(httpContentType) ??
+				DetectCharacterSetFromBOM(bytes) ??
+				DetectCharacterSetFromContent(bytes, httpContentType);
 			if (charSet != null) {
-				if (IsUTF(charSet)) {
-					int bomLength;
-					bool? bomIsBE;
-					bool? charSetIsBE;
-					bool isBigEndian;
-					bool hasBOM;
-
-					bomLength = GetBOMLength(bytes, out bomIsBE);
-
-					if (charSet.EndsWith("BE", StringComparison.OrdinalIgnoreCase)) charSetIsBE = true;
-					else if (charSet.EndsWith("LE", StringComparison.OrdinalIgnoreCase)) charSetIsBE = false;
-					else charSetIsBE = null;
-
-					isBigEndian = bomIsBE ?? charSetIsBE ?? true;
-					hasBOM = bomLength != 0;
-
-					if (IsUTF8(charSet)) {
-						return new UTF8Encoding(hasBOM);
-					}
-					else if (IsUTF16(charSet)) {
-						return new UnicodeEncoding(isBigEndian, hasBOM);
-					}
-					else if (IsUTF32(charSet)) {
-						return new UTF32Encoding(isBigEndian, hasBOM);
-					}
+				if (IsUTF8(charSet)) {
+					return new UTF8Encoding(HasBOM(bytes));
+				}
+				else if (IsUTF16(charSet)) {
+					return new UnicodeEncoding(IsUTFBigEndian(charSet) ?? false, HasBOM(bytes));
 				}
 				else {
 					try {
@@ -277,79 +220,105 @@ namespace ChanThreadWatch {
 					catch { }
 				}
 			}
-			return Encoding.GetEncoding("iso-8859-1");
+			return Encoding.GetEncoding("Windows-1252");
 		}
 
-		private static string DetectHTMLCharacterSet(byte[] bytes) {
-			string html = HTMLBytesToString(bytes, Encoding.ASCII);
-			ElementInfo elem;
-			string value;
-			int headClose;
-			elem = FindElement(html, 0, "?xml");
-			if (elem != null && elem.Offset <= 4) { // Allow for 3 byte BOM and 1 space preceding
-				value = elem.GetAttributeValue("encoding");
-				if (!String.IsNullOrEmpty(value)) {
-					return value;
-				}
+		private static string DetectCharacterSetFromBOM(byte[] bytes) {
+			switch (GetBOMType(bytes)) {
+				case BOMType.UTF8: return "UTF-8";
+				case BOMType.UTF16LE: return "UTF-16LE";
+				case BOMType.UTF16BE: return "UTF-16BE";
+				default: return null;
 			}
-			headClose = FindElementClose(html, 0, "head");
-			if (headClose != -1) {
-				int offset = 0;
-				while ((elem = FindElement(html, offset, headClose, "meta")) != null) {
-					offset = elem.Offset + 1;
-					value = elem.GetAttributeValue("http-equiv");
-					if (String.IsNullOrEmpty(value)) continue;
-					if (!value.Trim().Equals("Content-Type", StringComparison.OrdinalIgnoreCase)) continue;
-					value = elem.GetAttributeValue("content");
-					if (!String.IsNullOrEmpty(value)) {
-						value = GetCharSetFromContentType(value);
-						if (value != null) {
-							return value;
-						}
+		}
+
+		private static string DetectCharacterSetFromContent(byte[] bytes, string httpContentType) {
+			string text = UnknownEncodingToString(bytes, 4096);
+			HTMLParser htmlParser = new HTMLParser(text);
+			string mimeType = GetMIMETypeFromContentType(httpContentType) ?? String.Empty;
+			string charSet;
+
+			if (mimeType.Equals("application/xhtml+xml", StringComparison.OrdinalIgnoreCase) ||
+				mimeType.Equals("application/xml", StringComparison.OrdinalIgnoreCase))
+			{
+				if (text.StartsWith("<?xml", StringComparison.OrdinalIgnoreCase)) {
+					// XML declaration
+					HTMLParser xmlParser = new HTMLParser("<" + text.Substring(2));
+					HTMLTag xmlTag = xmlParser.Tags.Count >= 1 ? xmlParser.Tags[0] : null;
+					if (xmlTag != null && xmlTag.NameEquals("xml") && xmlTag.Offset == 0) {
+						charSet = xmlTag.GetAttributeValue("encoding");
+						if (!String.IsNullOrEmpty(charSet)) return charSet;
 					}
-					break;
+				}
+
+				// Default
+				return "UTF-8";
+			}
+
+			foreach (HTMLTag tag in htmlParser.FindStartTags("meta")) {
+				// charset attribute
+				charSet = tag.GetAttributeValue("charset");
+				if (!String.IsNullOrEmpty(charSet)) return charSet;
+
+				// http-equiv and content attributes
+				if (tag.GetAttributeValueOrEmpty("http-equiv").Trim().Equals("Content-Type", StringComparison.OrdinalIgnoreCase)) {
+					charSet = GetCharSetFromContentType(tag.GetAttributeValue("content"));
+					if (!String.IsNullOrEmpty(charSet)) return charSet;
 				}
 			}
+
 			return null;
+		}
+
+		public static string GetMIMETypeFromContentType(string contentType) {
+			if (contentType == null) return null;
+			int pos = contentType.IndexOf(';');
+			if (pos != -1) {
+				contentType = contentType.Substring(0, pos);
+			}
+			contentType = contentType.Trim();
+			return contentType.Length != 0 ? contentType : null;
 		}
 
 		public static string GetCharSetFromContentType(string contentType) {
+			if (contentType == null) return null;
 			foreach (string part in contentType.Split(';')) {
-				if (part.TrimStart().StartsWith("charset", StringComparison.OrdinalIgnoreCase)) {
-					int pos = part.IndexOf('=');
-					if (pos != -1) {
-						string value = part.Substring(pos + 1).Trim();
-						if (value.Length != 0) {
-							return value;
-						}
-					}
+				int pos = part.IndexOf('=');
+				if (pos == -1) continue;
+				string name = part.Substring(0, pos).Trim();
+				if (!name.Equals("charset", StringComparison.OrdinalIgnoreCase)) continue;
+				string value = part.Substring(pos + 1).Trim();
+				bool isQuoted = value.Length >= 1 && (value[0] == '"' || value[0] == '\'');
+				if (isQuoted) {
+					pos = value.IndexOf(value[0], 1);
+					if (pos == -1) pos = value.Length;
+					value = value.Substring(1, pos - 1).Trim();
 				}
+				return value.Length != 0 ? value : null;
 			}
 			return null;
 		}
 
-		private static int GetBOMLength(byte[] bytes, out bool? isBigEndian) {
-			isBigEndian = null;
-			if (bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF) {
-				return 3;
+		public static string UnknownEncodingToString(byte[] src, int maxLength) {
+			byte[] dst = new byte[maxLength > 0 ? Math.Min(maxLength, src.Length) : src.Length];
+			int iDst = 0;
+			for (int iSrc = 0; iSrc < src.Length; iSrc++) {
+				if (src[iSrc] == 0) continue;
+				dst[iDst++] = src[iSrc];
+				if (iDst >= dst.Length) break;
 			}
-			if (bytes.Length >= 4 && bytes[0] == 0x00 && bytes[1] == 0x00 && bytes[2] == 0xFE && bytes[3] == 0xFF) {
-				isBigEndian = true;
-				return 4;
-			}
-			if (bytes.Length >= 4 && bytes[0] == 0xFF && bytes[1] == 0xFE && bytes[2] == 0x00 && bytes[3] == 0x00) {
-				isBigEndian = false;
-				return 4;
-			}
-			if (bytes.Length >= 2 && bytes[0] == 0xFE && bytes[1] == 0xFF) {
-				isBigEndian = true;
-				return 2;
-			}
-			if (bytes.Length >= 2 && bytes[0] == 0xFF && bytes[1] == 0xFE) {
-				isBigEndian = false;
-				return 2;
-			}
-			return 0;
+			return Encoding.ASCII.GetString(dst, 0, iDst);
+		}
+
+		private static BOMType GetBOMType(byte[] bytes) {
+			if (bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF) return BOMType.UTF8;
+			if (bytes.Length >= 2 && bytes[0] == 0xFF && bytes[1] == 0xFE) return BOMType.UTF16LE;
+			if (bytes.Length >= 2 && bytes[0] == 0xFE && bytes[1] == 0xFF) return BOMType.UTF16BE;
+			return BOMType.None;
+		}
+
+		private static bool HasBOM(byte[] bytes) {
+			return GetBOMType(bytes) != BOMType.None;
 		}
 
 		private static bool IsUTF8(string charSet) {
@@ -362,14 +331,10 @@ namespace ChanThreadWatch {
 				   charSet.Equals("UTF-16LE", StringComparison.OrdinalIgnoreCase);
 		}
 
-		private static bool IsUTF32(string charSet) {
-			return charSet.Equals("UTF-32", StringComparison.OrdinalIgnoreCase) ||
-				   charSet.Equals("UTF-32BE", StringComparison.OrdinalIgnoreCase) ||
-				   charSet.Equals("UTF-32LE", StringComparison.OrdinalIgnoreCase);
-		}
-
-		private static bool IsUTF(string charset) {
-			return IsUTF8(charset) || IsUTF16(charset) || IsUTF32(charset);
+		private static bool? IsUTFBigEndian(string charSet) {
+			if (charSet.EndsWith("BE", StringComparison.OrdinalIgnoreCase)) return true;
+			if (charSet.EndsWith("LE", StringComparison.OrdinalIgnoreCase)) return false;
+			return null;
 		}
 
 		public static bool ArraysAreEqual<T>(T[] a, T[] b) where T : IComparable {
@@ -381,10 +346,31 @@ namespace ChanThreadWatch {
 		}
 
 		public static string GetAbsoluteURL(string baseURL, string relativeURL) {
-			try {
-				return new Uri(new Uri(baseURL), relativeURL).AbsoluteUri;
+			Uri uri;
+			if (!Uri.TryCreate(new Uri(baseURL), relativeURL, out uri)) {
+				return null;
 			}
-			catch { return null; }
+			return uri.AbsoluteUri;
+		}
+
+		public static string StripFragmentFromURL(string url) {
+			int pos = url.IndexOf('#');
+			return pos != -1 ? url.Substring(0, pos) : url;
+		}
+
+		public static string CleanPageURL(string url) {
+			url = url.Trim();
+			url = StripFragmentFromURL(url);
+			if (url.Length == 0) return null;
+			if (!url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+				!url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+			{
+				url = "http://" + url;
+			}
+			if (url.IndexOf('/', url.IndexOf("//") + 2) == -1) return null;
+			Uri uri;
+			if (!Uri.TryCreate(url, UriKind.Absolute, out uri)) return null;
+			return uri.AbsoluteUri;
 		}
 
 		public static string GetRelativeDirectoryPath(string dir, string baseDir) {
@@ -395,7 +381,7 @@ namespace ChanThreadWatch {
 					dir = Uri.UnescapeDataString(baseDirUri.MakeRelativeUri(targetDirUri).ToString());
 				}
 				catch (UriFormatException) {
-					// Work-around for Mono when determining the relative URI of directories
+					// Workaround for Mono when determining the relative URI of directories
 					// on different drives in Windows.
 					return dir;
 				}
@@ -487,7 +473,7 @@ namespace ChanThreadWatch {
 				return true;
 			}
 			catch (DirectoryNotFoundException) {
-				// Work-around for Mono
+				// Workaround for Mono
 				return true;
 			}
 		}
@@ -534,175 +520,66 @@ namespace ChanThreadWatch {
 			}
 		}
 
-		public static void AddOtherReplaces(string html, string pageURL, List<ReplaceInfo> replaceList) {
+		public static void AddOtherReplaces(HTMLParser htmlParser, string pageURL, List<ReplaceInfo> replaceList) {
 			HashSet<int> existingOffsets = new HashSet<int>();
-			ElementInfo elem;
-			int offset;
 
 			foreach (ReplaceInfo replace in replaceList) {
 				existingOffsets.Add(replace.Offset);
 			}
 
-			offset = 0;
-			while ((elem = FindElement(html, offset, "base", "a", "img", "script", "link")) != null) {
-				offset = elem.Offset + 1;
-				if (elem.Name.Equals("base", StringComparison.OrdinalIgnoreCase)) {
-					replaceList.Add(
-						new ReplaceInfo {
-							Offset = elem.Offset,
-							Length = elem.Length,
-							Type = ReplaceType.Other,
-							Value = String.Empty
-						});
+			if (Environment.NewLine != "\n") {
+				int offset = 0;
+				while ((offset = htmlParser.PreprocessedHTML.IndexOf('\n', offset)) != -1) {
+					replaceList.Add(new ReplaceInfo {
+						Offset = offset,
+						Length = 1,
+						Type = ReplaceType.Other,
+						Value = Environment.NewLine
+					});
+					offset += 1;
 				}
-				else {
-					bool isAElem = elem.Name.Equals("a", StringComparison.OrdinalIgnoreCase);
-					bool isImgElem = elem.Name.Equals("img", StringComparison.OrdinalIgnoreCase);
-					bool isScriptElem = elem.Name.Equals("script", StringComparison.OrdinalIgnoreCase);
-					bool isLinkElem = elem.Name.Equals("link", StringComparison.OrdinalIgnoreCase);
-					bool usesHRefAttr = isAElem || isLinkElem;
-					bool usesSrcAttr = isImgElem || isScriptElem;
-					if (usesHRefAttr || usesSrcAttr) {
-						AttributeInfo attrInfo = elem.GetAttribute(usesHRefAttr ? "href" : usesSrcAttr ? "src" : null);
-						if (attrInfo != null && !existingOffsets.Contains(attrInfo.Offset)) {
-							// Make attribute's URL absolute
-							string newURL = GetAbsoluteURL(pageURL, HttpUtility.HtmlDecode(attrInfo.Value));
-							// For links to anchors on the current page, use just the fragment
-							if (isAElem && newURL != null && newURL.Length > pageURL.Length &&
-								newURL.StartsWith(pageURL, StringComparison.Ordinal) && newURL[pageURL.Length] == '#')
-							{
-								newURL = newURL.Substring(pageURL.Length);
-							}
-							if (newURL != null) {
-								replaceList.Add(
-									new ReplaceInfo {
-										Offset = attrInfo.Offset,
-										Length = attrInfo.Length,
-										Type = ReplaceType.Other,
-										Value = attrInfo.Name + "=\"" + HttpUtility.HtmlAttributeEncode(newURL) + "\""
-									});
-							}
+			}
+
+			foreach (HTMLTag tag in htmlParser.FindStartTags("base")) {
+				replaceList.Add(
+					new ReplaceInfo {
+						Offset = tag.Offset,
+						Length = tag.Length,
+						Type = ReplaceType.Other,
+						Value = String.Empty
+					});
+			}
+
+			foreach (HTMLTag tag in htmlParser.FindStartTags("a", "img", "script", "link")) {
+				bool isATag = tag.NameEquals("a");
+				bool isImgTag = tag.NameEquals("img");
+				bool isScriptTag = tag.NameEquals("script");
+				bool isLinkTag = tag.NameEquals("link");
+				bool usesHRefAttr = isATag || isLinkTag;
+				bool usesSrcAttr = isImgTag || isScriptTag;
+				if (usesHRefAttr || usesSrcAttr) {
+					HTMLAttribute attribute = tag.GetAttribute(usesHRefAttr ? "href" : usesSrcAttr ? "src" : null);
+					if (attribute != null && !existingOffsets.Contains(attribute.Offset)) {
+						// Make attribute's URL absolute
+						string newURL = GetAbsoluteURL(pageURL, HttpUtility.HtmlDecode(attribute.Value));
+						// For links to anchors on the current page, use just the fragment
+						if (isATag && newURL != null && newURL.Length > pageURL.Length &&
+							newURL.StartsWith(pageURL, StringComparison.Ordinal) && newURL[pageURL.Length] == '#')
+						{
+							newURL = newURL.Substring(pageURL.Length);
+						}
+						if (newURL != null) {
+							replaceList.Add(
+								new ReplaceInfo {
+									Offset = attribute.Offset,
+									Length = attribute.Length,
+									Type = ReplaceType.Other,
+									Value = attribute.Name + "=\"" + HttpUtility.HtmlAttributeEncode(newURL) + "\""
+								});
 						}
 					}
 				}
 			}
-		}
-
-		public static ElementInfo FindElement(string html, int offset, int htmlLen, params string[] names) {
-			ElementInfo elem = new ElementInfo();
-
-			elem.Attributes = new List<AttributeInfo>();
-
-			while (offset < htmlLen) {
-				int pos;
-
-				int elementStart = html.IndexOf('<', offset);
-				if (elementStart == -1) break;
-
-				pos = elementStart + 1;
-				if (pos < htmlLen && html[pos] == ' ') pos++;
-				int nameEnd = html.IndexOfAny(new[] { ' ', '>' }, pos);
-				if (nameEnd == -1) goto NextElement;
-				int nameLength = nameEnd - pos;
-				bool nameIsMatch = Array.Exists(names, n => n.Length == nameLength &&
-					String.Compare(html, pos, n, 0, n.Length, StringComparison.OrdinalIgnoreCase) == 0);
-				if (!nameIsMatch) goto NextElement;
-
-				elem.Offset = elementStart;
-				elem.Name = html.Substring(pos, nameEnd - pos);
-
-				pos = nameEnd;
-				while (pos < htmlLen) {
-					if (html[pos] == ' ') pos++;
-					if (pos < htmlLen && html[pos] == '>') {
-						elem.Length = (pos + 1) - elementStart;
-						return elem;
-					}
-
-					int attrNameEnd = html.IndexOfAny(new[] { ' ', '=', '>' }, pos);
-					if (attrNameEnd == -1) goto NextElement;
-
-					AttributeInfo attrInfo = new AttributeInfo();
-					attrInfo.Name = html.Substring(pos, attrNameEnd - pos);
-					attrInfo.Value = String.Empty;
-					attrInfo.Offset = pos;
-					attrInfo.Length = attrNameEnd - attrInfo.Offset;
-
-					pos = attrNameEnd;
-					if (html[pos] == ' ') pos++;
-					if (pos < htmlLen && html[pos] == '=') {
-						pos++;
-						if (pos < htmlLen && html[pos] == ' ') pos++;
-
-						int attrValEnd;
-						if (pos < htmlLen && html[pos] == '"') {
-							pos++;
-							attrValEnd = html.IndexOf('"', pos);
-						}
-						else if (pos < htmlLen && html[pos] == '\'') {
-							pos++;
-							attrValEnd = html.IndexOf('\'', pos);
-						}
-						else {
-							attrValEnd = html.IndexOfAny(new[] { ' ', '>' }, pos);
-						}
-						if (attrValEnd == -1) goto NextElement;
-
-						attrInfo.Value = html.Substring(pos, attrValEnd - pos);
-
-						pos = attrValEnd;
-						if (html[pos] == '"' || html[pos] == '\'') pos++;
-
-						attrInfo.Length = pos - attrInfo.Offset;
-					}
-
-					elem.Attributes.Add(attrInfo);
-				}
-
-			NextElement:
-				offset = elementStart + 1;
-			}
-
-			return null;
-		}
-
-		public static ElementInfo FindElement(string html, int offset, params string[] names) {
-			return FindElement(html, offset, html.Length, names);
-		}
-
-		public static int FindElementClose(string html, int offset, int htmlLen, string name) {
-			while (offset < htmlLen) {
-				int pos;
-
-				int elementStart = html.IndexOf('<', offset);
-				if (elementStart == -1) break;
-
-				pos = elementStart + 1;
-				if (pos < htmlLen && html[pos] == ' ') pos++;
-				if (pos < htmlLen && html[pos] == '/') pos++;
-				else goto NextElement;
-				if (pos < htmlLen && html[pos] == ' ') pos++;
-				if (htmlLen - pos >= name.Length &&
-					String.Compare(html, pos, name, 0, name.Length, StringComparison.OrdinalIgnoreCase) == 0)
-				{
-					pos += name.Length;
-				}
-				else goto NextElement;
-				if (pos < htmlLen && html[pos] == ' ') pos++;
-				if (pos < htmlLen && html[pos] == '>') pos++;
-				else goto NextElement;
-
-				return elementStart;
-
-			NextElement:
-				offset = elementStart + 1;
-			}
-
-			return -1;
-		}
-
-		public static int FindElementClose(string html, int offset, string name) {
-			return FindElementClose(html, offset, html.Length, name);
 		}
 
 		public static string URLFileName(string url) {

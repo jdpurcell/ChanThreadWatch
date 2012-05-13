@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading;
 using System.Windows.Forms;
 
-namespace ChanThreadWatch {
+namespace JDP {
 	static class Program {
 		private static Mutex _mutex;
 
@@ -36,7 +36,7 @@ namespace ChanThreadWatch {
 			}
 			catch (Exception ex) {
 				if (ex is ArgumentOutOfRangeException || ex is NotImplementedException) {
-					// Work-around for Mono.
+					// Workaround for Mono
 					useDefaultSecurity = true;
 				}
 				else {

@@ -7,35 +7,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 
-namespace ChanThreadWatch {
-	public class ElementInfo {
-		public int Offset { get; set; }
-		public int Length { get; set; }
-		public string Name { get; set; }
-		public List<AttributeInfo> Attributes { get; set; }
-
-		public AttributeInfo GetAttribute(string attributeName) {
-			foreach (AttributeInfo attr in Attributes) {
-				if (attr.Name.Equals(attributeName, StringComparison.OrdinalIgnoreCase)) {
-					return attr;
-				}
-			}
-			return null;
-		}
-
-		public string GetAttributeValue(string attributeName) {
-			AttributeInfo attr = GetAttribute(attributeName);
-			return (attr != null) ? attr.Value : null;
-		}
-	}
-
-	public class AttributeInfo {
-		public string Name { get; set; }
-		public string Value { get; set; }
-		public int Offset { get; set; }
-		public int Length { get; set; }
-	}
-
+namespace JDP {
 	public class ReplaceInfo {
 		public int Offset { get; set; }
 		public int Length { get; set; }
@@ -146,7 +118,7 @@ namespace ChanThreadWatch {
 				servicePoint.CloseConnectionGroup(name);
 			}
 			catch (NotImplementedException) {
-				// Work-around for Mono
+				// Workaround for Mono
 			}
 			return GetConnectionGroupName();
 		}
@@ -700,7 +672,7 @@ namespace ChanThreadWatch {
 
 	public delegate void DownloadFileEndCallback(DownloadResult result);
 
-	public delegate void DownloadPageEndCallback(DownloadResult result, string content, DateTime? lastModifiedTime, Encoding encoding, List<ReplaceInfo> replaceList);
+	public delegate void DownloadPageEndCallback(DownloadResult result, string content, DateTime? lastModifiedTime, Encoding encoding);
 
 	public delegate void Action();
 
@@ -733,10 +705,8 @@ namespace ChanThreadWatch {
 
 	public enum ReplaceType {
 		Other = 0,
-		NewLine = 1,
-		ImageLinkHref = 2,
-		ImageSrc = 3,
-		MetaContentType = 4
+		ImageLinkHref = 1,
+		ImageSrc = 2
 	}
 
 	public enum DownloadType {
@@ -758,5 +728,12 @@ namespace ChanThreadWatch {
 		PageNotFound = 3,
 		DownloadComplete = 4,
 		IOError = 5
+	}
+
+	public enum BOMType {
+		None = 0,
+		UTF8 = 1,
+		UTF16LE = 2,
+		UTF16BE = 3
 	}
 }

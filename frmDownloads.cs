@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Windows.Forms;
 
-namespace ChanThreadWatch {
+namespace JDP {
 	public partial class frmDownloads : Form {
 		private frmChanThreadWatch _parentForm;
 		private Dictionary<long, ListViewItem> _items = new Dictionary<long, ListViewItem>();

@@ -4,10 +4,10 @@ using System.Globalization;
 using System.Reflection;
 using System.Web;
 
-namespace ChanThreadWatch {
+namespace JDP {
 	public class SiteHelper {
 		protected string _url = String.Empty;
-		protected string _html = String.Empty;
+		protected HTMLParser _htmlParser;
 
 		public static SiteHelper GetInstance(string host) {
 			Type type = null;
@@ -29,8 +29,8 @@ namespace ChanThreadWatch {
 			_url = url;
 		}
 
-		public void SetHTML(string html) {
-			_html = html;
+		public void SetHTMLParser(HTMLParser htmlParser) {
+			_htmlParser = htmlParser;
 		}
 
 		protected string[] SplitURL() {
@@ -74,21 +74,18 @@ namespace ChanThreadWatch {
 			HashSet<string> imageFileNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 			HashSet<string> thumbnailFileNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 			List<ImageInfo> imageList = new List<ImageInfo>();
-			ElementInfo elem;
-			int offset = 0;
-			AttributeInfo attr;
+			HTMLAttribute attribute;
 			string url;
 			int pos;
 
-			while ((elem = General.FindElement(_html, offset, "a")) != null) {
-				offset = elem.Offset + 1;
-				attr = elem.GetAttribute("href");
-				if (attr == null || String.IsNullOrEmpty(attr.Value)) continue;
-				url = General.GetAbsoluteURL(_url, HttpUtility.HtmlDecode(attr.Value));
+			foreach (HTMLTag linkTag in _htmlParser.FindStartTags("a")) {
+				attribute = linkTag.GetAttribute("href");
+				if (attribute == null) continue;
+				url = General.GetAbsoluteURL(_url, HttpUtility.HtmlDecode(attribute.Value));
 				if (url == null || url.IndexOf(ImageURLKeyword, StringComparison.OrdinalIgnoreCase) == -1) continue;
 
-				int linkEnd = General.FindElementClose(_html, elem.Offset + 1, "a");
-				if (linkEnd == -1) break;
+				HTMLTag linkEndTag = _htmlParser.FindCorrespondingEndTag(linkTag);
+				if (linkEndTag == null) continue;
 
 				ImageInfo image = new ImageInfo();
 				ThumbnailInfo thumb = null;
@@ -108,18 +105,18 @@ namespace ChanThreadWatch {
 				if (replaceList != null) {
 					replaceList.Add(
 						new ReplaceInfo {
-							Offset = attr.Offset,
-							Length = attr.Length,
+							Offset = attribute.Offset,
+							Length = attribute.Length,
 							Type = ReplaceType.ImageLinkHref,
 							Tag = image.FileName
 						});
 				}
 
-				elem = General.FindElement(_html, elem.Offset + 1, linkEnd, "img");
-				if (elem != null) {
-					attr = elem.GetAttribute("src");
-					if (attr != null && !String.IsNullOrEmpty(attr.Value)) {
-						url = General.GetAbsoluteURL(_url, HttpUtility.HtmlDecode(attr.Value));
+				HTMLTag imageTag = _htmlParser.FindStartTag(linkTag, linkEndTag, "img");
+				if (imageTag != null) {
+					attribute = imageTag.GetAttribute("src");
+					if (attribute != null) {
+						url = General.GetAbsoluteURL(_url, HttpUtility.HtmlDecode(attribute.Value));
 						if (url != null) {
 							thumb = new ThumbnailInfo();
 							thumb.URL = url;
@@ -127,8 +124,8 @@ namespace ChanThreadWatch {
 							if (replaceList != null) {
 								replaceList.Add(
 									new ReplaceInfo {
-										Offset = attr.Offset,
-										Length = attr.Length,
+										Offset = attribute.Offset,
+										Length = attribute.Length,
 										Type = ReplaceType.ImageSrc,
 										Tag = thumb.FileName
 									});
@@ -158,85 +155,85 @@ namespace ChanThreadWatch {
 	public class SiteHelper_4chan_org : SiteHelper {
 		public override List<ImageInfo> GetImages(List<ReplaceInfo> replaceList, List<ThumbnailInfo> thumbnailList) {
 			List<ImageInfo> imageList = new List<ImageInfo>();
-			ElementInfo elem;
-			AttributeInfo attr;
-			int offset = 0;
+			HTMLAttribute attribute;
 			string value;
 
-			while ((elem = General.FindElement(_html, offset, "span", "div")) != null) {
-				offset = elem.Offset + 1;
-				value = elem.GetAttributeValue("class");
+			foreach (HTMLTag fileTextTag in _htmlParser.FindStartTags("span")) {
+				value = fileTextTag.GetAttributeValue("class");
 				if (value == null) continue;
-				bool isNewHTML = elem.Name.Equals("div", StringComparison.OrdinalIgnoreCase) &&
-					value.Equals("fileInfo", StringComparison.OrdinalIgnoreCase);
+				bool isNewHTML = HTMLParser.ClassAttributeValueHas(value, "fileText");
 				if (!isNewHTML) {
-					bool isOldHTML = elem.Name.Equals("span", StringComparison.OrdinalIgnoreCase) &&
-						value.Equals("filesize", StringComparison.OrdinalIgnoreCase);
+					bool isOldHTML = HTMLParser.ClassAttributeValueHas(value, "filesize");
 					if (!isOldHTML) continue;
 				}
 
-				int postEnd = General.FindElementClose(_html, elem.Offset + 1, "blockquote");
-				if (postEnd == -1) break;
-				offset = postEnd + 1;
+				HTMLTag commentEndTag = _htmlParser.FindEndTag(fileTextTag, null, "blockquote");
+				if (commentEndTag == null) continue;
+
+				HTMLTag fileInfoEndTag = _htmlParser.FindCorrespondingEndTag(fileTextTag, commentEndTag);
+				if (fileInfoEndTag == null) continue;
 
 				ImageInfo image = new ImageInfo();
 				ThumbnailInfo thumb = new ThumbnailInfo();
 
-				elem = General.FindElement(_html, elem.Offset + 1, postEnd, "a");
-				if (elem == null) continue;
-				attr = elem.GetAttribute("href");
-				if (attr == null || String.IsNullOrEmpty(attr.Value)) continue;
-				image.URL = General.GetAbsoluteURL(_url, HttpUtility.HtmlDecode(attr.Value));
+				HTMLTag textLinkTag = _htmlParser.FindStartTag(fileTextTag, fileInfoEndTag, "a");
+				if (textLinkTag == null) continue;
+				attribute = textLinkTag.GetAttribute("href");
+				if (attribute == null) continue;
+				image.URL = General.GetAbsoluteURL(_url, HttpUtility.HtmlDecode(attribute.Value));
 				if (image.URL == null || image.FileName.Length == 0) continue;
 				image.Referer = _url;
 				if (replaceList != null) {
 					replaceList.Add(
 						new ReplaceInfo {
-							Offset = attr.Offset,
-							Length = attr.Length,
+							Offset = attribute.Offset,
+							Length = attribute.Length,
 							Type = ReplaceType.ImageLinkHref,
 							Tag = image.FileName
 						});
 				}
 
-				elem = General.FindElement(_html, elem.Offset + 1, postEnd, "span");
-				if (elem == null) continue;
-				value = elem.GetAttributeValue("title");
-				if (String.IsNullOrEmpty(value)) continue;
+				HTMLTag fileNameTag = _htmlParser.FindStartTag(fileTextTag, fileInfoEndTag, "span");
+				if (fileNameTag == null) continue;
+				value = fileNameTag.GetAttributeValue("title");
+				if (value == null) continue;
 				image.OriginalFileName = General.CleanFileName(HttpUtility.HtmlDecode(value));
 
-				elem = General.FindElement(_html, elem.Offset + 1, postEnd, "a");
-				if (elem == null) continue;
-				attr = elem.GetAttribute("href");
-				if (attr == null || String.IsNullOrEmpty(attr.Value)) continue;
+				HTMLTag imageLinkTag = _htmlParser.FindStartTag(fileInfoEndTag, commentEndTag, "a");
+				if (imageLinkTag == null) continue;
+				attribute = imageLinkTag.GetAttribute("href");
+				if (attribute == null) continue;
 				if (replaceList != null) {
 					replaceList.Add(
 						new ReplaceInfo {
-							Offset = attr.Offset,
-							Length = attr.Length,
+							Offset = attribute.Offset,
+							Length = attribute.Length,
 							Type = ReplaceType.ImageLinkHref,
 							Tag = image.FileName
 						});
 				}
 
-				elem = General.FindElement(_html, elem.Offset + 1, postEnd, "img");
-				if (elem == null) continue;
-				attr = elem.GetAttribute("src");
-				if (attr == null || String.IsNullOrEmpty(attr.Value)) continue;
-				thumb.URL = General.GetAbsoluteURL(_url, HttpUtility.HtmlDecode(attr.Value));
+				HTMLTag imageLinkEndTag = _htmlParser.FindCorrespondingEndTag(imageLinkTag, commentEndTag);
+				if (imageLinkEndTag == null) continue;
+
+				HTMLTag imageThumbnailTag = _htmlParser.FindStartTag(imageLinkTag, imageLinkEndTag, "img");
+				if (imageThumbnailTag == null) continue;
+				attribute = imageThumbnailTag.GetAttribute("src");
+				if (attribute == null) continue;
+				thumb.URL = General.GetAbsoluteURL(_url, HttpUtility.HtmlDecode(attribute.Value));
 				if (thumb.URL == null) continue;
 				thumb.Referer = _url;
 				if (replaceList != null) {
 					replaceList.Add(
 						new ReplaceInfo {
-							Offset = attr.Offset,
-							Length = attr.Length,
+							Offset = attribute.Offset,
+							Length = attribute.Length,
 							Type = ReplaceType.ImageSrc,
 							Tag = thumb.FileName
 						});
 				}
-				value = elem.GetAttributeValue(isNewHTML ? "data-md5" : "md5");
-				if (String.IsNullOrEmpty(value)) continue;
+				value = imageThumbnailTag.GetAttributeValue(isNewHTML ? "data-md5" : "md5");
+				if (value == null) continue;
 				try {
 					image.Hash = Convert.FromBase64String(value);
 				}
