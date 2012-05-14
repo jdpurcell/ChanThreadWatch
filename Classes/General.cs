@@ -346,11 +346,15 @@ namespace JDP {
 		}
 
 		public static string GetAbsoluteURL(string baseURL, string relativeURL) {
-			Uri uri;
-			if (!Uri.TryCreate(new Uri(baseURL), relativeURL, out uri)) {
-				return null;
+			try {
+				Uri uri;
+				if (!Uri.TryCreate(new Uri(baseURL), relativeURL, out uri)) {
+					return null;
+				}
+				// AbsoluteUri can throw undocumented Exception (e.g. for "mailto:+")
+				return uri.AbsoluteUri;
 			}
-			return uri.AbsoluteUri;
+			catch { return null; }
 		}
 
 		public static string StripFragmentFromURL(string url) {
@@ -368,9 +372,12 @@ namespace JDP {
 				url = "http://" + url;
 			}
 			if (url.IndexOf('/', url.IndexOf("//") + 2) == -1) return null;
-			Uri uri;
-			if (!Uri.TryCreate(url, UriKind.Absolute, out uri)) return null;
-			return uri.AbsoluteUri;
+			try {
+				Uri uri;
+				if (!Uri.TryCreate(url, UriKind.Absolute, out uri)) return null;
+				return uri.AbsoluteUri;
+			}
+			catch { return null; }
 		}
 
 		public static string GetRelativeDirectoryPath(string dir, string baseDir) {
