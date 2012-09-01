@@ -152,7 +152,7 @@ namespace JDP {
 		}
 
 		public bool WaitOne(int timeout) {
-			QueueSync queueSync = null;
+			QueueSync queueSync;
 			lock (_mainSync) {
 				if (_currentCount > 0) {
 					_currentCount--;
@@ -381,7 +381,7 @@ namespace JDP {
 
 		public void QueueWorkItem(Action action) {
 			_schedulerThread.QueueWorkItem(() => {
-				ThreadPoolThread thread = null;
+				ThreadPoolThread thread;
 				if (_semaphore.WaitOne(_threadCreationDelay)) {
 					lock (_sync) {
 						thread = _idleThreads.Pop();

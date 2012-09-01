@@ -60,16 +60,13 @@ namespace JDP {
 
 	public static class GUI {
 		public static void CenterChildForm(Form parent, Form child) {
-			int centerX, centerY, formX, formY;
-			Rectangle formRect, maxRect;
+			int centerX = ((parent.Left * 2) + parent.Width ) / 2;
+			int centerY = ((parent.Top  * 2) + parent.Height) / 2;
+			int formX   = ((parent.Left * 2) + parent.Width  - child.Width ) / 2;
+			int formY   = ((parent.Top  * 2) + parent.Height - child.Height) / 2;
 
-			centerX = ((parent.Left * 2) + parent.Width ) / 2;
-			centerY = ((parent.Top  * 2) + parent.Height) / 2;
-			formX   = ((parent.Left * 2) + parent.Width  - child.Width ) / 2;
-			formY   = ((parent.Top  * 2) + parent.Height - child.Height) / 2;
-
-			formRect = new Rectangle(formX, formY, child.Width, child.Height);
-			maxRect = Screen.GetWorkingArea(new Point(centerX, centerY));
+			Rectangle formRect = new Rectangle(formX, formY, child.Width, child.Height);
+			Rectangle maxRect = Screen.GetWorkingArea(new Point(centerX, centerY));
 
 			if (formRect.Right > maxRect.Right) {
 				formRect.X -= formRect.Right - maxRect.Right;

@@ -287,9 +287,6 @@ namespace JDP {
 		private void Check() {
 			try {
 				SiteHelper siteHelper = SiteHelper.GetInstance(PageHost);
-				string threadDir;
-				string imageDir;
-				string thumbDir;
 
 				try {
 					lock (_settingsSync) {
@@ -335,9 +332,9 @@ namespace JDP {
 					else throw;
 				}
 
-				threadDir = ThreadDownloadDirectory;
-				imageDir = ThreadDownloadDirectory;
-				thumbDir = Path.Combine(ThreadDownloadDirectory, "thumbs");
+				string threadDir = ThreadDownloadDirectory;
+				string imageDir = ThreadDownloadDirectory;
+				string thumbDir = Path.Combine(ThreadDownloadDirectory, "thumbs");
 
 				Queue<ImageInfo> pendingImages = new Queue<ImageInfo>();
 				Queue<ThumbnailInfo> pendingThumbs = new Queue<ThumbnailInfo>();

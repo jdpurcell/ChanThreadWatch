@@ -34,7 +34,7 @@ namespace JDP {
 		}
 
 		protected string[] SplitURL() {
-			int pos = _url.IndexOf("://");
+			int pos = _url.IndexOf("://", StringComparison.Ordinal);
 			if (pos == -1) return new string[0];
 			return _url.Substring(pos + 3).Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
 		}

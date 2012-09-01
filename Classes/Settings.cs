@@ -219,15 +219,12 @@ namespace JDP {
 			}
 
 			using (StreamReader sr = File.OpenText(path)) {
-				string line, name, val;
-				int pos;
-
+				string line;
 				while ((line = sr.ReadLine()) != null) {
-					pos = line.IndexOf('=');
+					int pos = line.IndexOf('=');
 					if (pos != -1) {
-						name = line.Substring(0, pos);
-						val = line.Substring(pos + 1);
-
+						string name = line.Substring(0, pos);
+						string val = line.Substring(pos + 1);
 						if (!_settings.ContainsKey(name)) {
 							_settings.Add(name, val);
 						}

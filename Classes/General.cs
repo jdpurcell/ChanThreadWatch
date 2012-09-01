@@ -239,7 +239,8 @@ namespace JDP {
 			string charSet;
 
 			if (mimeType.Equals("application/xhtml+xml", StringComparison.OrdinalIgnoreCase) ||
-				mimeType.Equals("application/xml", StringComparison.OrdinalIgnoreCase))
+				mimeType.Equals("application/xml", StringComparison.OrdinalIgnoreCase) ||
+				mimeType.Equals("text/xml", StringComparison.OrdinalIgnoreCase))
 			{
 				if (text.StartsWith("<?xml", StringComparison.OrdinalIgnoreCase)) {
 					// XML declaration
@@ -371,7 +372,7 @@ namespace JDP {
 			{
 				url = "http://" + url;
 			}
-			if (url.IndexOf('/', url.IndexOf("//") + 2) == -1) return null;
+			if (url.IndexOf('/', url.IndexOf("//", StringComparison.Ordinal) + 2) == -1) return null;
 			try {
 				Uri uri;
 				if (!Uri.TryCreate(url, UriKind.Absolute, out uri)) return null;
@@ -590,7 +591,7 @@ namespace JDP {
 		}
 
 		public static string URLFileName(string url) {
-			int pos = url.LastIndexOf("/");
+			int pos = url.LastIndexOf("/", StringComparison.Ordinal);
 			return (pos == -1) ? String.Empty : url.Substring(pos + 1);
 		}
 
