@@ -19,7 +19,7 @@ namespace JDP {
 			chkUseOriginalFileNames.Checked = Settings.UseOriginalFileNames ?? false;
 			chkVerifyImageHashes.Checked = Settings.VerifyImageHashes ?? true;
 			chkCheckForUpdates.Checked = Settings.CheckForUpdates ?? false;
-			if (Settings.UseExeDirForSettings == true) {
+			if (Settings.UseExeDirectoryForSettings == true) {
 				rbSettingsInExeFolder.Checked = true;
 			}
 			else {
@@ -43,8 +43,8 @@ namespace JDP {
 					}
 				}
 
-				string oldSettingsFolder = Settings.GetSettingsDir();
-				string newSettingsFolder = Settings.GetSettingsDir(rbSettingsInExeFolder.Checked);
+				string oldSettingsFolder = Settings.GetSettingsDirectory();
+				string newSettingsFolder = Settings.GetSettingsDirectory(rbSettingsInExeFolder.Checked);
 				if (!String.Equals(newSettingsFolder, oldSettingsFolder, StringComparison.OrdinalIgnoreCase)) {
 					if (!Program.ObtainMutex(newSettingsFolder)) {
 						MessageBox.Show("Another instance of this program is using the same settings folder.",
@@ -68,7 +68,7 @@ namespace JDP {
 					}
 				}
 
-				string oldAbsoluteDownloadFolder = Settings.AbsoluteDownloadDir;
+				string oldAbsoluteDownloadFolder = Settings.AbsoluteDownloadDirectory;
 
 				Settings.DownloadFolder = downloadFolder;
 				Settings.DownloadFolderIsRelative = chkRelativePath.Checked;
@@ -79,14 +79,14 @@ namespace JDP {
 				Settings.UseOriginalFileNames = chkUseOriginalFileNames.Checked;
 				Settings.VerifyImageHashes = chkVerifyImageHashes.Checked;
 				Settings.CheckForUpdates = chkCheckForUpdates.Checked;
-				Settings.UseExeDirForSettings = rbSettingsInExeFolder.Checked;
+				Settings.UseExeDirectoryForSettings = rbSettingsInExeFolder.Checked;
 
 				try {
 					Settings.Save();
 				}
 				catch { }
 
-				if (!String.Equals(Settings.AbsoluteDownloadDir, oldAbsoluteDownloadFolder, StringComparison.OrdinalIgnoreCase)) {
+				if (!String.Equals(Settings.AbsoluteDownloadDirectory, oldAbsoluteDownloadFolder, StringComparison.OrdinalIgnoreCase)) {
 					MessageBox.Show("The new download folder will not affect threads currently being watched until the program is restared.  " +
 						"If you are still watching the threads at next run, make sure you have moved their download folders into the new download folder.",
 						"Download Folder Changed", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -118,8 +118,8 @@ namespace JDP {
 
 		private void SetDownloadFolderTextBox(string path) {
 			txtDownloadFolder.Text = chkRelativePath.Checked ?
-				General.GetRelativeDirectoryPath(path, Settings.ExeDir) :
-				General.GetAbsoluteDirectoryPath(path, Settings.ExeDir);
+				General.GetRelativeDirectoryPath(path, Settings.ExeDirectory) :
+				General.GetAbsoluteDirectoryPath(path, Settings.ExeDirectory);
 		}
 	}
 }

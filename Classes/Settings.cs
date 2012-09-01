@@ -95,15 +95,15 @@ namespace JDP {
 			set { Set("LatestUpdateVersion", value); }
 		}
 
-		public static bool? UseExeDirForSettings { get; set; }
+		public static bool? UseExeDirectoryForSettings { get; set; }
 
-		public static string ExeDir {
+		public static string ExeDirectory {
 			get {
 				return Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
 			}
 		}
 
-		public static string AppDataDir {
+		public static string AppDataDirectory {
 			get {
 				return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), _appName);
 			}
@@ -128,19 +128,19 @@ namespace JDP {
 			}
 		}
 
-		public static string GetSettingsDir() {
-			if (UseExeDirForSettings == null) {
-				UseExeDirForSettings = File.Exists(Path.Combine(ExeDir, SettingsFileName));
+		public static string GetSettingsDirectory() {
+			if (UseExeDirectoryForSettings == null) {
+				UseExeDirectoryForSettings = File.Exists(Path.Combine(ExeDirectory, SettingsFileName));
 			}
-			return GetSettingsDir(UseExeDirForSettings.Value);
+			return GetSettingsDirectory(UseExeDirectoryForSettings.Value);
 		}
 
-		public static string GetSettingsDir(bool useExeDirForSettings) {
+		public static string GetSettingsDirectory(bool useExeDirForSettings) {
 			if (useExeDirForSettings) {
-				return ExeDir;
+				return ExeDirectory;
 			}
 			else {
-				string dir = AppDataDir;
+				string dir = AppDataDirectory;
 				if (!Directory.Exists(dir)) {
 					Directory.CreateDirectory(dir);
 				}
@@ -148,11 +148,11 @@ namespace JDP {
 			}
 		}
 
-		public static string AbsoluteDownloadDir {
+		public static string AbsoluteDownloadDirectory {
 			get {
 				string dir = DownloadFolder;
 				if (!String.IsNullOrEmpty(dir) && (DownloadFolderIsRelative == true)) {
-					dir = General.GetAbsoluteDirectoryPath(dir, ExeDir);
+					dir = General.GetAbsoluteDirectoryPath(dir, ExeDirectory);
 				}
 				return dir;
 			}
@@ -210,7 +210,7 @@ namespace JDP {
 		}
 
 		public static void Load() {
-			string path = Path.Combine(GetSettingsDir(), SettingsFileName);
+			string path = Path.Combine(GetSettingsDirectory(), SettingsFileName);
 
 			_settings = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
@@ -220,11 +220,14 @@ namespace JDP {
 
 			using (StreamReader sr = File.OpenText(path)) {
 				string line;
+
 				while ((line = sr.ReadLine()) != null) {
 					int pos = line.IndexOf('=');
+
 					if (pos != -1) {
 						string name = line.Substring(0, pos);
 						string val = line.Substring(pos + 1);
+
 						if (!_settings.ContainsKey(name)) {
 							_settings.Add(name, val);
 						}
@@ -234,7 +237,7 @@ namespace JDP {
 		}
 
 		public static void Save() {
-			string path = Path.Combine(GetSettingsDir(), SettingsFileName);
+			string path = Path.Combine(GetSettingsDirectory(), SettingsFileName);
 			using (StreamWriter sw = File.CreateText(path)) {
 				lock (_settings) {
 					foreach (KeyValuePair<string, string> kvp in _settings) {

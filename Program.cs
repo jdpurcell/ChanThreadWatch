@@ -21,7 +21,7 @@ namespace JDP {
 		}
 
 		public static bool ObtainMutex() {
-			return ObtainMutex(Settings.GetSettingsDir());
+			return ObtainMutex(Settings.GetSettingsDirectory());
 		}
 
 		public static bool ObtainMutex(string settingsFolder) {

@@ -40,7 +40,7 @@ namespace JDP {
 			BuildCheckEverySubMenu();
 			BuildColumnHeaderMenu();
 
-			if ((Settings.DownloadFolder == null) || !Directory.Exists(Settings.AbsoluteDownloadDir)) {
+			if ((Settings.DownloadFolder == null) || !Directory.Exists(Settings.AbsoluteDownloadDirectory)) {
 				Settings.DownloadFolder = Path.Combine(Environment.GetFolderPath(
 					Environment.SpecialFolder.MyDocuments), "Watched Threads");
 				Settings.DownloadFolderIsRelative = false;
@@ -814,7 +814,7 @@ namespace JDP {
 					lines.Add(extraData.AddedOn.ToUniversalTime().Ticks.ToString());
 					lines.Add(extraData.LastImageOn != null ? extraData.LastImageOn.Value.ToUniversalTime().Ticks.ToString() : String.Empty);
 				}
-				string path = Path.Combine(Settings.GetSettingsDir(), Settings.ThreadsFileName);
+				string path = Path.Combine(Settings.GetSettingsDirectory(), Settings.ThreadsFileName);
 				File.WriteAllLines(path, lines.ToArray());
 			}
 			catch { }
@@ -822,7 +822,7 @@ namespace JDP {
 
 		private void LoadThreadList() {
 			try {
-				string path = Path.Combine(Settings.GetSettingsDir(), Settings.ThreadsFileName);
+				string path = Path.Combine(Settings.GetSettingsDirectory(), Settings.ThreadsFileName);
 				if (!File.Exists(path)) return;
 				string[] lines = File.ReadAllLines(path);
 				if (lines.Length < 1) return;
@@ -843,7 +843,7 @@ namespace JDP {
 					int checkIntervalSeconds = Int32.Parse(lines[i++]);
 					bool oneTimeDownload = lines[i++] == "1";
 					string saveDir = lines[i++];
-					saveDir = saveDir.Length != 0 ? General.GetAbsoluteDirectoryPath(saveDir, Settings.AbsoluteDownloadDir) : null;
+					saveDir = saveDir.Length != 0 ? General.GetAbsoluteDirectoryPath(saveDir, Settings.AbsoluteDownloadDirectory) : null;
 					string description;
 					StopReason? stopReason = null;
 					WatcherExtraData extraData = new WatcherExtraData();
