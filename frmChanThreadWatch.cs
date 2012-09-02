@@ -169,11 +169,11 @@ namespace JDP {
 			if (txtPageURL.Text.Trim().Length == 0) return;
 			string pageURL = General.CleanPageURL(txtPageURL.Text);
 			if (pageURL == null) {
-				MessageBox.Show("The specified URL is invalid.", "Invalid URL", MessageBoxButtons.OK, MessageBoxIcon.Error);
+				MessageBox.Show(this, "The specified URL is invalid.", "Invalid URL", MessageBoxButtons.OK, MessageBoxIcon.Error);
 				return;
 			}
 			if (!AddThread(pageURL)) {
-				MessageBox.Show("The same thread is already being watched or downloaded.",
+				MessageBox.Show(this, "The same thread is already being watched or downloaded.",
 					"Duplicate Thread", MessageBoxButtons.OK, MessageBoxIcon.Error);
 				return;
 			}
@@ -238,7 +238,7 @@ namespace JDP {
 
 		private void miOpenFolder_Click(object sender, EventArgs e) {
 			int selectedCount = lvThreads.SelectedItems.Count;
-			if (selectedCount > 5 && MessageBox.Show("Do you want to open the folders of all " + selectedCount + " selected items?",
+			if (selectedCount > 5 && MessageBox.Show(this, "Do you want to open the folders of all " + selectedCount + " selected items?",
 				"Open Folders", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
 			{
 				return;
@@ -256,7 +256,7 @@ namespace JDP {
 
 		private void miOpenURL_Click(object sender, EventArgs e) {
 			int selectedCount = lvThreads.SelectedItems.Count;
-			if (selectedCount > 5 && MessageBox.Show("Do you want to open the URLs of all " + selectedCount + " selected items?",
+			if (selectedCount > 5 && MessageBox.Show(this, "Do you want to open the URLs of all " + selectedCount + " selected items?",
 				"Open URLs", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
 			{
 				return;
@@ -283,7 +283,7 @@ namespace JDP {
 				Clipboard.SetText(sb.ToString());
 			}
 			catch (Exception ex) {
-				MessageBox.Show("Unable to copy to clipboard: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+				MessageBox.Show(this, "Unable to copy to clipboard: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
 			}
 		}
 
@@ -292,7 +292,7 @@ namespace JDP {
 		}
 
 		private void miRemoveAndDeleteFolder_Click(object sender, EventArgs e) {
-			if (MessageBox.Show("Are you sure you want to delete the selected threads and all associated files from disk?",
+			if (MessageBox.Show(this, "Are you sure you want to delete the selected threads and all associated files from disk?",
 				"Delete From Disk", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
 			{
 				return;
@@ -343,7 +343,7 @@ namespace JDP {
 		}
 
 		private void btnAbout_Click(object sender, EventArgs e) {
-			MessageBox.Show(String.Format("Chan Thread Watch{0}Version {1} ({2}){0}Author: JDP (jart1126@yahoo.com){0}{3}",
+			MessageBox.Show(this, String.Format("Chan Thread Watch{0}Version {1} ({2}){0}Author: JDP (jart1126@yahoo.com){0}{3}",
 				Environment.NewLine, General.Version, General.ReleaseDate, General.ProgramURL), "About",
 				MessageBoxButtons.OK, MessageBoxIcon.Information);
 		}
@@ -905,7 +905,7 @@ namespace JDP {
 					if (IsDisposed) return;
 					Settings.LatestUpdateVersion = latestStr;
 					Invoke(() => {
-						if (MessageBox.Show("A newer version of Chan Thread Watch is available.  Would you like to open the Chan Thread Watch website?",
+						if (MessageBox.Show(this, "A newer version of Chan Thread Watch is available.  Would you like to open the Chan Thread Watch website?",
 							"Newer Version Found", MessageBoxButtons.YesNo, MessageBoxIcon.Information) == DialogResult.Yes)
 						{
 							Process.Start(General.ProgramURL);

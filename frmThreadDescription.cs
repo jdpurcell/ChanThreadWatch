@@ -20,7 +20,7 @@ namespace JDP {
 
 		private void btnOK_Click(object sender, EventArgs e) {
 			if (txtDescription.Text.Trim().Length == 0) {
-				MessageBox.Show("Description cannot be empty.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+				MessageBox.Show(this, "Description cannot be empty.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
 				return;
 			}
 			DialogResult = DialogResult.OK;

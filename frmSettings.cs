@@ -47,7 +47,7 @@ namespace JDP {
 				string newSettingsFolder = Settings.GetSettingsDirectory(rbSettingsInExeFolder.Checked);
 				if (!String.Equals(newSettingsFolder, oldSettingsFolder, StringComparison.OrdinalIgnoreCase)) {
 					if (!Program.ObtainMutex(newSettingsFolder)) {
-						MessageBox.Show("Another instance of this program is using the same settings folder.",
+						MessageBox.Show(this, "Another instance of this program is using the same settings folder.",
 							"Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
 						return;
 					}
@@ -62,7 +62,7 @@ namespace JDP {
 						}
 					}
 					catch {
-						MessageBox.Show("Unable to move the settings files.",
+						MessageBox.Show(this, "Unable to move the settings files.",
 							"Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
 						return;
 					}
@@ -87,7 +87,7 @@ namespace JDP {
 				catch { }
 
 				if (!String.Equals(Settings.AbsoluteDownloadDirectory, oldAbsoluteDownloadFolder, StringComparison.OrdinalIgnoreCase)) {
-					MessageBox.Show("The new download folder will not affect threads currently being watched until the program is restared.  " +
+					MessageBox.Show(this, "The new download folder will not affect threads currently being watched until the program is restared.  " +
 						"If you are still watching the threads at next run, make sure you have moved their download folders into the new download folder.",
 						"Download Folder Changed", MessageBoxButtons.OK, MessageBoxIcon.Information);
 				}
@@ -95,16 +95,17 @@ namespace JDP {
 				DialogResult = DialogResult.OK;
 			}
 			catch (Exception ex) {
-				MessageBox.Show(ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+				MessageBox.Show(this, ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
 			}
 		}
 
 		private void btnBrowse_Click(object sender, EventArgs e) {
-			FolderBrowserDialog dialog = new FolderBrowserDialog();
-			dialog.Description = "Select the download location.";
-			dialog.ShowNewFolderButton = true;
-			if (dialog.ShowDialog() == DialogResult.OK) {
-				SetDownloadFolderTextBox(dialog.SelectedPath);
+			using (FolderBrowserDialog dialog = new FolderBrowserDialog()) {
+				dialog.Description = "Select the download location.";
+				dialog.ShowNewFolderButton = true;
+				if (dialog.ShowDialog(this) == DialogResult.OK) {
+					SetDownloadFolderTextBox(dialog.SelectedPath);
+				}
 			}
 		}
 
