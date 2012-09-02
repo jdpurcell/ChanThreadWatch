@@ -161,9 +161,7 @@ namespace JDP {
 							htmlStart += 1;
 							isTagComplete = true;
 						}
-						else if (tag.IsSelfClosing) {
-							continue;
-						}
+						else if (tag.IsSelfClosing) { }
 						else {
 							HTMLAttribute attribute = new HTMLAttribute();
 							attribute.Offset = htmlStart;
