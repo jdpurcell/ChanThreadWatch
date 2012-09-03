@@ -27,11 +27,16 @@ namespace JDP {
 			return GetSection(_preprocessedHTML, startTag.EndOffset, endTag.Offset);
 		}
 
-		public IEnumerable<HTMLTag> FindTags(bool isEndTag, HTMLTag startAfterTag, HTMLTag stopBeforeTag, params string[] names) {
+		public IEnumerable<HTMLTag> EnumerateTags(HTMLTag startAfterTag, HTMLTag stopBeforeTag) {
 			int startIndex = startAfterTag != null ? (GetTagIndex(startAfterTag) + 1) : 0;
 			int stopIndex = stopBeforeTag != null ? (GetTagIndex(stopBeforeTag) - 1) : (_tags.Count - 1);
 			for (int i = startIndex; i <= stopIndex; i++) {
-				HTMLTag tag = _tags[i];
+				yield return _tags[i];
+			}
+		}
+
+		public IEnumerable<HTMLTag> FindTags(bool isEndTag, HTMLTag startAfterTag, HTMLTag stopBeforeTag, params string[] names) {
+			foreach (HTMLTag tag in EnumerateTags(startAfterTag, stopBeforeTag)) {
 				if (tag.IsEnd == isEndTag && tag.NameEqualsAny(names)) {
 					yield return tag;
 				}
