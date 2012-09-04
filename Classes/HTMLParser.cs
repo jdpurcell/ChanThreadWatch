@@ -35,12 +35,20 @@ namespace JDP {
 			}
 		}
 
+		public IEnumerable<HTMLTag> EnumerateTags(HTMLTagRange containingTagRange) {
+			return EnumerateTags(containingTagRange.StartTag, containingTagRange.EndTag);
+		}
+
 		public IEnumerable<HTMLTag> FindTags(bool isEndTag, HTMLTag startAfterTag, HTMLTag stopBeforeTag, params string[] names) {
 			foreach (HTMLTag tag in EnumerateTags(startAfterTag, stopBeforeTag)) {
 				if (tag.IsEnd == isEndTag && tag.NameEqualsAny(names)) {
 					yield return tag;
 				}
 			}
+		}
+
+		public IEnumerable<HTMLTag> FindTags(bool isEndTag, HTMLTagRange containingTagRange, params string[] names) {
+			return FindTags(isEndTag, containingTagRange.StartTag, containingTagRange.EndTag, names);
 		}
 
 		public HTMLTag FindTag(bool isEndTag, HTMLTag startAfterTag, HTMLTag stopBeforeTag, params string[] names) {
@@ -50,44 +58,66 @@ namespace JDP {
 			return null;
 		}
 
-		public HTMLTag FindStartTag(HTMLTag startAfterTag, HTMLTag stopBeforeTag, params string[] names) {
-			return FindTag(false, startAfterTag, stopBeforeTag, names);
-		}
-
-		public HTMLTag FindStartTag(params string[] names) {
-			return FindTag(false, null, null, names);
+		public HTMLTag FindTag(bool isEndTag, HTMLTagRange containingTagRange, params string[] names) {
+			return FindTag(isEndTag, containingTagRange.StartTag, containingTagRange.EndTag, names);
 		}
 
 		public IEnumerable<HTMLTag> FindStartTags(HTMLTag startAfterTag, HTMLTag stopBeforeTag, params string[] names) {
 			return FindTags(false, startAfterTag, stopBeforeTag, names);
 		}
 
+		public IEnumerable<HTMLTag> FindStartTags(HTMLTagRange containingTagRange, params string[] names) {
+			return FindStartTags(containingTagRange.StartTag, containingTagRange.EndTag, names);
+		}
+
 		public IEnumerable<HTMLTag> FindStartTags(params string[] names) {
 			return FindTags(false, null, null, names);
 		}
 
-		public HTMLTag FindEndTag(HTMLTag startAfterTag, HTMLTag stopBeforeTag, params string[] names) {
-			return FindTag(true, startAfterTag, stopBeforeTag, names);
+		public HTMLTag FindStartTag(HTMLTag startAfterTag, HTMLTag stopBeforeTag, params string[] names) {
+			return FindTag(false, startAfterTag, stopBeforeTag, names);
 		}
 
-		public HTMLTag FindEndTag(params string[] names) {
-			return FindTag(true, null, null, names);
+		public HTMLTag FindStartTag(HTMLTagRange containingTagRange, params string[] names) {
+			return FindStartTag(containingTagRange.StartTag, containingTagRange.EndTag, names);
+		}
+
+		public HTMLTag FindStartTag(params string[] names) {
+			return FindTag(false, null, null, names);
 		}
 
 		public IEnumerable<HTMLTag> FindEndTags(HTMLTag startAfterTag, HTMLTag stopBeforeTag, params string[] names) {
 			return FindTags(true, startAfterTag, stopBeforeTag, names);
 		}
 
+		public IEnumerable<HTMLTag> FindEndTags(HTMLTagRange containingTagRange, params string[] names) {
+			return FindEndTags(containingTagRange.StartTag, containingTagRange.EndTag, names);
+		}
+
 		public IEnumerable<HTMLTag> FindEndTags(params string[] names) {
 			return FindTags(true, null, null, names);
 		}
 
+		public HTMLTag FindEndTag(HTMLTag startAfterTag, HTMLTag stopBeforeTag, params string[] names) {
+			return FindTag(true, startAfterTag, stopBeforeTag, names);
+		}
+
+		public HTMLTag FindEndTag(HTMLTagRange containingTagRange, params string[] names) {
+			return FindEndTag(containingTagRange.StartTag, containingTagRange.EndTag, names);
+		}
+
+		public HTMLTag FindEndTag(params string[] names) {
+			return FindTag(true, null, null, names);
+		}
+
 		public HTMLTag FindCorrespondingEndTag(HTMLTag tag) {
-			if (tag == null) return null;
 			return FindCorrespondingEndTag(tag, null);
 		}
 
 		public HTMLTag FindCorrespondingEndTag(HTMLTag tag, HTMLTag stopBeforeTag) {
+			if (tag == null) {
+				return null;
+			}
 			if (tag.IsEnd) {
 				throw new ArgumentException("Tag must be a start tag.");
 			}
@@ -107,6 +137,15 @@ namespace JDP {
 				}
 			}
 			return null;
+		}
+
+		public HTMLTagRange CreateTagRange(HTMLTag tag) {
+			return CreateTagRange(tag, null);
+		}
+
+		public HTMLTagRange CreateTagRange(HTMLTag tag, HTMLTag stopBeforeTag) {
+			HTMLTag endTag = FindCorrespondingEndTag(tag, stopBeforeTag);
+			return (tag != null && endTag != null) ? new HTMLTagRange(tag, endTag) : null;
 		}
 
 		private int GetTagIndex(HTMLTag tag) {
@@ -423,6 +462,16 @@ namespace JDP {
 
 		public bool NameEquals(string name) {
 			return Name.Equals(name, StringComparison.OrdinalIgnoreCase);
+		}
+	}
+
+	public class HTMLTagRange {
+		public HTMLTag StartTag { get; set; }
+		public HTMLTag EndTag { get; set; }
+
+		public HTMLTagRange(HTMLTag startTag, HTMLTag endTag) {
+			StartTag = startTag;
+			EndTag = endTag;
 		}
 	}
 }

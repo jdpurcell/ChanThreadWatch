@@ -613,19 +613,25 @@ namespace JDP {
 	}
 
 	public static class Enumerable {
-		public static IEnumerable<T> Where<T>(IEnumerable<T> source, Func<T, bool> predicate) {
-			foreach (T item in source) {
+		public static IEnumerable<TSource> Where<TSource>(IEnumerable<TSource> source, Func<TSource, bool> predicate) {
+			foreach (TSource item in source) {
 				if (predicate(item)) {
 					yield return item;
 				}
 			}
 		}
 
-		public static T FirstOrDefault<T>(IEnumerable<T> source) {
-			foreach (T item in source) {
+		public static TSource FirstOrDefault<TSource>(IEnumerable<TSource> source) {
+			foreach (TSource item in source) {
 				return item;
 			}
-			return default(T);
+			return default(TSource);
+		}
+
+		public static IEnumerable<TResult> Select<TSource, TResult>(IEnumerable<TSource> source, Func<TSource, TResult> selector) {
+			foreach (TSource item in source) {
+				yield return selector(item);
+			}
 		}
 	}
 

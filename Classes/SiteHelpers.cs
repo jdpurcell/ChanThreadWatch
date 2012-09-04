@@ -156,28 +156,21 @@ namespace JDP {
 		public override List<ImageInfo> GetImages(List<ReplaceInfo> replaceList, List<ThumbnailInfo> thumbnailList) {
 			List<ImageInfo> imageList = new List<ImageInfo>();
 
-			foreach (HTMLTag postStartTag in Enumerable.Where(_htmlParser.FindStartTags("div"),
-				t => HTMLParser.ClassAttributeValueHas(t, "post")))
+			foreach (HTMLTagRange postTagRange in Enumerable.Where(Enumerable.Select(Enumerable.Where(_htmlParser.FindStartTags("div"),
+				t => HTMLParser.ClassAttributeValueHas(t, "post")), t => _htmlParser.CreateTagRange(t)), r => r != null))
 			{
-				HTMLTag postEndTag = _htmlParser.FindCorrespondingEndTag(postStartTag);
-				if (postEndTag == null) continue;
+				HTMLTagRange fileTextSpanTagRange = _htmlParser.CreateTagRange(Enumerable.FirstOrDefault(Enumerable.Where(
+					_htmlParser.FindStartTags(postTagRange, "span"), t => HTMLParser.ClassAttributeValueHas(t, "fileText"))));
+				if (fileTextSpanTagRange == null) continue;
 
-				HTMLTag fileTextSpanStartTag = Enumerable.FirstOrDefault(Enumerable.Where(_htmlParser.FindStartTags(
-					postStartTag, postEndTag, "span"), t => HTMLParser.ClassAttributeValueHas(t, "fileText")));
-				if (fileTextSpanStartTag == null) continue;
-				HTMLTag fileTextSpanEndTag = _htmlParser.FindCorrespondingEndTag(fileTextSpanStartTag);
-				if (fileTextSpanEndTag == null) continue;
+				HTMLTagRange fileThumbLinkTagRange = _htmlParser.CreateTagRange(Enumerable.FirstOrDefault(Enumerable.Where(
+					_htmlParser.FindStartTags(postTagRange, "a"), t => HTMLParser.ClassAttributeValueHas(t, "fileThumb"))));
+				if (fileThumbLinkTagRange == null) continue;
 
-				HTMLTag fileThumbLinkStartTag = Enumerable.FirstOrDefault(Enumerable.Where(_htmlParser.FindStartTags(
-					postStartTag, postEndTag, "a"), t => HTMLParser.ClassAttributeValueHas(t, "fileThumb")));
-				if (fileThumbLinkStartTag == null) continue;
-				HTMLTag fileThumbLinkEndTag = _htmlParser.FindCorrespondingEndTag(fileThumbLinkStartTag);
-				if (fileThumbLinkEndTag == null) continue;
-
-				HTMLTag fileTextLinkStartTag = _htmlParser.FindStartTag(fileTextSpanStartTag, fileTextSpanEndTag, "a");
+				HTMLTag fileTextLinkStartTag = _htmlParser.FindStartTag(fileTextSpanTagRange, "a");
 				if (fileTextLinkStartTag == null) continue;
 
-				HTMLTag fileThumbImageTag = _htmlParser.FindStartTag(fileThumbLinkStartTag, fileThumbLinkEndTag, "img");
+				HTMLTag fileThumbImageTag = _htmlParser.FindStartTag(fileThumbLinkTagRange, "img");
 				if (fileThumbImageTag == null) continue;
 
 				string imageURL = fileTextLinkStartTag.GetAttributeValue("href");
@@ -186,14 +179,14 @@ namespace JDP {
 				string thumbURL = fileThumbImageTag.GetAttributeValue("src");
 				if (thumbURL == null) continue;
 
-				bool isSpoiler = HTMLParser.ClassAttributeValueHas(fileThumbLinkStartTag, "imgspoiler");
+				bool isSpoiler = HTMLParser.ClassAttributeValueHas(fileThumbLinkTagRange.StartTag, "imgspoiler");
 
 				string originalFileName;
 				if (isSpoiler) {
-					originalFileName = fileTextSpanStartTag.GetAttributeValue("title");
+					originalFileName = fileTextSpanTagRange.StartTag.GetAttributeValue("title");
 				}
 				else {
-					HTMLTag fileNameSpanStartTag = _htmlParser.FindStartTag(fileTextSpanStartTag, fileTextSpanEndTag, "span");
+					HTMLTag fileNameSpanStartTag = _htmlParser.FindStartTag(fileTextSpanTagRange, "span");
 					if (fileNameSpanStartTag == null) continue;
 					originalFileName = fileNameSpanStartTag.GetAttributeValue("title");
 				}
@@ -231,7 +224,7 @@ namespace JDP {
 							});
 					}
 
-					attribute = fileThumbLinkStartTag.GetAttribute("href");
+					attribute = fileThumbLinkTagRange.StartTag.GetAttribute("href");
 					if (attribute != null) {
 						replaceList.Add(
 							new ReplaceInfo {
