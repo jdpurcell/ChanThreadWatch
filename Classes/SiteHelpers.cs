@@ -217,10 +217,11 @@ namespace JDP {
 				};
 				if (thumb.URL == null || thumb.FileName.Length == 0) continue;
 
-				{
-					HTMLAttribute attribute = fileTextLinkStartTag.GetAttribute("href");
-					if (attribute == null) continue;
-					if (replaceList != null) {
+				if (replaceList != null) {
+					HTMLAttribute attribute;
+
+					attribute = fileTextLinkStartTag.GetAttribute("href");
+					if (attribute != null) {
 						replaceList.Add(
 							new ReplaceInfo {
 								Offset = attribute.Offset,
@@ -229,12 +230,9 @@ namespace JDP {
 								Tag = image.FileName
 							});
 					}
-				}
 
-				{
-					HTMLAttribute attribute = fileThumbLinkStartTag.GetAttribute("href");
-					if (attribute == null) continue;
-					if (replaceList != null) {
+					attribute = fileThumbLinkStartTag.GetAttribute("href");
+					if (attribute != null) {
 						replaceList.Add(
 							new ReplaceInfo {
 								Offset = attribute.Offset,
@@ -243,12 +241,9 @@ namespace JDP {
 								Tag = image.FileName
 							});
 					}
-				}
 
-				{
-					HTMLAttribute attribute = fileThumbImageTag.GetAttribute("src");
-					if (attribute == null) continue;
-					if (replaceList != null) {
+					attribute = fileThumbImageTag.GetAttribute("src");
+					if (attribute != null) {
 						replaceList.Add(
 							new ReplaceInfo {
 								Offset = attribute.Offset,
