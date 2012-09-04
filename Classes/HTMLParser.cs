@@ -358,6 +358,11 @@ namespace JDP {
 			string[] assignedClassNames = attributeValue.Split(GetWhiteSpaceChars(), StringSplitOptions.RemoveEmptyEntries);
 			return Array.Exists(assignedClassNames, n => n.Equals(targetClassName, StringComparison.Ordinal));
 		}
+
+		public static bool ClassAttributeValueHas(HTMLTag tag, string targetClassName) {
+			string attributeValue = tag.GetAttributeValue("class");
+			return attributeValue != null && ClassAttributeValueHas(attributeValue, targetClassName);
+		}
 	}
 
 	public class HTMLTag {

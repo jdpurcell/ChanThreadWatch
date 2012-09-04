@@ -367,6 +367,7 @@ namespace JDP {
 					};
 					DownloadPageAsync(pageInfo.Path, pageInfo.URL, PageAuth, pageInfo.CacheTime, downloadEnd);
 					downloadEndEvent.WaitOne();
+					downloadEndEvent.Close();
 
 					if (pageParser != null) {
 						siteHelper.SetURL(pageInfo.URL);
@@ -515,6 +516,7 @@ namespace JDP {
 					}
 					foreach (ManualResetEvent downloadEndEvent in downloadEndEvents) {
 						downloadEndEvent.WaitOne();
+						downloadEndEvent.Close();
 					}
 				}
 
@@ -564,6 +566,7 @@ namespace JDP {
 						}
 						foreach (ManualResetEvent downloadEndEvent in downloadEndEvents) {
 							downloadEndEvent.WaitOne();
+							downloadEndEvent.Close();
 						}
 					}
 

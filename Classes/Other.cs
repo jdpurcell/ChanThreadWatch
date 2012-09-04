@@ -427,11 +427,11 @@ namespace JDP {
 			private ManualResetEvent _newWorkItem = new ManualResetEvent(false);
 			private Queue<Action> _workItems = new Queue<Action>();
 
-			public ThreadPoolThread(ThreadPoolManager manager) {
+			internal ThreadPoolThread(ThreadPoolManager manager) {
 				_manager = manager;
 			}
 
-			public void QueueWorkItem(Action action) {
+			internal void QueueWorkItem(Action action) {
 				lock (_sync) {
 					if (_thread == null) {
 						_thread = new Thread(WorkThread);
@@ -609,6 +609,23 @@ namespace JDP {
 
 		public override void SetLength(long value) {
 			throw new NotSupportedException();
+		}
+	}
+
+	public static class Enumerable {
+		public static IEnumerable<T> Where<T>(IEnumerable<T> source, Func<T, bool> predicate) {
+			foreach (T item in source) {
+				if (predicate(item)) {
+					yield return item;
+				}
+			}
+		}
+
+		public static T FirstOrDefault<T>(IEnumerable<T> source) {
+			foreach (T item in source) {
+				return item;
+			}
+			return default(T);
 		}
 	}
 

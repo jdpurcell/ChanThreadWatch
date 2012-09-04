@@ -495,9 +495,17 @@ namespace JDP {
 			}
 		}
 
+		public static byte[] TryBase64Decode(string s) {
+			try {
+				return Convert.FromBase64String(s);
+			}
+			catch { return null; }
+		}
+
 		public static ulong Calculate64BitMD5(byte[] bytes) {
-			MD5CryptoServiceProvider hashAlgo = new MD5CryptoServiceProvider();
-			return BytesTo64BitXor(hashAlgo.ComputeHash(bytes));
+			using (MD5CryptoServiceProvider hashAlgo = new MD5CryptoServiceProvider()) {
+				return BytesTo64BitXor(hashAlgo.ComputeHash(bytes));
+			}
 		}
 
 		public static ulong BytesTo64BitXor(byte[] bytes) {
