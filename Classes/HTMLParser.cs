@@ -27,6 +27,10 @@ namespace JDP {
 			return GetSection(_preprocessedHTML, startTag.EndOffset, endTag.Offset);
 		}
 
+		public string GetInnerHTML(HTMLTagRange tagRange) {
+			return GetInnerHTML(tagRange.StartTag, tagRange.EndTag);
+		}
+
 		public IEnumerable<HTMLTag> EnumerateTags(HTMLTag startAfterTag, HTMLTag stopBeforeTag) {
 			int startIndex = startAfterTag != null ? (GetTagIndex(startAfterTag) + 1) : 0;
 			int stopIndex = stopBeforeTag != null ? (GetTagIndex(stopBeforeTag) - 1) : (_tags.Count - 1);
