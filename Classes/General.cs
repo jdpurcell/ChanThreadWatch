@@ -20,7 +20,7 @@ namespace JDP {
 
 		public static string ReleaseDate {
 			get {
-				return "2012-May-13";
+				return "2012-Sep-30";
 			}
 		}
 
