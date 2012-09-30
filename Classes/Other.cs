@@ -424,7 +424,7 @@ namespace JDP {
 			private object _sync = new object();
 			private ThreadPoolManager _manager;
 			private Thread _thread;
-			private ManualResetEvent _newWorkItem = new ManualResetEvent(false);
+			private ManualResetEvent _newWorkItem;
 			private Queue<Action> _workItems = new Queue<Action>();
 
 			internal ThreadPoolThread(ThreadPoolManager manager) {
@@ -434,6 +434,7 @@ namespace JDP {
 			internal void QueueWorkItem(Action action) {
 				lock (_sync) {
 					if (_thread == null) {
+						_newWorkItem = new ManualResetEvent(false);
 						_thread = new Thread(WorkThread);
 						_thread.IsBackground = true;
 						_thread.Start();
@@ -468,6 +469,8 @@ namespace JDP {
 			private bool ReleaseThread() {
 				lock (_sync) {
 					if (_workItems.Count == 0) {
+						_newWorkItem.Close();
+						_newWorkItem = null;
 						_thread = null;
 						return true;
 					}

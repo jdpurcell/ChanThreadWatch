@@ -14,7 +14,7 @@ namespace JDP {
 
 		private WorkScheduler.WorkItem _nextCheckWorkItem;
 		private object _settingsSync = new object();
-		private ManualResetEvent _stopEvent = new ManualResetEvent(false);
+		private bool _isStopping;
 		private StopReason _stopReason;
 		private Dictionary<long, Action> _downloadAborters = new Dictionary<long, Action>();
 		private bool _hasRun;
@@ -155,7 +155,7 @@ namespace JDP {
 				if (IsRunning) {
 					throw new Exception("The watcher is already running.");
 				}
-				_stopEvent.Reset();
+				_isStopping = false;
 				_stopReason = StopReason.Other;
 				_hasRun = true;
 				_hasInitialized = false;
@@ -170,7 +170,7 @@ namespace JDP {
 			lock (_settingsSync) {
 				if (!IsStopping) {
 					stoppingNow = true;
-					_stopEvent.Set();
+					_isStopping = true;
 					_stopReason = reason;
 					_hasRun = true;
 					if (_nextCheckWorkItem != null) {
@@ -221,7 +221,7 @@ namespace JDP {
 		}
 
 		public bool IsStopping {
-			get { lock (_settingsSync) { return _stopEvent.WaitOne(0, false); } }
+			get { lock (_settingsSync) { return _isStopping; } }
 		}
 
 		public StopReason StopReason {
