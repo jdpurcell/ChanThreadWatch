@@ -24,7 +24,7 @@ namespace JDP {
 		}
 
 		public string GetInnerHTML(HTMLTag startTag, HTMLTag endTag) {
-			return GetSection(_preprocessedHTML, startTag.EndOffset, endTag.Offset);
+			return startTag.IsSelfClosing ? String.Empty : GetSection(_preprocessedHTML, startTag.EndOffset, endTag.Offset);
 		}
 
 		public string GetInnerHTML(HTMLTagRange tagRange) {
