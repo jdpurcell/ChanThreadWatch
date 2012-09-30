@@ -155,6 +155,7 @@ namespace JDP {
 	public class SiteHelper_4chan_org : SiteHelper {
 		public override List<ImageInfo> GetImages(List<ReplaceInfo> replaceList, List<ThumbnailInfo> thumbnailList) {
 			List<ImageInfo> imageList = new List<ImageInfo>();
+			bool seenSpoiler = false;
 
 			foreach (HTMLTagRange postTagRange in Enumerable.Where(Enumerable.Select(Enumerable.Where(_htmlParser.FindStartTags("div"),
 				t => HTMLParser.ClassAttributeValueHas(t, "post")), t => _htmlParser.CreateTagRange(t)), r => r != null))
@@ -248,7 +249,11 @@ namespace JDP {
 				}
 
 				imageList.Add(image);
-				thumbnailList.Add(thumb);
+
+				if (!isSpoiler || !seenSpoiler) {
+					thumbnailList.Add(thumb);
+					if (isSpoiler) seenSpoiler = true;
+				}
 			}
 
 			return imageList;
