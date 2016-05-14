@@ -30,7 +30,7 @@ namespace JDP {
 		private string _mainDownloadDirectory = Settings.AbsoluteDownloadDirectory;
 		private string _threadDownloadDirectory;
 		private long _nextCheckTicks;
-		private string _description = String.Empty;
+		private string _description = "";
 		private object _tag;
 
 		static ThreadWatcher() {
@@ -348,7 +348,7 @@ namespace JDP {
 				int pageIndex = 0;
 				OnDownloadStatus(new DownloadStatusEventArgs(DownloadType.Page, 0, _pageList.Count));
 				while (pageIndex < _pageList.Count && !IsStopping) {
-					string saveFileName = General.CleanFileName(_threadName) + ((pageIndex == 0) ? String.Empty : ("_" + (pageIndex + 1))) + ".html";
+					string saveFileName = General.CleanFileName(_threadName) + ((pageIndex == 0) ? "" : ("_" + (pageIndex + 1))) + ".html";
 					HTMLParser pageParser = null;
 
 					PageInfo pageInfo = _pageList[pageIndex];
@@ -384,7 +384,7 @@ namespace JDP {
 									int iSuffix = 1;
 									string fileName;
 									do {
-										fileName = baseFileNameNoExtension + ((iSuffix == 1) ? String.Empty :
+										fileName = baseFileNameNoExtension + ((iSuffix == 1) ? "" :
 											("_" + iSuffix)) + baseExtension;
 										iSuffix++;
 									}
@@ -477,8 +477,7 @@ namespace JDP {
 						bool fileNameTaken;
 						string saveFileName;
 						do {
-							savePath = Path.Combine(imageDir, saveFileNameNoExtension + ((iSuffix == 1) ?
-								String.Empty : ("_" + iSuffix)) + saveExtension);
+							savePath = Path.Combine(imageDir, saveFileNameNoExtension + ((iSuffix == 1) ? "" : ("_" + iSuffix)) + saveExtension);
 							saveFileName = Path.GetFileName(savePath);
 							fileNameTaken = _imageDiskFileNames.Contains(saveFileName);
 							iSuffix++;

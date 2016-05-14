@@ -235,7 +235,7 @@ namespace JDP {
 		private static string DetectCharacterSetFromContent(byte[] bytes, string httpContentType) {
 			string text = UnknownEncodingToString(bytes, 4096);
 			HTMLParser htmlParser = new HTMLParser(text);
-			string mimeType = GetMIMETypeFromContentType(httpContentType) ?? String.Empty;
+			string mimeType = GetMIMETypeFromContentType(httpContentType) ?? "";
 			string charSet;
 
 			if (mimeType.Equals("application/xhtml+xml", StringComparison.OrdinalIgnoreCase) ||
@@ -433,7 +433,7 @@ namespace JDP {
 			char[] separators = new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar };
 			dir = dir.TrimEnd(separators);
 			int pos = dir.LastIndexOfAny(separators);
-			return (pos == -1) ? String.Empty : dir.Substring(0, pos);
+			return (pos == -1) ? "" : dir.Substring(0, pos);
 		}
 
 		public static int GetMaximumFileNameLength(string dir) {
@@ -562,7 +562,7 @@ namespace JDP {
 						Offset = tag.Offset,
 						Length = tag.Length,
 						Type = ReplaceType.Other,
-						Value = String.Empty
+						Value = ""
 					});
 			}
 
@@ -600,7 +600,7 @@ namespace JDP {
 
 		public static string URLFileName(string url) {
 			int pos = url.LastIndexOf("/", StringComparison.Ordinal);
-			return (pos == -1) ? String.Empty : url.Substring(pos + 1);
+			return (pos == -1) ? "" : url.Substring(pos + 1);
 		}
 
 		public static string CleanFileName(string src) {

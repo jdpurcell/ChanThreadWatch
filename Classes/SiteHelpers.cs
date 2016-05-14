@@ -1,12 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Reflection;
 using System.Web;
 
 namespace JDP {
 	public class SiteHelper {
-		protected string _url = String.Empty;
+		protected string _url = "";
 		protected HTMLParser _htmlParser;
 
 		public static SiteHelper GetInstance(string host) {
@@ -41,12 +42,12 @@ namespace JDP {
 
 		public virtual string GetSiteName() {
 			string[] hostSplit = (new Uri(_url)).Host.Split('.');
-			return (hostSplit.Length >= 2) ? hostSplit[hostSplit.Length - 2] : String.Empty;
+			return (hostSplit.Length >= 2) ? hostSplit[hostSplit.Length - 2] : "";
 		}
 
 		public virtual string GetBoardName() {
 			string[] urlSplit = SplitURL();
-			return (urlSplit.Length >= 3) ? urlSplit[1] : String.Empty;
+			return (urlSplit.Length >= 3) ? urlSplit[1] : "";
 		}
 
 		public virtual string GetThreadName() {
@@ -59,7 +60,7 @@ namespace JDP {
 				if (pos != -1) page = page.Substring(0, pos);
 				return page;
 			}
-			return String.Empty;
+			return "";
 		}
 
 		public virtual bool IsBoardHighTurnover() {
@@ -157,15 +158,15 @@ namespace JDP {
 			List<ImageInfo> imageList = new List<ImageInfo>();
 			bool seenSpoiler = false;
 
-			foreach (HTMLTagRange postTagRange in Enumerable.Where(Enumerable.Select(Enumerable.Where(_htmlParser.FindStartTags("div"),
-				t => HTMLParser.ClassAttributeValueHas(t, "post")), t => _htmlParser.CreateTagRange(t)), r => r != null))
+			foreach (HTMLTagRange postTagRange in _htmlParser.FindStartTags("div").Where(t => HTMLParser.ClassAttributeValueHas(t, "post"))
+				.Select(t => _htmlParser.CreateTagRange(t)).Where(r => r != null))
 			{
-				HTMLTagRange fileTextSpanTagRange = _htmlParser.CreateTagRange(Enumerable.FirstOrDefault(Enumerable.Where(
-					_htmlParser.FindStartTags(postTagRange, "span"), t => HTMLParser.ClassAttributeValueHas(t, "fileText"))));
+				HTMLTagRange fileTextSpanTagRange = _htmlParser.CreateTagRange(_htmlParser.FindStartTags(postTagRange, "span")
+					.Where(t => HTMLParser.ClassAttributeValueHas(t, "fileText")).FirstOrDefault());
 				if (fileTextSpanTagRange == null) continue;
 
-				HTMLTagRange fileThumbLinkTagRange = _htmlParser.CreateTagRange(Enumerable.FirstOrDefault(Enumerable.Where(
-					_htmlParser.FindStartTags(postTagRange, "a"), t => HTMLParser.ClassAttributeValueHas(t, "fileThumb"))));
+				HTMLTagRange fileThumbLinkTagRange = _htmlParser.CreateTagRange(_htmlParser.FindStartTags(postTagRange, "a")
+					.Where(t => HTMLParser.ClassAttributeValueHas(t, "fileThumb")).FirstOrDefault());
 				if (fileThumbLinkTagRange == null) continue;
 
 				HTMLTag fileTextLinkStartTag = _htmlParser.FindStartTag(fileTextSpanTagRange, "a");

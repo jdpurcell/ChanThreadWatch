@@ -50,9 +50,9 @@ namespace JDP {
 			}
 
 			chkPageAuth.Checked = Settings.UsePageAuth ?? false;
-			txtPageAuth.Text = Settings.PageAuth ?? String.Empty;
+			txtPageAuth.Text = Settings.PageAuth ?? "";
 			chkImageAuth.Checked = Settings.UseImageAuth ?? false;
-			txtImageAuth.Text = Settings.ImageAuth ?? String.Empty;
+			txtImageAuth.Text = Settings.ImageAuth ?? "";
 			chkOneTime.Checked = Settings.OneTimeDownload ?? false;
 			cboCheckEvery.SelectedValue = Settings.CheckEvery ?? 3;
 			if (cboCheckEvery.SelectedIndex == -1) cboCheckEvery.SelectedValue = 3;
@@ -540,10 +540,10 @@ namespace JDP {
 		}
 
 		private bool AddThread(string pageURL) {
-			string pageAuth = (chkPageAuth.Checked && (txtPageAuth.Text.IndexOf(':') != -1)) ? txtPageAuth.Text : String.Empty;
-			string imageAuth = (chkImageAuth.Checked && (txtImageAuth.Text.IndexOf(':') != -1)) ? txtImageAuth.Text : String.Empty;
+			string pageAuth = (chkPageAuth.Checked && (txtPageAuth.Text.IndexOf(':') != -1)) ? txtPageAuth.Text : "";
+			string imageAuth = (chkImageAuth.Checked && (txtImageAuth.Text.IndexOf(':') != -1)) ? txtImageAuth.Text : "";
 			int checkInterval = (int)cboCheckEvery.SelectedValue * 60;
-			return AddThread(pageURL, pageAuth, imageAuth, checkInterval, chkOneTime.Checked, null, String.Empty, null, null);
+			return AddThread(pageURL, pageAuth, imageAuth, checkInterval, chkOneTime.Checked, null, "", null, null);
 		}
 
 		private bool AddThread(string pageURL, string pageAuth, string imageAuth, int checkInterval, bool oneTime, string saveDir, string description, StopReason? stopReason, WatcherExtraData extraData) {
@@ -570,9 +570,9 @@ namespace JDP {
 				watcher.DownloadProgress += ThreadWatcher_DownloadProgress;
 				watcher.DownloadEnd += ThreadWatcher_DownloadEnd;
 
-				newListViewItem = new ListViewItem(String.Empty);
+				newListViewItem = new ListViewItem("");
 				for (int i = 1; i < lvThreads.Columns.Count; i++) {
-					newListViewItem.SubItems.Add(String.Empty);
+					newListViewItem.SubItems.Add("");
 				}
 				newListViewItem.Tag = watcher;
 				lvThreads.Items.Add(newListViewItem);
@@ -740,7 +740,7 @@ namespace JDP {
 
 		private void DisplayLastImageOn(ThreadWatcher watcher) {
 			DateTime? time = ((WatcherExtraData)watcher.Tag).LastImageOn;
-			SetSubItemText(watcher, ColumnIndex.LastImageOn, time != null ? time.Value.ToString("yyyy/MM/dd HH:mm:ss") : String.Empty);
+			SetSubItemText(watcher, ColumnIndex.LastImageOn, time != null ? time.Value.ToString("yyyy/MM/dd HH:mm:ss") : "");
 		}
 
 		private void SetDownloadStatus(ThreadWatcher watcher, DownloadType downloadType, int completeCount, int totalCount) {
@@ -808,11 +808,11 @@ namespace JDP {
 					lines.Add(watcher.ImageAuth);
 					lines.Add(watcher.CheckIntervalSeconds.ToString());
 					lines.Add(watcher.OneTimeDownload ? "1" : "0");
-					lines.Add(watcher.ThreadDownloadDirectory != null ? General.GetRelativeDirectoryPath(watcher.ThreadDownloadDirectory, watcher.MainDownloadDirectory) : String.Empty);
-					lines.Add((watcher.IsStopping && watcher.StopReason != StopReason.Exiting) ? ((int)watcher.StopReason).ToString() : String.Empty);
+					lines.Add(watcher.ThreadDownloadDirectory != null ? General.GetRelativeDirectoryPath(watcher.ThreadDownloadDirectory, watcher.MainDownloadDirectory) : "");
+					lines.Add((watcher.IsStopping && watcher.StopReason != StopReason.Exiting) ? ((int)watcher.StopReason).ToString() : "");
 					lines.Add(watcher.Description);
 					lines.Add(extraData.AddedOn.ToUniversalTime().Ticks.ToString());
-					lines.Add(extraData.LastImageOn != null ? extraData.LastImageOn.Value.ToUniversalTime().Ticks.ToString() : String.Empty);
+					lines.Add(extraData.LastImageOn != null ? extraData.LastImageOn.Value.ToUniversalTime().Ticks.ToString() : "");
 				}
 				string path = Path.Combine(Settings.GetSettingsDirectory(), Settings.ThreadsFileName);
 				File.WriteAllLines(path, lines.ToArray());
@@ -862,7 +862,7 @@ namespace JDP {
 						}
 					}
 					else {
-						description = String.Empty;
+						description = "";
 						extraData.AddedOn = DateTime.Now;
 					}
 					AddThread(pageURL, pageAuth, imageAuth, checkIntervalSeconds, oneTimeDownload, saveDir, description, stopReason, extraData);

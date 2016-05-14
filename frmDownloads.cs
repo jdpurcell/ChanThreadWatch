@@ -75,9 +75,9 @@ namespace JDP {
 		public void UpdateDownloadProgress(DownloadProgressInfo info, long? bytesPerSec) {
 			ListViewItem item;
 			if (!_items.TryGetValue(info.DownloadID, out item)) {
-				item = new ListViewItem(String.Empty);
+				item = new ListViewItem("");
 				for (int i = 1; i < lvDownloads.Columns.Count; i++) {
-					item.SubItems.Add(String.Empty);
+					item.SubItems.Add("");
 				}
 				SetSubItemText(item, ColumnIndex.URL, info.URL);
 				SetSubItemText(item, ColumnIndex.Size, GetKilobytesString(info.TotalSize, "KB"));
@@ -102,7 +102,7 @@ namespace JDP {
 		}
 
 		private string GetKilobytesString(long? byteSize, string units) {
-			if (byteSize == null) return String.Empty;
+			if (byteSize == null) return "";
 			return (byteSize.Value / 1024).ToString("#,##0") + " " + units;
 		}
 

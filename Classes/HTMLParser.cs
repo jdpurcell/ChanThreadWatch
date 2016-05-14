@@ -24,7 +24,7 @@ namespace JDP {
 		}
 
 		public string GetInnerHTML(HTMLTag startTag, HTMLTag endTag) {
-			return startTag.IsSelfClosing ? String.Empty : GetSection(_preprocessedHTML, startTag.EndOffset, endTag.Offset);
+			return startTag.IsSelfClosing ? "" : GetSection(_preprocessedHTML, startTag.EndOffset, endTag.Offset);
 		}
 
 		public string GetInnerHTML(HTMLTagRange tagRange) {
@@ -241,7 +241,7 @@ namespace JDP {
 								}
 							}
 							else {
-								attribute.Value = String.Empty;
+								attribute.Value = "";
 							}
 
 							attribute.Length = htmlStart - attribute.Offset;
@@ -454,7 +454,7 @@ namespace JDP {
 		}
 
 		public string GetAttributeValueOrEmpty(string attributeName) {
-			return GetAttributeValue(attributeName) ?? String.Empty;
+			return GetAttributeValue(attributeName) ?? "";
 		}
 	}
 

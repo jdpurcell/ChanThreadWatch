@@ -13,7 +13,7 @@ namespace JDP {
 			txtDownloadFolder.Text = Settings.DownloadFolder;
 			chkRelativePath.Checked = Settings.DownloadFolderIsRelative ?? false;
 			chkCustomUserAgent.Checked = Settings.UseCustomUserAgent ?? false;
-			txtCustomUserAgent.Text = Settings.CustomUserAgent ?? String.Empty;
+			txtCustomUserAgent.Text = Settings.CustomUserAgent ?? "";
 			chkSaveThumbnails.Checked = Settings.SaveThumbnails ?? true;
 			chkRenameDownloadFolderWithDescription.Checked = Settings.RenameDownloadFolderWithDescription ?? false;
 			chkUseOriginalFileNames.Checked = Settings.UseOriginalFileNames ?? false;
