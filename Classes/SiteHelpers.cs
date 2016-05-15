@@ -278,4 +278,41 @@ namespace JDP {
 			get { return "/files/"; }
 		}
 	}
+
+	public class SiteHelper_ttvnw_net : SiteHelper {
+		public override string GetBoardName() {
+			return "Twitch";
+		}
+
+		public override string GetThreadName() {
+			return "Default";
+		}
+
+		public override List<ImageInfo> GetImages(List<ReplaceInfo> replaceList, List<ThumbnailInfo> thumbnailList) {
+			var chunks =
+				from line in _htmlParser.PreprocessedHTML.Split('\n').Select(l => l.Trim())
+				where line.Length != 0 &&
+					  !line.StartsWith("#")
+				let parameters = line.SubstringAfterFirst("?").Split("&")
+				select new {
+					FileName = line.SubstringBeforeFirst("?"),
+					StartOffset = parameters.Single(p => p.StartsWith("start_offset=")).SubstringAfterFirst("=").ParseInt32(),
+					EndOffset = parameters.Single(p => p.StartsWith("end_offset=")).SubstringAfterFirst("=").ParseInt32()
+				};
+
+			var files =
+				from chunk in chunks
+				group chunk by chunk.FileName into g
+				select new {
+					FileName = g.Key,
+					StartOffset = g.Min(c => c.StartOffset),
+					EndOffset = g.Max(c => c.EndOffset)
+				};
+
+			return files.Select(f => new ImageInfo {
+				URL = General.GetAbsoluteURL(_url, String.Format("{0}?start_offset={1}&end_offset={2}", f.FileName, f.StartOffset, f.EndOffset)),
+				OriginalFileName = f.FileName
+			}).ToList();
+		}
+	}
 }
