@@ -289,29 +289,17 @@ namespace JDP {
 		}
 
 		public override List<ImageInfo> GetImages(List<ReplaceInfo> replaceList, List<ThumbnailInfo> thumbnailList) {
-			var chunks =
+			var files =
 				from line in _htmlParser.PreprocessedHTML.Split('\n').Select(l => l.Trim())
 				where line.Length != 0 &&
 					  !line.StartsWith("#")
-				let parameters = line.SubstringAfterFirst("?").Split("&")
 				select new {
-					FileName = line.SubstringBeforeFirst("?"),
-					StartOffset = parameters.Single(p => p.StartsWith("start_offset=")).SubstringAfterFirst("=").ParseInt32(),
-					EndOffset = parameters.Single(p => p.StartsWith("end_offset=")).SubstringAfterFirst("=").ParseInt32()
+					FileName = line
 				};
 
-			var files =
-				from chunk in chunks
-				group chunk by chunk.FileName into g
-				select new {
-					FileName = g.Key,
-					StartOffset = g.Min(c => c.StartOffset),
-					EndOffset = g.Max(c => c.EndOffset)
-				};
-
-			return files.Select(f => new ImageInfo {
-				URL = General.GetAbsoluteURL(_url, String.Format("{0}?start_offset={1}&end_offset={2}", f.FileName, f.StartOffset, f.EndOffset)),
-				OriginalFileName = f.FileName
+			return files.Select((f, i) => new ImageInfo {
+				URL = General.GetAbsoluteURL(_url, f.FileName),
+				OriginalFileName = i.ToString("D6") + ".ts"
 			}).ToList();
 		}
 	}
