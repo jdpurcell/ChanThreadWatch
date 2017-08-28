@@ -1,6 +1,8 @@
 ﻿
-Microsoft Visual Studio Solution File, Format Version 11.00
-# Visual Studio 2010
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 15
+VisualStudioVersion = 15.0.26730.8
+MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChanThreadWatch", "ChanThreadWatch.csproj", "{1DAC6953-5A72-45F4-8677-3F2B0A15F32A}"
 EndProject
 Global
@@ -16,5 +18,8 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {916B734C-69F0-49CF-8540-A5035E4BAFB9}
 	EndGlobalSection
 EndGlobal
