@@ -279,7 +279,7 @@ namespace JDP {
 		}
 	}
 
-	public class SiteHelper_ttvnw_net : SiteHelper {
+	public class SiteHelper_twitch_tv : SiteHelper {
 		public override string GetBoardName() {
 			return "Twitch";
 		}
@@ -292,7 +292,7 @@ namespace JDP {
 			var files =
 				from line in _htmlParser.PreprocessedHTML.Split('\n').Select(l => l.Trim())
 				where line.Length != 0 &&
-					  !line.StartsWith("#")
+					  !line.StartsWith("#", StringComparison.Ordinal)
 				select new {
 					FileName = line
 				};
@@ -303,4 +303,8 @@ namespace JDP {
 			}).ToList();
 		}
 	}
+
+	public class SiteHelper_akamaized_net : SiteHelper_twitch_tv { }
+
+	public class SiteHelper_ttvnw_net : SiteHelper_twitch_tv { }
 }
