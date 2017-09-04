@@ -60,6 +60,11 @@ namespace JDP {
 		}
 	}
 
+	public class PostprocessingTask {
+		public IThreadPostprocessor SiteHelper { get; set; }
+		public string DownloadDirectory { get; set; }
+	}
+
 	public class HTTP404Exception : Exception {
 	}
 

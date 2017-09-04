@@ -26,7 +26,6 @@ namespace JDP {
 		private bool _hasRun;
 		private bool _hasInitialized;
 		private bool _isWaiting;
-		private string _pageURL;
 		private string _pageAuth;
 		private string _imageAuth;
 		private bool _oneTimeDownload;
@@ -50,16 +49,13 @@ namespace JDP {
 		}
 
 		public ThreadWatcher(string pageURL) {
-			_pageURL = pageURL;
+			PageURL = pageURL;
+			PageHost = new Uri(pageURL).Host;
 		}
 
-		public string PageURL {
-			get { return _pageURL; }
-		}
+		public string PageURL { get; }
 
-		private string PageHost {
-			get { return (new Uri(PageURL)).Host; }
-		}
+		public string PageHost { get; }
 
 		public string PageAuth {
 			get { return _pageAuth; }
@@ -293,11 +289,11 @@ namespace JDP {
 						_isWaiting = false;
 
 						if (!_hasInitialized) {
-							siteHelper.SetURL(_pageURL);
+							siteHelper.SetURL(PageURL);
 
 							_pageList = new List<PageInfo> {
 								new PageInfo {
-									URL = _pageURL
+									URL = PageURL
 								}
 							};
 							_imageDiskFileNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);

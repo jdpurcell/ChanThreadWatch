@@ -168,7 +168,7 @@ namespace JDP {
 			if (txtPageURL.Text.Trim().Length == 0) return;
 			string pageURL = General.CleanPageURL(txtPageURL.Text);
 			if (pageURL == null) {
-				MessageBox.Show(this, "The specified URL is invalid.", "Invalid URL", MessageBoxButtons.OK, MessageBoxIcon.Error);
+				ShowErrorMessage("The specified URL is invalid.", "Invalid URL");
 				return;
 			}
 			if (!AddThread(pageURL)) {
@@ -235,16 +235,17 @@ namespace JDP {
 
 		private void miOpenFolder_Click(object sender, EventArgs e) {
 			int selectedCount = lvThreads.SelectedItems.Count;
-			if (selectedCount > 5 && MessageBox.Show(this, "Do you want to open the folders of all " + selectedCount + " selected items?",
+			if (selectedCount > 5 && MessageBox.Show(this, $"Do you want to open the folders of all {selectedCount} selected items?",
 				"Open Folders", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
 			{
 				return;
 			}
 			foreach (ThreadWatcher watcher in SelectedThreadWatchers) {
 				string dir = watcher.ThreadDownloadDirectory;
+				if (dir == null) continue;
 				ThreadPool.QueueUserWorkItem((s) => {
 					try {
-						Process.Start(dir);
+						using (Process.Start(dir)) { }
 					}
 					catch { }
 				});
@@ -253,7 +254,7 @@ namespace JDP {
 
 		private void miOpenURL_Click(object sender, EventArgs e) {
 			int selectedCount = lvThreads.SelectedItems.Count;
-			if (selectedCount > 5 && MessageBox.Show(this, "Do you want to open the URLs of all " + selectedCount + " selected items?",
+			if (selectedCount > 5 && MessageBox.Show(this, $"Do you want to open the URLs of all {selectedCount} selected items?",
 				"Open URLs", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
 			{
 				return;
@@ -262,7 +263,7 @@ namespace JDP {
 				string url = watcher.PageURL;
 				ThreadPool.QueueUserWorkItem((s) => {
 					try {
-						Process.Start(url);
+						using (Process.Start(url)) { }
 					}
 					catch { }
 				});
@@ -280,7 +281,7 @@ namespace JDP {
 				Clipboard.SetText(sb.ToString());
 			}
 			catch (Exception ex) {
-				MessageBox.Show(this, "Unable to copy to clipboard: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+				ShowErrorMessage("Unable to copy to clipboard: " + ex.Message, "Error");
 			}
 		}
 
@@ -296,10 +297,9 @@ namespace JDP {
 			}
 			RemoveThreads(false, true,
 				(watcher) => {
-					try {
-						Directory.Delete(watcher.ThreadDownloadDirectory, true);
-					}
-					catch { }
+					string dir = watcher.ThreadDownloadDirectory;
+					if (dir == null) return;
+					Directory.Delete(watcher.ThreadDownloadDirectory, true);
 				});
 		}
 
@@ -319,6 +319,37 @@ namespace JDP {
 				UpdateWaitingWatcherStatuses();
 			}
 			_saveThreadList = true;
+		}
+
+		private void miPostprocess_Click(object sender, EventArgs e) {
+			var tasks = new List<PostprocessingTask>();
+
+			foreach (ThreadWatcher watcher in SelectedThreadWatchers) {
+				if (watcher.IsRunning) continue;
+				IThreadPostprocessor siteHelper = SiteHelper.GetInstance(watcher.PageHost) as IThreadPostprocessor;
+				if (siteHelper == null) continue;
+				string downloadDirectory = watcher.ThreadDownloadDirectory;
+				if (downloadDirectory == null) continue;
+				tasks.Add(new PostprocessingTask {
+					SiteHelper = siteHelper,
+					DownloadDirectory = downloadDirectory
+				});
+			}
+
+			bool anyFailed = false;
+			RunWorkSynchronous(() => {
+				foreach (PostprocessingTask task in tasks) {
+					try {
+						task.SiteHelper.Postprocess(task.DownloadDirectory);
+					}
+					catch {
+						anyFailed = true;
+					}
+				}
+			});
+			if (anyFailed) {
+				ShowErrorMessage("Postprocessing failed.", "Error");
+			}
 		}
 
 		private void btnDownloads_Click(object sender, EventArgs e) {
@@ -366,10 +397,12 @@ namespace JDP {
 				if (selectedCount != 0) {
 					bool anyRunning = false;
 					bool anyStopped = false;
+					bool anyCanPostprocess = false;
 					foreach (ThreadWatcher watcher in SelectedThreadWatchers) {
 						bool isRunning = watcher.IsRunning;
 						anyRunning |= isRunning;
 						anyStopped |= !isRunning;
+						anyCanPostprocess |= !isRunning && SiteHelper.GetInstance(watcher.PageHost) is IThreadPostprocessor;
 					}
 					miEditDescription.Visible = selectedCount == 1;
 					miStop.Visible = anyRunning;
@@ -378,6 +411,7 @@ namespace JDP {
 					miCheckEvery.Visible = anyRunning;
 					miRemove.Visible = anyStopped;
 					miRemoveAndDeleteFolder.Visible = anyStopped;
+					miPostprocess.Visible = anyCanPostprocess;
 					cmThreads.Show(lvThreads, e.Location);
 				}
 			}
@@ -535,27 +569,43 @@ namespace JDP {
 			}
 		}
 
+		private void ShowErrorMessage(string message, string title) {
+			MessageBox.Show(this, message, title, MessageBoxButtons.OK, MessageBoxIcon.Error);
+		}
+
+		private void RunWorkSynchronous(Action action) {
+			using (var waitForm = new frmWait()) {
+				var thread = new Thread(() => {
+					action();
+					waitForm.OnWorkComplete();
+				});
+				thread.Start();
+				waitForm.ShowDialog(this);
+				thread.Join();
+			}
+		}
+
 		private bool AddThread(string pageURL, bool silent = false) {
 			string pageAuth = (chkPageAuth.Checked && (txtPageAuth.Text.IndexOf(':') != -1)) ? txtPageAuth.Text : "";
 			string imageAuth = (chkImageAuth.Checked && (txtImageAuth.Text.IndexOf(':') != -1)) ? txtImageAuth.Text : "";
 			int checkInterval = (int)cboCheckEvery.SelectedValue * 60;
 
-			void ShowError(string message, string title) {
-				if (silent) return;
-				MessageBox.Show(this, message, title, MessageBoxButtons.OK, MessageBoxIcon.Error);
-			}
-
-			try {
-				// TODO: This shouldn't run in the UI thread
-				pageURL = URLTransformer.Transform(pageURL, pageAuth);
-			}
-			catch {
-				ShowError("Unable to transform the URL.", "Error");
+			bool wasTransformSuccessful = false;
+			RunWorkSynchronous(() => {
+				try {
+					pageURL = URLTransformer.Transform(pageURL, pageAuth);
+					wasTransformSuccessful = true;
+				}
+				catch { }
+			});
+			if (!wasTransformSuccessful) {
+				if (!silent) ShowErrorMessage("Unable to transform the URL.", "Error");
 				return false;
 			}
 
-			if (!AddThread(pageURL, pageAuth, imageAuth, checkInterval, chkOneTime.Checked, null, "", null, null)) {
-				ShowError("The same thread is already being watched or downloaded.", "Duplicate Thread");
+			bool wasAdded = AddThread(pageURL, pageAuth, imageAuth, checkInterval, chkOneTime.Checked, null, "", null, null);
+			if (!wasAdded) {
+				if (!silent) ShowErrorMessage("The same thread is already being watched or downloaded.", "Duplicate Thread");
 				return false;
 			}
 
@@ -625,19 +675,13 @@ namespace JDP {
 			return true;
 		}
 
-		private void RemoveThreads(bool removeCompleted, bool removeSelected) {
-			RemoveThreads(removeCompleted, removeSelected, null);
-		}
-
-		private void RemoveThreads(bool removeCompleted, bool removeSelected, Action<ThreadWatcher> preRemoveAction) {
+		private void RemoveThreads(bool removeCompleted, bool removeSelected, Action<ThreadWatcher> preRemoveAction = null) {
 			int i = 0;
 			while (i < lvThreads.Items.Count) {
 				ThreadWatcher watcher = (ThreadWatcher)lvThreads.Items[i].Tag;
 				if ((removeCompleted || (removeSelected && lvThreads.Items[i].Selected)) && !watcher.IsRunning) {
-					if (preRemoveAction != null) {
-						try { preRemoveAction(watcher); }
-						catch { }
-					}
+					try { preRemoveAction?.Invoke(watcher); }
+					catch { }
 					lvThreads.Items.RemoveAt(i);
 				}
 				else {

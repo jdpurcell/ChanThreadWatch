@@ -25,14 +25,6 @@ namespace JDP {
 			return Substring(str, delim, true, true, comparisonType, defaultValue);
 		}
 
-		public static string[] Split(this string str, params string[] separator) {
-			return str.Split(separator, StringSplitOptions.None);
-		}
-
-		public static int ParseInt32(this string str) {
-			return Int32.Parse(str);
-		}
-
 		public static IAsyncResult BeginInvoke(this Control control, Action action) {
 			return control.BeginInvoke(action);
 		}

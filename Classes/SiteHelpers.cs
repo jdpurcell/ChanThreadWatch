@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Web;
@@ -308,7 +309,7 @@ namespace JDP {
 		}
 	}
 
-	public class SiteHelper_TwitchVOD : SiteHelper {
+	public class SiteHelper_TwitchVOD : SiteHelper, IThreadPostprocessor {
 		public static string[] Hosts { get; } = {
 			"twitch.tv",
 			"hls.ttvnw.net",
@@ -343,8 +344,33 @@ namespace JDP {
 
 			return files.Select((f, i) => new ImageInfo {
 				URL = General.GetAbsoluteURL(URL, f.FileName),
-				RequiredFileName = i.ToString("D6") + ".ts"
+				RequiredFileName = $"{i:D6}.ts"
 			}).ToList();
 		}
+
+		public void Postprocess(string downloadDirectory) {
+			List<string> files =
+				(from path in Directory.GetFiles(downloadDirectory, "*.ts")
+				 let name = Path.GetFileNameWithoutExtension(path)
+				 where name.All(Char.IsDigit)
+				 let sequence = Int32.Parse(name)
+				 orderby sequence
+				 select path).ToList();
+			if (files.Count == 0) return;
+			using (FileStream dst = File.Create(Path.Combine(downloadDirectory, "stream.ts"))) {
+				foreach (string path in files) {
+					using (FileStream src = File.OpenRead(path)) {
+						src.CopyTo(dst);
+					}
+				}
+			}
+			foreach (string path in files) {
+				try { File.Delete(path); } catch { }
+			}
+		}
+	}
+
+	public interface IThreadPostprocessor {
+		void Postprocess(string downloadDirectory);
 	}
 }
