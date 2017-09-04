@@ -1,47 +1,56 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using System.Web;
 
 namespace JDP {
 	public class SiteHelper {
-		protected string _url = "";
-		protected HTMLParser _htmlParser;
+		private static readonly Dictionary<string, Type> _siteHelpersByHost;
+
+		protected string URL { get; private set; }
+
+		protected HTMLParser Parser { get; private set; }
+
+		static SiteHelper() {
+			_siteHelpersByHost =
+				(from t in Assembly.GetExecutingAssembly().GetTypes()
+				 where t.IsSubclassOf(typeof(SiteHelper))
+				 let hosts = (string[])t.InvokeMember("Hosts", BindingFlags.GetProperty, null, null, null)
+				 from host in hosts
+				 select new {
+					 Host = host,
+					 Type = t
+				 }).ToDictionary(n => n.Host, n => n.Type, StringComparer.OrdinalIgnoreCase);
+		}
 
 		public static SiteHelper GetInstance(string host) {
-			Type type = null;
-			try {
-				string ns = (typeof(SiteHelper)).Namespace;
-				string[] hostSplit = host.ToLower(CultureInfo.InvariantCulture).Split('.');
-				for (int i = 0; i < hostSplit.Length - 1; i++) {
-					type = Assembly.GetExecutingAssembly().GetType(ns +	".SiteHelper_" +
-						String.Join("_", hostSplit, i, hostSplit.Length - i));
-					if (type != null) break;
+			List<string> hostSplit = host.Split('.').ToList();
+			while (hostSplit.Count > 0) {
+				if (_siteHelpersByHost.TryGetValue(String.Join(".", hostSplit), out Type type)) {
+					return (SiteHelper)Activator.CreateInstance(type);
 				}
+				hostSplit.RemoveAt(0);
 			}
-			catch { }
-			if (type == null) type = typeof(SiteHelper);
-			return (SiteHelper)Activator.CreateInstance(type);
+			return new SiteHelper();
 		}
 
 		public void SetURL(string url) {
-			_url = url;
+			URL = url;
 		}
 
 		public void SetHTMLParser(HTMLParser htmlParser) {
-			_htmlParser = htmlParser;
+			Parser = htmlParser;
 		}
 
 		protected string[] SplitURL() {
-			int pos = _url.IndexOf("://", StringComparison.Ordinal);
+			int pos = URL.IndexOf("://", StringComparison.Ordinal);
 			if (pos == -1) return new string[0];
-			return _url.Substring(pos + 3).Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
+			return URL.Substring(pos + 3).Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
 		}
 
 		public virtual string GetSiteName() {
-			string[] hostSplit = (new Uri(_url)).Host.Split('.');
+			string[] hostSplit = (new Uri(URL)).Host.Split('.');
 			return (hostSplit.Length >= 2) ? hostSplit[hostSplit.Length - 2] : "";
 		}
 
@@ -79,13 +88,13 @@ namespace JDP {
 			string url;
 			int pos;
 
-			foreach (HTMLTag linkTag in _htmlParser.FindStartTags("a")) {
+			foreach (HTMLTag linkTag in Parser.FindStartTags("a")) {
 				attribute = linkTag.GetAttribute("href");
 				if (attribute == null) continue;
-				url = General.GetAbsoluteURL(_url, HttpUtility.HtmlDecode(attribute.Value));
+				url = General.GetAbsoluteURL(URL, HttpUtility.HtmlDecode(attribute.Value));
 				if (url == null || url.IndexOf(ImageURLKeyword, StringComparison.OrdinalIgnoreCase) == -1) continue;
 
-				HTMLTag linkEndTag = _htmlParser.FindCorrespondingEndTag(linkTag);
+				HTMLTag linkEndTag = Parser.FindCorrespondingEndTag(linkTag);
 				if (linkEndTag == null) continue;
 
 				ImageInfo image = new ImageInfo();
@@ -97,7 +106,7 @@ namespace JDP {
 					image.URL.LastIndexOf("http://", StringComparison.OrdinalIgnoreCase),
 					image.URL.LastIndexOf("https://", StringComparison.OrdinalIgnoreCase));
 				if (pos == -1) {
-					image.Referer = _url;
+					image.Referer = URL;
 				}
 				else {
 					image.Referer = image.URL;
@@ -111,15 +120,15 @@ namespace JDP {
 						Tag = image.FileName
 					});
 
-				HTMLTag imageTag = _htmlParser.FindStartTag(linkTag, linkEndTag, "img");
+				HTMLTag imageTag = Parser.FindStartTag(linkTag, linkEndTag, "img");
 				if (imageTag != null) {
 					attribute = imageTag.GetAttribute("src");
 					if (attribute != null) {
-						url = General.GetAbsoluteURL(_url, HttpUtility.HtmlDecode(attribute.Value));
+						url = General.GetAbsoluteURL(URL, HttpUtility.HtmlDecode(attribute.Value));
 						if (url != null) {
 							thumb = new ThumbnailInfo();
 							thumb.URL = url;
-							thumb.Referer = _url;
+							thumb.Referer = URL;
 							replaceList?.Add(
 								new ReplaceInfo {
 									Offset = attribute.Offset,
@@ -149,7 +158,11 @@ namespace JDP {
 		}
 	}
 
-	public class SiteHelper_4chan_org : SiteHelper {
+	public class SiteHelper_4chan : SiteHelper {
+		public static string[] Hosts { get; } = {
+			"4chan.org"
+		};
+
 		public override string GetThreadName() {
 			string[] urlSplit = SplitURL();
 			if (urlSplit.Length >= 4 && urlSplit[2].Equals("thread", StringComparison.Ordinal)) {
@@ -165,21 +178,21 @@ namespace JDP {
 			List<ImageInfo> imageList = new List<ImageInfo>();
 			bool seenSpoiler = false;
 
-			foreach (HTMLTagRange postTagRange in _htmlParser.FindStartTags("div").Where(t => HTMLParser.ClassAttributeValueHas(t, "post"))
-				.Select(t => _htmlParser.CreateTagRange(t)).Where(r => r != null))
+			foreach (HTMLTagRange postTagRange in Parser.FindStartTags("div").Where(t => HTMLParser.ClassAttributeValueHas(t, "post"))
+				.Select(t => Parser.CreateTagRange(t)).Where(r => r != null))
 			{
-				HTMLTagRange fileTextDivTagRange = _htmlParser.CreateTagRange(_htmlParser.FindStartTags(postTagRange, "div")
+				HTMLTagRange fileTextDivTagRange = Parser.CreateTagRange(Parser.FindStartTags(postTagRange, "div")
 					.Where(t => HTMLParser.ClassAttributeValueHas(t, "fileText")).FirstOrDefault());
 				if (fileTextDivTagRange == null) continue;
 
-				HTMLTagRange fileThumbLinkTagRange = _htmlParser.CreateTagRange(_htmlParser.FindStartTags(postTagRange, "a")
+				HTMLTagRange fileThumbLinkTagRange = Parser.CreateTagRange(Parser.FindStartTags(postTagRange, "a")
 					.Where(t => HTMLParser.ClassAttributeValueHas(t, "fileThumb")).FirstOrDefault());
 				if (fileThumbLinkTagRange == null) continue;
 
-				HTMLTag fileTextLinkStartTag = _htmlParser.FindStartTag(fileTextDivTagRange, "a");
+				HTMLTag fileTextLinkStartTag = Parser.FindStartTag(fileTextDivTagRange, "a");
 				if (fileTextLinkStartTag == null) continue;
 
-				HTMLTag fileThumbImageTag = _htmlParser.FindStartTag(fileThumbLinkTagRange, "img");
+				HTMLTag fileThumbImageTag = Parser.FindStartTag(fileThumbLinkTagRange, "img");
 				if (fileThumbImageTag == null) continue;
 
 				string imageURL = fileTextLinkStartTag.GetAttributeValue("href");
@@ -199,9 +212,9 @@ namespace JDP {
 					originalFileName = fileTextLinkStartTag.GetAttributeValue("title");
 					// Otherwise, the link's innerHTML contains the original filename
 					if (originalFileName == null) {
-						HTMLTagRange fileTextLinkTagRange = _htmlParser.CreateTagRange(fileTextLinkStartTag);
+						HTMLTagRange fileTextLinkTagRange = Parser.CreateTagRange(fileTextLinkStartTag);
 						if (fileTextLinkTagRange == null) continue;
-						originalFileName = _htmlParser.GetInnerHTML(fileTextLinkTagRange);
+						originalFileName = Parser.GetInnerHTML(fileTextLinkTagRange);
 					}
 				}
 				if (originalFileName == null) continue;
@@ -210,8 +223,8 @@ namespace JDP {
 				if (imageMD5 == null) continue;
 
 				ImageInfo image = new ImageInfo {
-					URL = General.GetAbsoluteURL(_url, HttpUtility.HtmlDecode(imageURL)),
-					Referer = _url,
+					URL = General.GetAbsoluteURL(URL, HttpUtility.HtmlDecode(imageURL)),
+					Referer = URL,
 					OriginalFileName = General.CleanFileName(HttpUtility.HtmlDecode(originalFileName)),
 					HashType = HashType.MD5,
 					Hash = General.TryBase64Decode(imageMD5)
@@ -219,8 +232,8 @@ namespace JDP {
 				if (image.URL.Length == 0 || image.FileName.Length == 0 || image.Hash == null) continue;
 
 				ThumbnailInfo thumb = new ThumbnailInfo {
-					URL = General.GetAbsoluteURL(_url, HttpUtility.HtmlDecode(thumbURL)),
-					Referer = _url
+					URL = General.GetAbsoluteURL(URL, HttpUtility.HtmlDecode(thumbURL)),
+					Referer = URL
 				};
 				if (thumb.URL == null || thumb.FileName.Length == 0) continue;
 
@@ -277,7 +290,11 @@ namespace JDP {
 		}
 	}
 
-	public class SiteHelper_krautchan_net : SiteHelper {
+	public class SiteHelper_Krautchan : SiteHelper {
+		public static string[] Hosts { get; } = {
+			"krautchan.net"
+		};
+
 		public override string GetThreadName() {
 			string threadName = base.GetThreadName();
 			if (threadName.StartsWith("thread-", StringComparison.Ordinal)) {
@@ -291,7 +308,13 @@ namespace JDP {
 		}
 	}
 
-	public class SiteHelper_twitch_tv : SiteHelper {
+	public class SiteHelper_Twitch : SiteHelper {
+		public static string[] Hosts { get; } = {
+			"twitch.tv",
+			"akamaized.net",
+			"ttvnw.net"
+		};
+
 		public override string GetBoardName() {
 			return "Twitch";
 		}
@@ -302,7 +325,7 @@ namespace JDP {
 
 		public override List<ImageInfo> GetImages(List<ReplaceInfo> replaceList, List<ThumbnailInfo> thumbnailList) {
 			var files =
-				from line in _htmlParser.PreprocessedHTML.Split('\n').Select(l => l.Trim())
+				from line in Parser.PreprocessedHTML.Split('\n').Select(l => l.Trim())
 				where line.Length != 0 &&
 					  !line.StartsWith("#", StringComparison.Ordinal)
 				select new {
@@ -310,13 +333,9 @@ namespace JDP {
 				};
 
 			return files.Select((f, i) => new ImageInfo {
-				URL = General.GetAbsoluteURL(_url, f.FileName),
-				OriginalFileName = i.ToString("D6") + ".ts"
+				URL = General.GetAbsoluteURL(URL, f.FileName),
+				RequiredFileName = i.ToString("D6") + ".ts"
 			}).ToList();
 		}
 	}
-
-	public class SiteHelper_akamaized_net : SiteHelper_twitch_tv { }
-
-	public class SiteHelper_ttvnw_net : SiteHelper_twitch_tv { }
 }

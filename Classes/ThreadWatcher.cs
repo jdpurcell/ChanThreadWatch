@@ -458,14 +458,20 @@ namespace JDP {
 						ImageInfo image = pendingImages.Dequeue();
 						bool pathTooLong = false;
 
+						void ConfigureSaveFileName(string fileName) {
+							saveFileNameNoExtension = Path.GetFileNameWithoutExtension(fileName);
+							saveExtension = Path.GetExtension(fileName);
+						}
+
 					MakeImagePath:
-						if ((Settings.UseOriginalFileNames == true) && !String.IsNullOrEmpty(image.OriginalFileName) && !pathTooLong) {
-							saveFileNameNoExtension = Path.GetFileNameWithoutExtension(image.OriginalFileName);
-							saveExtension = Path.GetExtension(image.OriginalFileName);
+						if (!String.IsNullOrEmpty(image.RequiredFileName)) {
+							ConfigureSaveFileName(image.RequiredFileName);
+						}
+						else if ((Settings.UseOriginalFileNames == true) && !String.IsNullOrEmpty(image.OriginalFileName) && !pathTooLong) {
+							ConfigureSaveFileName(image.OriginalFileName);
 						}
 						else {
-							saveFileNameNoExtension = Path.GetFileNameWithoutExtension(image.FileName);
-							saveExtension = Path.GetExtension(image.FileName);
+							ConfigureSaveFileName(image.FileName);
 						}
 
 						int iSuffix = 1;

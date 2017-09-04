@@ -33,6 +33,7 @@ namespace JDP {
 		public string URL { get; set; }
 		public string Referer { get; set; }
 		public string OriginalFileName { get; set; }
+		public string RequiredFileName { get; set; }
 		public HashType HashType { get; set; }
 		public byte[] Hash { get; set; }
 
