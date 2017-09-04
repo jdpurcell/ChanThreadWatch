@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Windows.Forms;
 
 namespace JDP {
 	public static class ExtensionMethods {
@@ -30,6 +31,14 @@ namespace JDP {
 
 		public static int ParseInt32(this string str) {
 			return Int32.Parse(str);
+		}
+
+		public static IAsyncResult BeginInvoke(this Control control, Action action) {
+			return control.BeginInvoke(action);
+		}
+
+		public static object Invoke(this Control control, Action action) {
+			return control.Invoke(action);
 		}
 	}
 }

@@ -24,8 +24,8 @@ namespace JDP {
 	}
 
 	public class DownloadedSizeSnapshot {
-		public long Ticks { get; set; }
-		public long DownloadedSize { get; set; }
+		public long Ticks { get; }
+		public long DownloadedSize { get; }
 
 		public DownloadedSizeSnapshot(long ticks, long downloadedSize) {
 			Ticks = ticks;
@@ -34,8 +34,8 @@ namespace JDP {
 	}
 
 	public class ListItemInt32 {
-		public int Value { get; private set; }
-		public string Text { get; private set; }
+		public int Value { get; }
+		public string Text { get; }
 
 		public ListItemInt32(int value, string text) {
 			Value = value;

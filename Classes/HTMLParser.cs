@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Collections.Generic;
 
 namespace JDP {
@@ -40,11 +41,8 @@ namespace JDP {
 		}
 
 		public IEnumerable<HTMLTag> FindTags(bool isEndTag, HTMLTag startAfterTag, HTMLTag stopBeforeTag, params string[] names) {
-			foreach (HTMLTag tag in EnumerateTags(startAfterTag, stopBeforeTag)) {
-				if (tag.IsEnd == isEndTag && tag.NameEqualsAny(names)) {
-					yield return tag;
-				}
-			}
+			return EnumerateTags(startAfterTag, stopBeforeTag)
+				.Where(tag => tag.IsEnd == isEndTag && tag.NameEqualsAny(names));
 		}
 
 		public IEnumerable<HTMLTag> FindTags(bool isEndTag, HTMLTagRange containingTagRange, params string[] names) {
@@ -149,11 +147,8 @@ namespace JDP {
 		}
 
 		private int GetTagIndex(HTMLTag tag) {
-			int i;
-			if (!_offsetToIndex.TryGetValue(tag.Offset, out i)) {
+			return _offsetToIndex.TryGetValue(tag.Offset, out int i) ? i :
 				throw new Exception("Unable to locate the specified tag.");
-			}
-			return i;
 		}
 
 		private static string Preprocess(string html) {

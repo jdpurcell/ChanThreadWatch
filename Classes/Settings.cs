@@ -8,7 +8,7 @@ namespace JDP {
 	public static class Settings {
 		private const string _appName = "Chan Thread Watch";
 
-		private static Dictionary<string, string> _settings;
+		private static readonly Dictionary<string, string> _settings = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
 		public static bool? UseCustomUserAgent {
 			get { return GetBool("UseCustomUserAgent"); }
@@ -145,8 +145,7 @@ namespace JDP {
 
 		private static string Get(string name) {
 			lock (_settings) {
-				string value;
-				return _settings.TryGetValue(name, out value) ? value : null;
+				return _settings.TryGetValue(name, out string value) ? value : null;
 			}
 		}
 
@@ -159,16 +158,14 @@ namespace JDP {
 		private static int? GetInt(string name) {
 			string value = Get(name);
 			if (value == null) return null;
-			int x;
-			return Int32.TryParse(value, out x) ? x : (int?)null;
+			return Int32.TryParse(value, out int x) ? x : (int?)null;
 		}
 
 		private static DateTime? GetDate(string name) {
 			string value = Get(name);
 			if (value == null) return null;
-			DateTime x;
 			return DateTime.TryParseExact(value, "yyyyMMdd", CultureInfo.InvariantCulture,
-				DateTimeStyles.None, out x) ? x : (DateTime?)null;
+				DateTimeStyles.None, out DateTime x) ? x : (DateTime?)null;
 		}
 
 		private static void Set(string name, string value) {
@@ -197,7 +194,7 @@ namespace JDP {
 		public static void Load() {
 			string path = Path.Combine(GetSettingsDirectory(), SettingsFileName);
 
-			_settings = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+			_settings.Clear();
 
 			if (!File.Exists(path)) {
 				return;

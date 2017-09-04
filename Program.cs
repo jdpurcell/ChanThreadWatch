@@ -6,11 +6,11 @@ using System.Threading;
 using System.Windows.Forms;
 
 namespace JDP {
-	static class Program {
+	internal static class Program {
 		private static Mutex _mutex;
 
 		[STAThread]
-		static void Main() {
+		private static void Main() {
 			Application.EnableVisualStyles();
 			Application.SetCompatibleTextRenderingDefault(false);
 			if (!ObtainMutex()) {
@@ -20,7 +20,7 @@ namespace JDP {
 			Application.Run(new frmChanThreadWatch());
 		}
 
-		public static bool ObtainMutex() {
+		private static bool ObtainMutex() {
 			return ObtainMutex(Settings.GetSettingsDirectory());
 		}
 
@@ -28,25 +28,19 @@ namespace JDP {
 			SecurityIdentifier sid = new SecurityIdentifier(WellKnownSidType.WorldSid, null);
 			MutexSecurity security = new MutexSecurity();
 			bool useDefaultSecurity = false;
-			bool createdNew;
 			try {
 				security.AddAccessRule(new MutexAccessRule(sid, MutexRights.FullControl, AccessControlType.Allow));
 				security.AddAccessRule(new MutexAccessRule(sid, MutexRights.ChangePermissions, AccessControlType.Deny));
 				security.AddAccessRule(new MutexAccessRule(sid, MutexRights.Delete, AccessControlType.Deny));
 			}
-			catch (Exception ex) {
-				if (ex is ArgumentOutOfRangeException || ex is NotImplementedException) {
-					// Workaround for Mono
-					useDefaultSecurity = true;
-				}
-				else {
-					throw;
-				}
+			catch (Exception ex) when (ex is ArgumentOutOfRangeException || ex is NotImplementedException) {
+				// Workaround for Mono
+				useDefaultSecurity = true;
 			}
 			string name = @"Global\ChanThreadWatch_" + General.Calculate64BitMD5(Encoding.UTF8.GetBytes(
 				settingsFolder.ToUpperInvariant())).ToString("X16");
 			Mutex mutex = !useDefaultSecurity ?
-				new Mutex(false, name, out createdNew, security) :
+				new Mutex(false, name, out bool _, security) :
 				new Mutex(false, name);
 			try {
 				if (!mutex.WaitOne(0, false)) {

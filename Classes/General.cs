@@ -14,19 +14,7 @@ namespace JDP {
 		public static string Version {
 			get {
 				Version ver = Assembly.GetExecutingAssembly().GetName().Version;
-				return ver.Major + "." + ver.Minor + "." + ver.Revision;
-			}
-		}
-
-		public static string ReleaseDate {
-			get {
-				return "2012-Sep-30";
-			}
-		}
-
-		public static string ProgramURL {
-			get {
-				return "http://sites.google.com/site/chanthreadwatch/";
+				return $"{ver.Major}.{ver.Minor}.{ver.Revision}";
 			}
 		}
 
@@ -347,13 +335,9 @@ namespace JDP {
 		}
 
 		public static string GetAbsoluteURL(string baseURL, string relativeURL) {
+			// AbsoluteUri can throw undocumented Exception (e.g. for "mailto:+")
 			try {
-				Uri uri;
-				if (!Uri.TryCreate(new Uri(baseURL), relativeURL, out uri)) {
-					return null;
-				}
-				// AbsoluteUri can throw undocumented Exception (e.g. for "mailto:+")
-				return uri.AbsoluteUri;
+				return Uri.TryCreate(new Uri(baseURL), relativeURL, out Uri uri) ? uri.AbsoluteUri : null;
 			}
 			catch { return null; }
 		}
@@ -374,9 +358,7 @@ namespace JDP {
 			}
 			if (url.IndexOf('/', url.IndexOf("//", StringComparison.Ordinal) + 2) == -1) return null;
 			try {
-				Uri uri;
-				if (!Uri.TryCreate(url, UriKind.Absolute, out uri)) return null;
-				return uri.AbsoluteUri;
+				return Uri.TryCreate(url, UriKind.Absolute, out Uri uri) ? uri.AbsoluteUri : null;
 			}
 			catch { return null; }
 		}
@@ -423,14 +405,14 @@ namespace JDP {
 		}
 
 		public static string GetLastDirectory(string dir) {
-			char[] separators = new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar };
+			char[] separators = { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar };
 			dir = dir.TrimEnd(separators);
 			int pos = dir.LastIndexOfAny(separators);
 			return (pos == -1) ? dir : dir.Substring(pos + 1);
 		}
 
 		public static string RemoveLastDirectory(string dir) {
-			char[] separators = new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar };
+			char[] separators = { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar };
 			dir = dir.TrimEnd(separators);
 			int pos = dir.LastIndexOfAny(separators);
 			return (pos == -1) ? "" : dir.Substring(0, pos);
@@ -487,9 +469,7 @@ namespace JDP {
 		}
 
 		public static void EnsureThreadPoolMaxThreads(int minWorkerThreads, int minCompletionPortThreads) {
-			int workerThreads;
-			int completionPortThreads;
-			ThreadPool.GetMaxThreads(out workerThreads, out completionPortThreads);
+			ThreadPool.GetMaxThreads(out int workerThreads, out int completionPortThreads);
 			if (workerThreads < minWorkerThreads || completionPortThreads < minCompletionPortThreads) {
 				ThreadPool.SetMaxThreads(Math.Max(workerThreads, minWorkerThreads), Math.Max(completionPortThreads, minCompletionPortThreads));
 			}

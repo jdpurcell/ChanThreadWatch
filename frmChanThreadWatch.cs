@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Windows.Forms;
@@ -10,9 +11,8 @@ using JDP.Properties;
 
 namespace JDP {
 	public partial class frmChanThreadWatch : Form {
-		private Dictionary<long, DownloadProgressInfo> _downloadProgresses = new Dictionary<long, DownloadProgressInfo>();
+		private readonly Dictionary<long, DownloadProgressInfo> _downloadProgresses = new Dictionary<long, DownloadProgressInfo>();
 		private frmDownloads _downloadForm;
-		private object _startupPromptSync = new object();
 		private bool _isExiting;
 		private bool _saveThreadList;
 		private int _itemAreaY;
@@ -339,9 +339,8 @@ namespace JDP {
 		}
 
 		private void btnAbout_Click(object sender, EventArgs e) {
-			MessageBox.Show(this, String.Format("Chan Thread Watch{0}Version {1} ({2}){0}Author: JDP (jart1126@yahoo.com){0}{3}",
-				Environment.NewLine, General.Version, General.ReleaseDate, General.ProgramURL), "About",
-				MessageBoxButtons.OK, MessageBoxIcon.Information);
+			MessageBox.Show(this, String.Format("Chan Thread Watch{0}Version {1}{0}Author: J.D. Purcell",
+				Environment.NewLine, General.Version), "About", MessageBoxButtons.OK, MessageBoxIcon.Information);
 		}
 
 		private void lvThreads_KeyDown(object sender, KeyEventArgs e) {
@@ -466,7 +465,7 @@ namespace JDP {
 				extraData.PreviousDownloadWasPage = false;
 				isFirstImageUpdate = true;
 			}
-			BeginInvoke(() => {
+			this.BeginInvoke(() => {
 				SetDownloadStatus(watcher, args.DownloadType, args.CompleteCount, args.TotalCount);
 				if (isInitialPageDownload) {
 					DisplayDescription(watcher);
@@ -481,14 +480,14 @@ namespace JDP {
 		}
 
 		private void ThreadWatcher_WaitStatus(ThreadWatcher watcher, EventArgs args) {
-			BeginInvoke(() => {
+			this.BeginInvoke(() => {
 				SetWaitStatus(watcher);
 				SetupWaitTimer();
 			});
 		}
 
 		private void ThreadWatcher_StopStatus(ThreadWatcher watcher, StopStatusEventArgs args) {
-			BeginInvoke(() => {
+			this.BeginInvoke(() => {
 				SetStopStatus(watcher, args.StopReason);
 				SetupWaitTimer();
 				if (args.StopReason != StopReason.UserRequest && args.StopReason != StopReason.Exiting) {
@@ -498,7 +497,7 @@ namespace JDP {
 		}
 
 		private void ThreadWatcher_ThreadDownloadDirectoryRename(ThreadWatcher watcher, EventArgs args) {
-			BeginInvoke(() => {
+			this.BeginInvoke(() => {
 				_saveThreadList = true;
 			});
 		}
@@ -756,14 +755,13 @@ namespace JDP {
 				default:
 					return;
 			}
-			string status = hideDetail ? "Downloading " + type :
-				String.Format("Downloading {0}: {1} of {2} completed", type, completeCount, totalCount);
+			string status = hideDetail ? $"Downloading {type}" : $"Downloading {type}: {completeCount} of {totalCount} completed";
 			DisplayStatus(watcher, status);
 		}
 
 		private void SetWaitStatus(ThreadWatcher watcher) {
 			int remainingSeconds = (watcher.MillisecondsUntilNextCheck + 999) / 1000;
-			DisplayStatus(watcher, String.Format("Waiting {0} seconds", remainingSeconds));
+			DisplayStatus(watcher, $"Waiting {remainingSeconds} seconds");
 		}
 
 		private void SetStopStatus(ThreadWatcher watcher, StopReason stopReason) {
@@ -808,7 +806,7 @@ namespace JDP {
 					lines.Add((watcher.IsStopping && watcher.StopReason != StopReason.Exiting) ? ((int)watcher.StopReason).ToString() : "");
 					lines.Add(watcher.Description);
 					lines.Add(extraData.AddedOn.ToUniversalTime().Ticks.ToString());
-					lines.Add(extraData.LastImageOn != null ? extraData.LastImageOn.Value.ToUniversalTime().Ticks.ToString() : "");
+					lines.Add(extraData.LastImageOn?.ToUniversalTime().Ticks.ToString() ?? "");
 				}
 				string path = Path.Combine(Settings.GetSettingsDirectory(), Settings.ThreadsFileName);
 				File.WriteAllLines(path, lines.ToArray());
@@ -867,29 +865,11 @@ namespace JDP {
 			catch { }
 		}
 
-		private IAsyncResult BeginInvoke(MethodInvoker method) {
-			return BeginInvoke((Delegate)method);
-		}
+		private IEnumerable<ThreadWatcher> ThreadWatchers =>
+			lvThreads.Items.Cast<ListViewItem>().Select(n => (ThreadWatcher)n.Tag);
 
-		private object Invoke(MethodInvoker method) {
-			return Invoke((Delegate)method);
-		}
-
-		private IEnumerable<ThreadWatcher> ThreadWatchers {
-			get {
-				foreach (ListViewItem item in lvThreads.Items) {
-					yield return (ThreadWatcher)item.Tag;
-				}
-			}
-		}
-
-		private IEnumerable<ThreadWatcher> SelectedThreadWatchers {
-			get {
-				foreach (ListViewItem item in lvThreads.SelectedItems) {
-					yield return (ThreadWatcher)item.Tag;
-				}
-			}
-		}
+		private IEnumerable<ThreadWatcher> SelectedThreadWatchers =>
+			lvThreads.SelectedItems.Cast<ListViewItem>().Select(n => (ThreadWatcher)n.Tag);
 
 		private enum ColumnIndex {
 			Description = 0,

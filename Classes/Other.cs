@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
@@ -62,7 +61,7 @@ namespace JDP {
 	}
 
 	public static class TickCount {
-		private static object _sync = new object();
+		private static readonly object _sync = new object();
 		private static int _lastTickCount;
 		private static long _correction;
 
@@ -83,10 +82,10 @@ namespace JDP {
 	public class ConnectionManager {
 		private const int _maxConnectionsPerHost = 4;
 
-		private static Dictionary<string, ConnectionManager> _connectionManagers = new Dictionary<string, ConnectionManager>(StringComparer.OrdinalIgnoreCase);
+		private static readonly Dictionary<string, ConnectionManager> _connectionManagers = new Dictionary<string, ConnectionManager>(StringComparer.OrdinalIgnoreCase);
 
-		private FIFOSemaphore _semaphore = new FIFOSemaphore(_maxConnectionsPerHost, _maxConnectionsPerHost);
-		private Stack<string> _groupNames = new Stack<string>();
+		private readonly FIFOSemaphore _semaphore = new FIFOSemaphore(_maxConnectionsPerHost, _maxConnectionsPerHost);
+		private readonly Stack<string> _groupNames = new Stack<string>();
 
 		public static ConnectionManager GetInstance(string url) {
 			string host = (new Uri(url)).Host;
@@ -131,10 +130,10 @@ namespace JDP {
 	}
 
 	public class FIFOSemaphore {
+		private readonly object _mainSync = new object();
+		private readonly Queue<QueueSync> _queueSyncs = new Queue<QueueSync>();
 		private int _currentCount;
 		private int _maximumCount;
-		private object _mainSync = new object();
-		private Queue<QueueSync> _queueSyncs = new Queue<QueueSync>();
 
 		public FIFOSemaphore(int initialCount, int maximumCount) {
 			if (initialCount > maximumCount) {
@@ -206,9 +205,9 @@ namespace JDP {
 	public class WorkScheduler {
 		private const int _maxThreadIdleTime = 15000;
 
-		private object _sync = new object();
-		private LinkedList<WorkItem> _workItems = new LinkedList<WorkItem>();
-		private ManualResetEvent _scheduleChanged = new ManualResetEvent(false);
+		private readonly object _sync = new object();
+		private readonly LinkedList<WorkItem> _workItems = new LinkedList<WorkItem>();
+		private readonly ManualResetEvent _scheduleChanged = new ManualResetEvent(false);
 		private Thread _schedulerThread;
 
 		public WorkItem AddItem(long runAtTicks, Action action) {
@@ -311,11 +310,11 @@ namespace JDP {
 		}
 
 		public class WorkItem {
-			private bool _hasStarted;
-			private WorkScheduler _scheduler;
+			private readonly WorkScheduler _scheduler;
+			private readonly Action _action;
+			private readonly string _group;
 			private long _runAtTicks;
-			private Action _action;
-			private string _group;
+			private bool _hasStarted;
 
 			public WorkItem(WorkScheduler scheduler, long runAtTicks, Action action, string group) {
 				_scheduler = scheduler;
@@ -352,12 +351,12 @@ namespace JDP {
 		private const int _threadCreationDelay = 500;
 		private const int _maxThreadIdleTime = 15000;
 
-		private static Dictionary<string, ThreadPoolManager> _threadPoolManagers = new Dictionary<string, ThreadPoolManager>(StringComparer.OrdinalIgnoreCase);
+		private static readonly Dictionary<string, ThreadPoolManager> _threadPoolManagers = new Dictionary<string, ThreadPoolManager>(StringComparer.OrdinalIgnoreCase);
 
-		private object _sync = new object();
-		private FIFOSemaphore _semaphore = new FIFOSemaphore(0, Int32.MaxValue);
-		private Stack<ThreadPoolThread> _idleThreads = new Stack<ThreadPoolThread>();
-		private ThreadPoolThread _schedulerThread = new ThreadPoolThread(null);
+		private readonly object _sync = new object();
+		private readonly FIFOSemaphore _semaphore = new FIFOSemaphore(0, Int32.MaxValue);
+		private readonly Stack<ThreadPoolThread> _idleThreads = new Stack<ThreadPoolThread>();
+		private readonly ThreadPoolThread _schedulerThread = new ThreadPoolThread(null);
 
 		public ThreadPoolManager() {
 			lock (_sync) {
@@ -421,11 +420,11 @@ namespace JDP {
 		}
 
 		private class ThreadPoolThread {
-			private object _sync = new object();
-			private ThreadPoolManager _manager;
+			private readonly object _sync = new object();
+			private readonly ThreadPoolManager _manager;
+			private readonly Queue<Action> _workItems = new Queue<Action>();
 			private Thread _thread;
 			private ManualResetEvent _newWorkItem;
-			private Queue<Action> _workItems = new Queue<Action>();
 
 			internal ThreadPoolThread(ThreadPoolManager manager) {
 				_manager = manager;
@@ -482,72 +481,6 @@ namespace JDP {
 		}
 	}
 
-	public class HashSet<T> : IEnumerable<T> {
-		private Dictionary<T, int> _dict;
-
-		public HashSet() {
-			_dict = new Dictionary<T, int>();
-		}
-
-		public HashSet(IEqualityComparer<T> comparer) {
-			_dict = new Dictionary<T, int>(comparer);
-		}
-
-		public HashSet(IEnumerable<T> collection) :
-			this()
-		{
-			AddRange(collection);
-		}
-
-		public HashSet(IEnumerable<T> collection, IEqualityComparer<T> comparer) :
-			this(comparer)
-		{
-			AddRange(collection);
-		}
-
-		public int Count {
-			get { return _dict.Count; }
-		}
-
-		public bool Add(T item) {
-			if (!_dict.ContainsKey(item)) {
-				_dict[item] = 0;
-				return false;
-			}
-			else {
-				return true;
-			}
-		}
-
-		private void AddRange(IEnumerable<T> collection) {
-			foreach (T item in collection) {
-				Add(item);
-			}
-		}
-
-		public bool Remove(T item) {
-			return _dict.Remove(item);
-		}
-
-		public void Clear() {
-			_dict.Clear();
-		}
-
-		public bool Contains(T item) {
-			return _dict.ContainsKey(item);
-		}
-
-		public IEnumerator<T> GetEnumerator() {
-			foreach (KeyValuePair<T, int> item in _dict) {
-				yield return item.Key;
-			}
-		}
-
-		IEnumerator IEnumerable.GetEnumerator() {
-			return GetEnumerator();
-		}
-	}
-
 	public class HashGeneratorStream : Stream {
 		private HashAlgorithm _hashAlgo;
 		private byte[] _dataHash;
@@ -560,6 +493,14 @@ namespace JDP {
 				default:
 					throw new Exception("Unsupported hash type.");
 			}
+		}
+
+		public override void Close() {
+			if (_hashAlgo != null) {
+				try { _hashAlgo.Dispose(); } catch { }
+				_hashAlgo = null;
+			}
+			base.Close();
 		}
 
 		public override bool CanRead {
@@ -588,6 +529,7 @@ namespace JDP {
 			if (_hashAlgo != null) {
 				_hashAlgo.TransformFinalBlock(new byte[0], 0, 0);
 				_dataHash = _hashAlgo.Hash;
+				_hashAlgo.Dispose();
 				_hashAlgo = null;
 			}
 			return _dataHash;
@@ -616,9 +558,9 @@ namespace JDP {
 	}
 
 	public class DownloadStatusEventArgs : EventArgs {
-		public DownloadType DownloadType { get; private set; }
-		public int CompleteCount { get; private set; }
-		public int TotalCount { get; private set; }
+		public DownloadType DownloadType { get; }
+		public int CompleteCount { get; }
+		public int TotalCount { get; }
 
 		public DownloadStatusEventArgs(DownloadType downloadType, int completeCount, int totalCount) {
 			DownloadType = downloadType;
@@ -628,7 +570,7 @@ namespace JDP {
 	}
 
 	public class StopStatusEventArgs : EventArgs {
-		public StopReason StopReason { get; private set; }
+		public StopReason StopReason { get; }
 
 		public StopStatusEventArgs(StopReason stopReason) {
 			StopReason = stopReason;
@@ -636,10 +578,10 @@ namespace JDP {
 	}
 
 	public class DownloadStartEventArgs : EventArgs {
-		public long DownloadID { get; private set; }
-		public string URL { get; private set; }
-		public int TryNumber { get; private set; }
-		public long? TotalSize { get; private set; }
+		public long DownloadID { get; }
+		public string URL { get; }
+		public int TryNumber { get; }
+		public long? TotalSize { get; }
 
 		public DownloadStartEventArgs(long downloadID, string url, int tryNumber, long? totalSize) {
 			DownloadID = downloadID;
@@ -650,8 +592,8 @@ namespace JDP {
 	}
 
 	public class DownloadProgressEventArgs : EventArgs {
-		public long DownloadID { get; private set; }
-		public long DownloadedSize { get; private set; }
+		public long DownloadID { get; }
+		public long DownloadedSize { get; }
 
 		public DownloadProgressEventArgs(long downloadID, long downloadedSize) {
 			DownloadID = downloadID;
@@ -660,9 +602,9 @@ namespace JDP {
 	}
 
 	public class DownloadEndEventArgs : EventArgs {
-		public long DownloadID { get; private set; }
-		public long DownloadedSize { get; private set; }
-		public bool IsSuccessful { get; private set; }
+		public long DownloadID { get; }
+		public long DownloadedSize { get; }
+		public bool IsSuccessful { get; }
 
 		public DownloadEndEventArgs(long downloadID, long downloadedSize, bool isSuccessful) {
 			DownloadID = downloadID;

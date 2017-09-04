@@ -8,9 +8,9 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyTitle("Chan Thread Watch")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("")]
-[assembly: AssemblyProduct("")]
-[assembly: AssemblyCopyright("Copyright 2012 JDP")]
+[assembly: AssemblyCompany("J.D. Purcell")]
+[assembly: AssemblyProduct("Chan Thread Watch")]
+[assembly: AssemblyCopyright("© J.D. Purcell")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
@@ -29,5 +29,5 @@ using System.Runtime.InteropServices;
 //      Build Number
 //      Revision
 //
-[assembly: AssemblyVersion("1.7.0.4")]
-[assembly: AssemblyFileVersion("1.7.0.4")]
+[assembly: AssemblyVersion("1.7.0.5")]
+[assembly: AssemblyFileVersion("1.7.0.5")]

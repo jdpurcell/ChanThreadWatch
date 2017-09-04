@@ -10,16 +10,16 @@ namespace JDP {
 	public class ThreadWatcher {
 		private const int _maxDownloadTries = 3;
 
-		private static WorkScheduler _workScheduler = new WorkScheduler();
+		private static readonly WorkScheduler _workScheduler = new WorkScheduler();
 
+		private readonly object _settingsSync = new object();
+		private readonly Dictionary<long, Action> _downloadAborters = new Dictionary<long, Action>();
+		private readonly ManualResetEvent _checkFinishedEvent = new ManualResetEvent(true);
 		private WorkScheduler.WorkItem _nextCheckWorkItem;
-		private object _settingsSync = new object();
 		private bool _isStopping;
 		private StopReason _stopReason;
-		private Dictionary<long, Action> _downloadAborters = new Dictionary<long, Action>();
 		private bool _hasRun;
 		private bool _hasInitialized;
-		private ManualResetEvent _checkFinishedEvent = new ManualResetEvent(true);
 		private bool _isWaiting;
 		private string _pageURL;
 		private string _pageAuth;
@@ -243,38 +243,31 @@ namespace JDP {
 		public event EventHandler<ThreadWatcher, DownloadEndEventArgs> DownloadEnd;
 
 		private void OnDownloadStatus(DownloadStatusEventArgs e) {
-			var evt = DownloadStatus;
-			if (evt != null) try { evt(this, e); } catch { }
+			try { DownloadStatus?.Invoke(this, e); } catch { }
 		}
 
 		private void OnWaitStatus(EventArgs e) {
-			var evt = WaitStatus;
-			if (evt != null) try { evt(this, e); } catch { }
+			try { WaitStatus?.Invoke(this, e); } catch { }
 		}
 
 		private void OnStopStatus(StopStatusEventArgs e) {
-			var evt = StopStatus;
-			if (evt != null) try { evt(this, e); } catch { }
+			try { StopStatus?.Invoke(this, e); } catch { }
 		}
 
 		private void OnThreadDownloadDirectoryRename(EventArgs e) {
-			var evt = ThreadDownloadDirectoryRename;
-			if (evt != null) try { evt(this, e); } catch { }
+			try { ThreadDownloadDirectoryRename?.Invoke(this, e); } catch { }
 		}
 
 		private void OnDownloadStart(DownloadStartEventArgs e) {
-			var evt = DownloadStart;
-			if (evt != null) try { evt(this, e); } catch { }
+			try { DownloadStart?.Invoke(this, e); } catch { }
 		}
 
 		private void OnDownloadProgress(DownloadProgressEventArgs e) {
-			var evt = DownloadProgress;
-			if (evt != null) try { evt(this, e); } catch { }
+			try { DownloadProgress?.Invoke(this, e); } catch { }
 		}
 
 		private void OnDownloadEnd(DownloadEndEventArgs e) {
-			var evt = DownloadEnd;
-			if (evt != null) try { evt(this, e); } catch { }
+			try { DownloadEnd?.Invoke(this, e); } catch { }
 		}
 
 		private List<PageInfo> _pageList;
@@ -309,8 +302,8 @@ namespace JDP {
 							_threadName = siteHelper.GetThreadName();
 
 							if (String.IsNullOrEmpty(_threadDownloadDirectory)) {
-								_threadDownloadDirectory = Path.Combine(_mainDownloadDirectory, General.CleanFileName(String.Format(
-									"{0}_{1}_{2}", siteHelper.GetSiteName(), siteHelper.GetBoardName(), _threadName)));
+								_threadDownloadDirectory = Path.Combine(_mainDownloadDirectory, General.CleanFileName(
+									$"{siteHelper.GetSiteName()}_{siteHelper.GetBoardName()}_{_threadName}"));
 								if (!Directory.Exists(_threadDownloadDirectory)) {
 									Directory.CreateDirectory(_threadDownloadDirectory);
 								}
@@ -325,11 +318,8 @@ namespace JDP {
 						}
 					}
 				}
-				catch (Exception ex) {
-					if (ex is IOException || ex is UnauthorizedAccessException) {
-						Stop(StopReason.IOError);
-					}
-					else throw;
+				catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) {
+					Stop(StopReason.IOError);
 				}
 
 				string threadDir = ThreadDownloadDirectory;
