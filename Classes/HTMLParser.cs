@@ -3,9 +3,9 @@ using System.Collections.Generic;
 
 namespace JDP {
 	public class HTMLParser {
-		private string _preprocessedHTML;
-		private List<HTMLTag> _tags;
-		private Dictionary<int, int> _offsetToIndex = new Dictionary<int, int>();
+		private readonly string _preprocessedHTML;
+		private readonly List<HTMLTag> _tags;
+		private readonly Dictionary<int, int> _offsetToIndex = new Dictionary<int, int>();
 
 		public HTMLParser(string html) {
 			_preprocessedHTML = Preprocess(html);
@@ -15,13 +15,9 @@ namespace JDP {
 			}
 		}
 
-		public string PreprocessedHTML {
-			get { return _preprocessedHTML; }
-		}
+		public string PreprocessedHTML => _preprocessedHTML;
 
-		public IList<HTMLTag> Tags {
-			get { return _tags.AsReadOnly(); }
-		}
+		public IList<HTMLTag> Tags => _tags.AsReadOnly();
 
 		public string GetInnerHTML(HTMLTag startTag, HTMLTag endTag) {
 			return startTag.IsSelfClosing ? "" : GetSection(_preprocessedHTML, startTag.EndOffset, endTag.Offset);
@@ -449,8 +445,7 @@ namespace JDP {
 		}
 
 		public string GetAttributeValue(string attributeName) {
-			HTMLAttribute attribute = GetAttribute(attributeName);
-			return attribute != null ? attribute.Value : null;
+			return GetAttribute(attributeName)?.Value;
 		}
 
 		public string GetAttributeValueOrEmpty(string attributeName) {
@@ -470,8 +465,8 @@ namespace JDP {
 	}
 
 	public class HTMLTagRange {
-		public HTMLTag StartTag { get; set; }
-		public HTMLTag EndTag { get; set; }
+		public HTMLTag StartTag { get; }
+		public HTMLTag EndTag { get; }
 
 		public HTMLTagRange(HTMLTag startTag, HTMLTag endTag) {
 			StartTag = startTag;

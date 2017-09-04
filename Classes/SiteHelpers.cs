@@ -103,15 +103,13 @@ namespace JDP {
 					image.Referer = image.URL;
 					image.URL = image.URL.Substring(pos);
 				}
-				if (replaceList != null) {
-					replaceList.Add(
-						new ReplaceInfo {
-							Offset = attribute.Offset,
-							Length = attribute.Length,
-							Type = ReplaceType.ImageLinkHref,
-							Tag = image.FileName
-						});
-				}
+				replaceList?.Add(
+					new ReplaceInfo {
+						Offset = attribute.Offset,
+						Length = attribute.Length,
+						Type = ReplaceType.ImageLinkHref,
+						Tag = image.FileName
+					});
 
 				HTMLTag imageTag = _htmlParser.FindStartTag(linkTag, linkEndTag, "img");
 				if (imageTag != null) {
@@ -122,15 +120,13 @@ namespace JDP {
 							thumb = new ThumbnailInfo();
 							thumb.URL = url;
 							thumb.Referer = _url;
-							if (replaceList != null) {
-								replaceList.Add(
-									new ReplaceInfo {
-										Offset = attribute.Offset,
-										Length = attribute.Length,
-										Type = ReplaceType.ImageSrc,
-										Tag = thumb.FileName
-									});
-							}
+							replaceList?.Add(
+								new ReplaceInfo {
+									Offset = attribute.Offset,
+									Length = attribute.Length,
+									Type = ReplaceType.ImageSrc,
+									Tag = thumb.FileName
+								});
 						}
 					}
 				}
@@ -154,6 +150,17 @@ namespace JDP {
 	}
 
 	public class SiteHelper_4chan_org : SiteHelper {
+		public override string GetThreadName() {
+			string[] urlSplit = SplitURL();
+			if (urlSplit.Length >= 4 && urlSplit[2].Equals("thread", StringComparison.Ordinal)) {
+				string page = urlSplit[3];
+				int pos = page.IndexOf('?');
+				if (pos != -1) page = page.Substring(0, pos);
+				return page;
+			}
+			return base.GetThreadName();
+		}
+
 		public override List<ImageInfo> GetImages(List<ReplaceInfo> replaceList, List<ThumbnailInfo> thumbnailList) {
 			List<ImageInfo> imageList = new List<ImageInfo>();
 			bool seenSpoiler = false;
@@ -161,15 +168,15 @@ namespace JDP {
 			foreach (HTMLTagRange postTagRange in _htmlParser.FindStartTags("div").Where(t => HTMLParser.ClassAttributeValueHas(t, "post"))
 				.Select(t => _htmlParser.CreateTagRange(t)).Where(r => r != null))
 			{
-				HTMLTagRange fileTextSpanTagRange = _htmlParser.CreateTagRange(_htmlParser.FindStartTags(postTagRange, "span")
+				HTMLTagRange fileTextDivTagRange = _htmlParser.CreateTagRange(_htmlParser.FindStartTags(postTagRange, "div")
 					.Where(t => HTMLParser.ClassAttributeValueHas(t, "fileText")).FirstOrDefault());
-				if (fileTextSpanTagRange == null) continue;
+				if (fileTextDivTagRange == null) continue;
 
 				HTMLTagRange fileThumbLinkTagRange = _htmlParser.CreateTagRange(_htmlParser.FindStartTags(postTagRange, "a")
 					.Where(t => HTMLParser.ClassAttributeValueHas(t, "fileThumb")).FirstOrDefault());
 				if (fileThumbLinkTagRange == null) continue;
 
-				HTMLTag fileTextLinkStartTag = _htmlParser.FindStartTag(fileTextSpanTagRange, "a");
+				HTMLTag fileTextLinkStartTag = _htmlParser.FindStartTag(fileTextDivTagRange, "a");
 				if (fileTextLinkStartTag == null) continue;
 
 				HTMLTag fileThumbImageTag = _htmlParser.FindStartTag(fileThumbLinkTagRange, "img");
@@ -185,12 +192,17 @@ namespace JDP {
 
 				string originalFileName;
 				if (isSpoiler) {
-					originalFileName = fileTextSpanTagRange.StartTag.GetAttributeValue("title");
+					originalFileName = fileTextDivTagRange.StartTag.GetAttributeValue("title");
 				}
 				else {
-					HTMLTag fileNameSpanStartTag = _htmlParser.FindStartTag(fileTextSpanTagRange, "span");
-					if (fileNameSpanStartTag == null) continue;
-					originalFileName = fileNameSpanStartTag.GetAttributeValue("title");
+					// If the filename is shortened, the original filename is in the title attribute
+					originalFileName = fileTextLinkStartTag.GetAttributeValue("title");
+					// Otherwise, the link's innerHTML contains the original filename
+					if (originalFileName == null) {
+						HTMLTagRange fileTextLinkTagRange = _htmlParser.CreateTagRange(fileTextLinkStartTag);
+						if (fileTextLinkTagRange == null) continue;
+						originalFileName = _htmlParser.GetInnerHTML(fileTextLinkTagRange);
+					}
 				}
 				if (originalFileName == null) continue;
 
@@ -261,14 +273,14 @@ namespace JDP {
 		}
 
 		public override bool IsBoardHighTurnover() {
-			return String.Equals(GetBoardName(), "b", StringComparison.OrdinalIgnoreCase);
+			return String.Equals(GetBoardName(), "b", StringComparison.Ordinal);
 		}
 	}
 
 	public class SiteHelper_krautchan_net : SiteHelper {
 		public override string GetThreadName() {
 			string threadName = base.GetThreadName();
-			if (threadName.StartsWith("thread-", StringComparison.OrdinalIgnoreCase)) {
+			if (threadName.StartsWith("thread-", StringComparison.Ordinal)) {
 				threadName = threadName.Substring(7);
 			}
 			return threadName;
