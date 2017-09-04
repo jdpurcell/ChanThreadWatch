@@ -23,6 +23,33 @@ namespace JDP {
 			}
 		}
 
+		public static string UserAgent {
+			get {
+				return Settings.UseCustomUserAgent == true ? Settings.CustomUserAgent : $"Chan Thread Watch {Version}";
+			}
+		}
+
+		public static string NormalizeNewLines(string str) {
+			if (str.IndexOf('\r') == -1) {
+				return str;
+			}
+			char[] dst = new char[str.Length];
+			int iDst = 0;
+			for (int iSrc = 0; iSrc < str.Length; iSrc++) {
+				char c = str[iSrc];
+				if (c == '\n' && iSrc >= 1 && str[iSrc - 1] == '\r') {
+					// Skip line feed following carriage return
+					continue;
+				}
+				if (c == '\r') {
+					// Convert carriage return to line feed
+					c = '\n';
+				}
+				dst[iDst++] = c;
+			}
+			return new string(dst, 0, iDst);
+		}
+
 		public static Action DownloadAsync(string url, string auth, string referer, string connectionGroupName, DateTime? cacheLastModifiedTime, Action<HttpWebResponse> onResponse, Action<byte[], int> onDownloadChunk, Action onComplete, Action<Exception> onException) {
 			const int readBufferSize = 8192;
 			const int requestTimeoutMS = 60000;
@@ -65,7 +92,7 @@ namespace JDP {
 					if (connectionGroupName != null) {
 						request.ConnectionGroupName = connectionGroupName;
 					}
-					request.UserAgent = (Settings.UseCustomUserAgent == true) ? Settings.CustomUserAgent : ("Chan Thread Watch " + Version);
+					request.UserAgent = UserAgent;
 					request.Referer = referer;
 					if (cacheLastModifiedTime != null) {
 						request.IfModifiedSince = cacheLastModifiedTime.Value;
@@ -143,9 +170,10 @@ namespace JDP {
 			return abortDownload;
 		}
 
-		public static string DownloadPageToString(string url) {
+		public static string DownloadPageToString(string url, Action<HttpWebRequest> withRequest = null) {
 			HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
-			request.UserAgent = "Chan Thread Watch " + Version;
+			request.UserAgent = UserAgent;
+			withRequest?.Invoke(request);
 			HttpWebResponse response = null;
 			Stream responseStream = null;
 			MemoryStream memoryStream = null;
@@ -153,7 +181,7 @@ namespace JDP {
 				response = (HttpWebResponse)request.GetResponse();
 				responseStream = response.GetResponseStream();
 				memoryStream = new MemoryStream();
-				CopyStream(responseStream, memoryStream);
+				responseStream.CopyTo(memoryStream);
 				byte[] pageBytes = memoryStream.ToArray();
 				Encoding encoding = DetectHTMLEncoding(pageBytes, response.ContentType);
 				return encoding.GetString(pageBytes);
@@ -162,19 +190,6 @@ namespace JDP {
 				if (responseStream != null) try { responseStream.Close(); } catch { }
 				if (response != null) try { response.Close(); } catch { }
 				if (memoryStream != null) try { memoryStream.Close(); } catch { }
-			}
-		}
-
-		private static void CopyStream(Stream srcStream, params Stream[] dstStreams) {
-			byte[] data = new byte[8192];
-			while (true) {
-				int dataLen = srcStream.Read(data, 0, data.Length);
-				if (dataLen == 0) break;
-				foreach (Stream dstStream in dstStreams) {
-					if (dstStream != null) {
-						dstStream.Write(data, 0, dataLen);
-					}
-				}
 			}
 		}
 

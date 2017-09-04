@@ -14,7 +14,7 @@ namespace JDP {
 		private readonly Dictionary<int, int> _offsetToIndex = new Dictionary<int, int>();
 
 		public HTMLParser(string html) {
-			_preprocessedHTML = Preprocess(html);
+			_preprocessedHTML = General.NormalizeNewLines(html);
 			_tags = new List<HTMLTag>(ParseTags(_preprocessedHTML, 0, _preprocessedHTML.Length));
 			for (int i = 0; i < _tags.Count; i++) {
 				_offsetToIndex.Add(_tags[i].Offset, i);
@@ -154,28 +154,6 @@ namespace JDP {
 		private int GetTagIndex(HTMLTag tag) {
 			return _offsetToIndex.TryGetValue(tag.Offset, out int i) ? i :
 				throw new Exception("Unable to locate the specified tag.");
-		}
-
-		private static string Preprocess(string html) {
-			if (html.IndexOf('\r') == -1) {
-				// No preprocessing needed
-				return html;
-			}
-			char[] dst = new char[html.Length];
-			int iDst = 0;
-			for (int iSrc = 0; iSrc < html.Length; iSrc++) {
-				char c = html[iSrc];
-				if (c == '\n' && iSrc >= 1 && html[iSrc - 1] == '\r') {
-					// Skip line feed following carriage return
-					continue;
-				}
-				if (c == '\r') {
-					// Convert carriage return to line feed
-					c = '\n';
-				}
-				dst[iDst++] = c;
-			}
-			return new string(dst, 0, iDst);
 		}
 
 		private static IEnumerable<HTMLTag> ParseTags(string html, int htmlStart, int htmlEnd) {

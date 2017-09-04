@@ -23,8 +23,6 @@ namespace JDP {
 		private int _itemAreaY;
 		private int[] _columnWidths;
 
-		// ReleaseDate property and version in AssemblyInfo.cs should be updated for each release.
-
 		public frmChanThreadWatch() {
 			InitializeComponent();
 			Icon = Resources.ChanThreadWatchIcon;
@@ -153,7 +151,7 @@ namespace JDP {
 			}
 			url = General.CleanPageURL(url);
 			if (url != null) {
-				AddThread(url);
+				AddThread(url, silent: true);
 				_saveThreadList = true;
 			}
 		}
@@ -174,8 +172,6 @@ namespace JDP {
 				return;
 			}
 			if (!AddThread(pageURL)) {
-				MessageBox.Show(this, "The same thread is already being watched or downloaded.",
-					"Duplicate Thread", MessageBoxButtons.OK, MessageBoxIcon.Error);
 				return;
 			}
 			txtPageURL.Clear();
@@ -192,11 +188,11 @@ namespace JDP {
 			catch {
 				return;
 			}
-			string[] urls = text.Split(new [] { "\r\n", "\r", "\n" }, StringSplitOptions.RemoveEmptyEntries);
+			string[] urls = General.NormalizeNewLines(text).Split(new [] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
 			for (int iURL = 0; iURL < urls.Length; iURL++) {
 				string url = General.CleanPageURL(urls[iURL]);
 				if (url == null) continue;
-				AddThread(url);
+				AddThread(url, silent: true);
 			}
 			_saveThreadList = true;
 		}
@@ -539,11 +535,31 @@ namespace JDP {
 			}
 		}
 
-		private bool AddThread(string pageURL) {
+		private bool AddThread(string pageURL, bool silent = false) {
 			string pageAuth = (chkPageAuth.Checked && (txtPageAuth.Text.IndexOf(':') != -1)) ? txtPageAuth.Text : "";
 			string imageAuth = (chkImageAuth.Checked && (txtImageAuth.Text.IndexOf(':') != -1)) ? txtImageAuth.Text : "";
 			int checkInterval = (int)cboCheckEvery.SelectedValue * 60;
-			return AddThread(pageURL, pageAuth, imageAuth, checkInterval, chkOneTime.Checked, null, "", null, null);
+
+			void ShowError(string message, string title) {
+				if (silent) return;
+				MessageBox.Show(this, message, title, MessageBoxButtons.OK, MessageBoxIcon.Error);
+			}
+
+			try {
+				// TODO: This shouldn't run in the UI thread
+				pageURL = URLTransformer.Transform(pageURL, pageAuth);
+			}
+			catch {
+				ShowError("Unable to transform the URL.", "Error");
+				return false;
+			}
+
+			if (!AddThread(pageURL, pageAuth, imageAuth, checkInterval, chkOneTime.Checked, null, "", null, null)) {
+				ShowError("The same thread is already being watched or downloaded.", "Duplicate Thread");
+				return false;
+			}
+
+			return true;
 		}
 
 		private bool AddThread(string pageURL, string pageAuth, string imageAuth, int checkInterval, bool oneTime, string saveDir, string description, StopReason? stopReason, WatcherExtraData extraData) {

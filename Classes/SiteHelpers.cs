@@ -308,19 +308,28 @@ namespace JDP {
 		}
 	}
 
-	public class SiteHelper_Twitch : SiteHelper {
+	public class SiteHelper_TwitchVOD : SiteHelper {
 		public static string[] Hosts { get; } = {
 			"twitch.tv",
+			"hls.ttvnw.net",
 			"akamaized.net",
-			"ttvnw.net"
 		};
 
 		public override string GetBoardName() {
-			return "Twitch";
+			return "TwitchVOD";
 		}
 
 		public override string GetThreadName() {
-			return "Default";
+			string[] urlSplit = SplitURL();
+			if (urlSplit.Length >= 2) {
+				string[] s = urlSplit[1].Split('_');
+				// Can have more than 4 items if the channel name contains an underscore. The item
+				// we're returning is what Twitch refers to as "broadcast_id".
+				if (s.Length >= 4) {
+					return s[s.Length - 2];
+				}
+			}
+			return "";
 		}
 
 		public override List<ImageInfo> GetImages(List<ReplaceInfo> replaceList, List<ThumbnailInfo> thumbnailList) {
