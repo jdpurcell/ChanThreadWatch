@@ -80,21 +80,6 @@ namespace JDP {
 			set { SetBool("VerifyImageHashes", value); }
 		}
 
-		public static bool? CheckForUpdates {
-			get { return GetBool("CheckForUpdates"); }
-			set { SetBool("CheckForUpdates", value); }
-		}
-
-		public static DateTime? LastUpdateCheck {
-			get { return GetDate("LastUpdateCheck"); }
-			set { SetDate("LastUpdateCheck", value); }
-		}
-
-		public static string LatestUpdateVersion {
-			get { return Get("LatestUpdateVersion"); }
-			set { Set("LatestUpdateVersion", value); }
-		}
-
 		public static bool? UseExeDirectoryForSettings { get; set; }
 
 		public static string ExeDirectory {

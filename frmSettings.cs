@@ -18,7 +18,6 @@ namespace JDP {
 			chkRenameDownloadFolderWithDescription.Checked = Settings.RenameDownloadFolderWithDescription ?? false;
 			chkUseOriginalFileNames.Checked = Settings.UseOriginalFileNames ?? false;
 			chkVerifyImageHashes.Checked = Settings.VerifyImageHashes ?? true;
-			chkCheckForUpdates.Checked = Settings.CheckForUpdates ?? false;
 			if (Settings.UseExeDirectoryForSettings == true) {
 				rbSettingsInExeFolder.Checked = true;
 			}
@@ -78,7 +77,6 @@ namespace JDP {
 				Settings.RenameDownloadFolderWithDescription = chkRenameDownloadFolderWithDescription.Checked;
 				Settings.UseOriginalFileNames = chkUseOriginalFileNames.Checked;
 				Settings.VerifyImageHashes = chkVerifyImageHashes.Checked;
-				Settings.CheckForUpdates = chkCheckForUpdates.Checked;
 				Settings.UseExeDirectoryForSettings = rbSettingsInExeFolder.Checked;
 
 				try {

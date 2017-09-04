@@ -57,10 +57,6 @@ namespace JDP {
 			cboCheckEvery.SelectedValue = Settings.CheckEvery ?? 3;
 			if (cboCheckEvery.SelectedIndex == -1) cboCheckEvery.SelectedValue = 3;
 			OnThreadDoubleClick = Settings.OnThreadDoubleClick ?? ThreadDoubleClickAction.OpenFolder;
-
-			if ((Settings.CheckForUpdates == true) && (Settings.LastUpdateCheck ?? DateTime.MinValue) < DateTime.Now.Date) {
-				CheckForUpdates();
-			}
 		}
 
 		public Dictionary<long, DownloadProgressInfo> DownloadProgresses {
@@ -869,65 +865,6 @@ namespace JDP {
 				}
 			}
 			catch { }
-		}
-
-		private void CheckForUpdates() {
-			Thread thread = new Thread(CheckForUpdateThread);
-			thread.IsBackground = true;
-			thread.Start();
-		}
-
-		private void CheckForUpdateThread() {
-			string html;
-			try {
-				html = General.DownloadPageToString(General.ProgramURL);
-			}
-			catch {
-				return;
-			}
-			Settings.LastUpdateCheck = DateTime.Now.Date;
-			string openTag = "[LatestVersion]";
-			string closeTag = "[/LatestVersion]";
-			int start = html.IndexOf(openTag, StringComparison.OrdinalIgnoreCase);
-			if (start == -1) return;
-			start += openTag.Length;
-			int end = html.IndexOf(closeTag, start, StringComparison.OrdinalIgnoreCase);
-			if (end == -1) return;
-			string latestStr = html.Substring(start, end - start).Trim();
-			int latest = ParseVersionNumber(latestStr);
-			if (latest == -1) return;
-			int current = ParseVersionNumber(General.Version);
-			if (!String.IsNullOrEmpty(Settings.LatestUpdateVersion)) {
-				current = Math.Max(current, ParseVersionNumber(Settings.LatestUpdateVersion));
-			}
-			if (latest > current) {
-				lock (_startupPromptSync) {
-					if (IsDisposed) return;
-					Settings.LatestUpdateVersion = latestStr;
-					Invoke(() => {
-						if (MessageBox.Show(this, "A newer version of Chan Thread Watch is available.  Would you like to open the Chan Thread Watch website?",
-							"Newer Version Found", MessageBoxButtons.YesNo, MessageBoxIcon.Information) == DialogResult.Yes)
-						{
-							Process.Start(General.ProgramURL);
-						}
-					});
-				}
-			}
-		}
-
-		private int ParseVersionNumber(string str) {
-			string[] split = str.Split('.');
-			int num = 0;
-			try {
-				if (split.Length >= 1) num |= (Int32.Parse(split[0]) & 0x7F) << 24;
-				if (split.Length >= 2) num |= (Int32.Parse(split[1]) & 0xFF) << 16;
-				if (split.Length >= 3) num |= (Int32.Parse(split[2]) & 0xFF) <<  8;
-				if (split.Length >= 4) num |= (Int32.Parse(split[3]) & 0xFF);
-				return num;
-			}
-			catch {
-				return -1;
-			}
 		}
 
 		private IAsyncResult BeginInvoke(MethodInvoker method) {

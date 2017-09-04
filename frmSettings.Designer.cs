@@ -36,7 +36,6 @@
 			this.rbSettingsInExeFolder = new System.Windows.Forms.RadioButton();
 			this.chkUseOriginalFileNames = new System.Windows.Forms.CheckBox();
 			this.chkVerifyImageHashes = new System.Windows.Forms.CheckBox();
-			this.chkCheckForUpdates = new System.Windows.Forms.CheckBox();
 			this.chkSaveThumbnails = new System.Windows.Forms.CheckBox();
 			this.chkRenameDownloadFolderWithDescription = new System.Windows.Forms.CheckBox();
 			this.SuspendLayout();
@@ -69,10 +68,10 @@
 			// 
 			// btnOK
 			// 
-			this.btnOK.Location = new System.Drawing.Point(568, 192);
+			this.btnOK.Location = new System.Drawing.Point(568, 168);
 			this.btnOK.Name = "btnOK";
 			this.btnOK.Size = new System.Drawing.Size(60, 23);
-			this.btnOK.TabIndex = 14;
+			this.btnOK.TabIndex = 13;
 			this.btnOK.Text = "OK";
 			this.btnOK.UseVisualStyleBackColor = true;
 			this.btnOK.Click += new System.EventHandler(this.btnOK_Click);
@@ -80,10 +79,10 @@
 			// btnCancel
 			// 
 			this.btnCancel.DialogResult = System.Windows.Forms.DialogResult.Cancel;
-			this.btnCancel.Location = new System.Drawing.Point(636, 192);
+			this.btnCancel.Location = new System.Drawing.Point(636, 168);
 			this.btnCancel.Name = "btnCancel";
 			this.btnCancel.Size = new System.Drawing.Size(68, 23);
-			this.btnCancel.TabIndex = 15;
+			this.btnCancel.TabIndex = 14;
 			this.btnCancel.Text = "Cancel";
 			this.btnCancel.UseVisualStyleBackColor = true;
 			// 
@@ -120,19 +119,19 @@
 			// lblSettingsLocation
 			// 
 			this.lblSettingsLocation.AutoSize = true;
-			this.lblSettingsLocation.Location = new System.Drawing.Point(8, 200);
+			this.lblSettingsLocation.Location = new System.Drawing.Point(8, 176);
 			this.lblSettingsLocation.Name = "lblSettingsLocation";
 			this.lblSettingsLocation.Size = new System.Drawing.Size(85, 13);
-			this.lblSettingsLocation.TabIndex = 11;
+			this.lblSettingsLocation.TabIndex = 10;
 			this.lblSettingsLocation.Text = "Save settings in:";
 			// 
 			// rbSettingsInAppDataFolder
 			// 
 			this.rbSettingsInAppDataFolder.AutoSize = true;
-			this.rbSettingsInAppDataFolder.Location = new System.Drawing.Point(108, 198);
+			this.rbSettingsInAppDataFolder.Location = new System.Drawing.Point(108, 174);
 			this.rbSettingsInAppDataFolder.Name = "rbSettingsInAppDataFolder";
 			this.rbSettingsInAppDataFolder.Size = new System.Drawing.Size(130, 17);
-			this.rbSettingsInAppDataFolder.TabIndex = 12;
+			this.rbSettingsInAppDataFolder.TabIndex = 11;
 			this.rbSettingsInAppDataFolder.TabStop = true;
 			this.rbSettingsInAppDataFolder.Text = "Application data folder";
 			this.rbSettingsInAppDataFolder.UseVisualStyleBackColor = true;
@@ -140,10 +139,10 @@
 			// rbSettingsInExeFolder
 			// 
 			this.rbSettingsInExeFolder.AutoSize = true;
-			this.rbSettingsInExeFolder.Location = new System.Drawing.Point(252, 198);
+			this.rbSettingsInExeFolder.Location = new System.Drawing.Point(252, 174);
 			this.rbSettingsInExeFolder.Name = "rbSettingsInExeFolder";
 			this.rbSettingsInExeFolder.Size = new System.Drawing.Size(107, 17);
-			this.rbSettingsInExeFolder.TabIndex = 13;
+			this.rbSettingsInExeFolder.TabIndex = 12;
 			this.rbSettingsInExeFolder.TabStop = true;
 			this.rbSettingsInExeFolder.Text = "Executable folder";
 			this.rbSettingsInExeFolder.UseVisualStyleBackColor = true;
@@ -167,16 +166,6 @@
 			this.chkVerifyImageHashes.TabIndex = 9;
 			this.chkVerifyImageHashes.Text = "Verify image hashes (only supported for some sites)";
 			this.chkVerifyImageHashes.UseVisualStyleBackColor = true;
-			// 
-			// chkCheckForUpdates
-			// 
-			this.chkCheckForUpdates.AutoSize = true;
-			this.chkCheckForUpdates.Location = new System.Drawing.Point(10, 168);
-			this.chkCheckForUpdates.Name = "chkCheckForUpdates";
-			this.chkCheckForUpdates.Size = new System.Drawing.Size(353, 17);
-			this.chkCheckForUpdates.TabIndex = 10;
-			this.chkCheckForUpdates.Text = "Automatically check for and notify of updated versions of this program";
-			this.chkCheckForUpdates.UseVisualStyleBackColor = true;
 			// 
 			// chkSaveThumbnails
 			// 
@@ -203,10 +192,9 @@
 			this.AcceptButton = this.btnOK;
 			this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
 			this.CancelButton = this.btnCancel;
-			this.ClientSize = new System.Drawing.Size(714, 225);
+			this.ClientSize = new System.Drawing.Size(714, 201);
 			this.Controls.Add(this.chkRenameDownloadFolderWithDescription);
 			this.Controls.Add(this.chkSaveThumbnails);
-			this.Controls.Add(this.chkCheckForUpdates);
 			this.Controls.Add(this.chkVerifyImageHashes);
 			this.Controls.Add(this.chkUseOriginalFileNames);
 			this.Controls.Add(this.rbSettingsInExeFolder);
@@ -249,7 +237,6 @@
 		private System.Windows.Forms.RadioButton rbSettingsInExeFolder;
 		private System.Windows.Forms.CheckBox chkUseOriginalFileNames;
 		private System.Windows.Forms.CheckBox chkVerifyImageHashes;
-		private System.Windows.Forms.CheckBox chkCheckForUpdates;
 		private System.Windows.Forms.CheckBox chkSaveThumbnails;
 		private System.Windows.Forms.CheckBox chkRenameDownloadFolderWithDescription;
 	}
