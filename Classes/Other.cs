@@ -1,4 +1,9 @@
-﻿using System;
+﻿// --------------------------------------------------------------------------------
+// Copyright (c) J.D. Purcell
+//
+// Licensed under the MIT License (see LICENSE.txt)
+// --------------------------------------------------------------------------------
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
