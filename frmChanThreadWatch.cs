@@ -337,7 +337,7 @@ namespace JDP {
 			}
 
 			bool anyFailed = false;
-			RunWorkSynchronous(() => {
+			frmWait.RunWork(this, () => {
 				foreach (PostprocessingTask task in tasks) {
 					try {
 						task.SiteHelper.Postprocess(task.DownloadDirectory);
@@ -573,25 +573,13 @@ namespace JDP {
 			MessageBox.Show(this, message, title, MessageBoxButtons.OK, MessageBoxIcon.Error);
 		}
 
-		private void RunWorkSynchronous(Action action) {
-			using (var waitForm = new frmWait()) {
-				var thread = new Thread(() => {
-					action();
-					waitForm.OnWorkComplete();
-				});
-				thread.Start();
-				waitForm.ShowDialog(this);
-				thread.Join();
-			}
-		}
-
 		private bool AddThread(string pageURL, bool silent = false) {
 			string pageAuth = (chkPageAuth.Checked && (txtPageAuth.Text.IndexOf(':') != -1)) ? txtPageAuth.Text : "";
 			string imageAuth = (chkImageAuth.Checked && (txtImageAuth.Text.IndexOf(':') != -1)) ? txtImageAuth.Text : "";
 			int checkInterval = (int)cboCheckEvery.SelectedValue * 60;
 
 			bool wasTransformSuccessful = false;
-			RunWorkSynchronous(() => {
+			frmWait.RunWork(this, () => {
 				try {
 					pageURL = URLTransformer.Transform(pageURL, pageAuth);
 					wasTransformSuccessful = true;

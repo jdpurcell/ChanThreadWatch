@@ -28,9 +28,9 @@
 			// 
 			// lblMessage
 			// 
-			this.lblMessage.Location = new System.Drawing.Point(8, 12);
+			this.lblMessage.Location = new System.Drawing.Point(12, 12);
 			this.lblMessage.Name = "lblMessage";
-			this.lblMessage.Size = new System.Drawing.Size(192, 20);
+			this.lblMessage.Size = new System.Drawing.Size(176, 20);
 			this.lblMessage.TabIndex = 0;
 			this.lblMessage.Text = "Please wait...";
 			this.lblMessage.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
@@ -38,7 +38,7 @@
 			// frmWait
 			// 
 			this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
-			this.ClientSize = new System.Drawing.Size(204, 40);
+			this.ClientSize = new System.Drawing.Size(200, 44);
 			this.ControlBox = false;
 			this.Controls.Add(this.lblMessage);
 			this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle;
