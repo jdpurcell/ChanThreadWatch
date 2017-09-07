@@ -226,7 +226,7 @@ namespace JDP {
 				ImageInfo image = new ImageInfo {
 					URL = General.GetAbsoluteURL(URL, HttpUtility.HtmlDecode(imageURL)),
 					Referer = URL,
-					OriginalFileName = General.CleanFileName(HttpUtility.HtmlDecode(originalFileName)),
+					UnsanitizedOriginalFileName = HttpUtility.HtmlDecode(originalFileName),
 					HashType = HashType.MD5,
 					Hash = General.TryBase64Decode(imageMD5)
 				};
@@ -342,9 +342,12 @@ namespace JDP {
 					FileName = line
 				};
 
+			// We aren't really returning the "original" filenames; we just need to assign
+			// filenames that ensure correct chronological order when sorted.
 			return files.Select((f, i) => new ImageInfo {
 				URL = General.GetAbsoluteURL(URL, f.FileName),
-				RequiredFileName = $"{i:D6}.ts"
+				UnsanitizedOriginalFileName = $"{i:D6}.ts",
+				ForceOriginalFileName = true
 			}).ToList();
 		}
 

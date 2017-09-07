@@ -32,16 +32,16 @@ namespace JDP {
 	public class ImageInfo {
 		public string URL { get; set; }
 		public string Referer { get; set; }
-		public string OriginalFileName { get; set; }
-		public string RequiredFileName { get; set; }
+		public string UnsanitizedOriginalFileName { get; set; }
+		public bool ForceOriginalFileName { get; set; }
 		public HashType HashType { get; set; }
 		public byte[] Hash { get; set; }
 
-		public string FileName {
-			get {
-				return General.CleanFileName(General.URLFileName(URL));
-			}
-		}
+		public string UnsanitizedFileName => General.URLFileName(URL);
+
+		public string FileName => General.CleanFileName(UnsanitizedFileName);
+
+		public string OriginalFileName => General.CleanFileName(UnsanitizedOriginalFileName);
 	}
 
 	public class DownloadInfo {

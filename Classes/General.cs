@@ -599,8 +599,7 @@ namespace JDP {
 		}
 
 		public static string URLFileName(string url) {
-			int pos = url.LastIndexOf("/", StringComparison.Ordinal);
-			return (pos == -1) ? "" : url.Substring(pos + 1);
+			return url.SubstringAfterLast("/", StringComparison.Ordinal);
 		}
 
 		public static string CleanFileName(string src) {

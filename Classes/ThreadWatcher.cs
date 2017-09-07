@@ -460,10 +460,7 @@ namespace JDP {
 						}
 
 					MakeImagePath:
-						if (!String.IsNullOrEmpty(image.RequiredFileName)) {
-							ConfigureSaveFileName(image.RequiredFileName);
-						}
-						else if ((Settings.UseOriginalFileNames == true) && !String.IsNullOrEmpty(image.OriginalFileName) && !pathTooLong) {
+						if (!String.IsNullOrEmpty(image.OriginalFileName) && (image.ForceOriginalFileName || (Settings.UseOriginalFileNames == true && !pathTooLong))) {
 							ConfigureSaveFileName(image.OriginalFileName);
 						}
 						else {
