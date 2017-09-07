@@ -6,7 +6,7 @@ using System.Reflection;
 
 namespace JDP {
 	public static class Settings {
-		private const string _appName = "Chan Thread Watch";
+		private const string _appName = "CTW Classic";
 
 		private static readonly Dictionary<string, string> _settings = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
@@ -82,31 +82,18 @@ namespace JDP {
 
 		public static bool? UseExeDirectoryForSettings { get; set; }
 
-		public static string ExeDirectory {
-			get {
-				return Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
-			}
-		}
+		public static string ExeDirectory { get; } = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
 
-		public static string AppDataDirectory {
-			get {
-				return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), _appName);
-			}
-		}
+		public static string AppDataDirectory { get; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), _appName);
 
-		public static string SettingsFileName {
-			get { return "settings.txt"; }
-		}
+		public static string SettingsFileName { get; } = "settings.txt";
 
-		public static string ThreadsFileName {
-			get { return "threads.txt"; }
-		}
+		public static string ThreadsFileName { get; } = "threads.txt";
 
 		public static ThreadDoubleClickAction? OnThreadDoubleClick {
 			get {
 				int x = GetInt("OnThreadDoubleClick") ?? -1;
-				return Enum.IsDefined(typeof(ThreadDoubleClickAction), x) ?
-					(ThreadDoubleClickAction?)x : null;
+				return Enum.IsDefined(typeof(ThreadDoubleClickAction), x) ? (ThreadDoubleClickAction?)x : null;
 			}
 			set {
 				SetInt("OnThreadDoubleClick", value.HasValue ? (int?)value.Value : null);
