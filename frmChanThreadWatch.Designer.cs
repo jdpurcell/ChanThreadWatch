@@ -54,7 +54,7 @@
 			this.miRemoveAndDeleteFolder = new System.Windows.Forms.MenuItem();
 			this.miCheckNow = new System.Windows.Forms.MenuItem();
 			this.miCheckEvery = new System.Windows.Forms.MenuItem();
-			this.miPostprocess = new System.Windows.Forms.MenuItem();
+			this.miPostprocessFiles = new System.Windows.Forms.MenuItem();
 			this.grpDoubleClick = new System.Windows.Forms.GroupBox();
 			this.rbEditDescription = new System.Windows.Forms.RadioButton();
 			this.rbOpenURL = new System.Windows.Forms.RadioButton();
@@ -272,7 +272,7 @@
             this.miRemoveAndDeleteFolder,
             this.miCheckNow,
             this.miCheckEvery,
-            this.miPostprocess});
+            this.miPostprocessFiles});
 			// 
 			// miEditDescription
 			// 
@@ -333,11 +333,11 @@
 			this.miCheckEvery.Index = 9;
 			this.miCheckEvery.Text = "Check Every";
 			// 
-			// miPostprocess
+			// miPostprocessFiles
 			// 
-			this.miPostprocess.Index = 10;
-			this.miPostprocess.Text = "Postprocess";
-			this.miPostprocess.Click += new System.EventHandler(this.miPostprocess_Click);
+			this.miPostprocessFiles.Index = 10;
+			this.miPostprocessFiles.Text = "Postprocess Files";
+			this.miPostprocessFiles.Click += new System.EventHandler(this.miPostprocess_Click);
 			// 
 			// grpDoubleClick
 			// 
@@ -475,7 +475,7 @@
 		private System.Windows.Forms.MenuItem miStop;
 		private System.Windows.Forms.MenuItem miCopyURL;
 		private System.Windows.Forms.MenuItem miCheckEvery;
-		private System.Windows.Forms.MenuItem miPostprocess;
+		private System.Windows.Forms.MenuItem miPostprocessFiles;
 		private System.Windows.Forms.GroupBox grpDoubleClick;
 		private System.Windows.Forms.RadioButton rbOpenURL;
 		private System.Windows.Forms.RadioButton rbOpenFolder;

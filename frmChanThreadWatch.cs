@@ -326,7 +326,7 @@ namespace JDP {
 
 			foreach (ThreadWatcher watcher in SelectedThreadWatchers) {
 				if (watcher.IsRunning) continue;
-				IThreadPostprocessor siteHelper = SiteHelper.GetInstance(watcher.PageHost) as IThreadPostprocessor;
+				IFilePostprocessor siteHelper = SiteHelper.GetInstance(watcher.PageHost) as IFilePostprocessor;
 				if (siteHelper == null) continue;
 				string downloadDirectory = watcher.ThreadDownloadDirectory;
 				if (downloadDirectory == null) continue;
@@ -402,7 +402,7 @@ namespace JDP {
 						bool isRunning = watcher.IsRunning;
 						anyRunning |= isRunning;
 						anyStopped |= !isRunning;
-						anyCanPostprocess |= !isRunning && SiteHelper.GetInstance(watcher.PageHost) is IThreadPostprocessor;
+						anyCanPostprocess |= !isRunning && SiteHelper.GetInstance(watcher.PageHost) is IFilePostprocessor;
 					}
 					miEditDescription.Visible = selectedCount == 1;
 					miStop.Visible = anyRunning;
@@ -411,7 +411,7 @@ namespace JDP {
 					miCheckEvery.Visible = anyRunning;
 					miRemove.Visible = anyStopped;
 					miRemoveAndDeleteFolder.Visible = anyStopped;
-					miPostprocess.Visible = anyCanPostprocess;
+					miPostprocessFiles.Visible = anyCanPostprocess;
 					cmThreads.Show(lvThreads, e.Location);
 				}
 			}
@@ -591,7 +591,7 @@ namespace JDP {
 				return false;
 			}
 
-			bool wasAdded = AddThread(pageURL, pageAuth, imageAuth, checkInterval, chkOneTime.Checked, null, "", null, null);
+			bool wasAdded = AddThread(pageURL, pageAuth, imageAuth, checkInterval, chkOneTime.Checked);
 			if (!wasAdded) {
 				if (!silent) ShowErrorMessage("The same thread is already being watched or downloaded.", "Duplicate Thread");
 				return false;
@@ -600,7 +600,9 @@ namespace JDP {
 			return true;
 		}
 
-		private bool AddThread(string pageURL, string pageAuth, string imageAuth, int checkInterval, bool oneTime, string saveDir, string description, StopReason? stopReason, WatcherExtraData extraData) {
+		private bool AddThread(string pageURL, string pageAuth, string imageAuth, int checkInterval, bool oneTime, string saveDir = null,
+			string description = "", StopReason? stopReason = null, WatcherExtraData extraData = null)
+		{
 			ThreadWatcher watcher = null;
 			ListViewItem newListViewItem = null;
 
@@ -734,8 +736,8 @@ namespace JDP {
 			ContextMenuStrip contextMenuStrip = new ContextMenuStrip();
 			contextMenuStrip.Opening += (s, e) => {
 				e.Cancel = true;
-				Point pos = lvThreads.PointToClient(Control.MousePosition);
-				if (pos.Y >= _itemAreaY) return;
+				Point pos = lvThreads.PointToClient(MousePosition);
+				if (pos.Y < 0 || pos.Y >= _itemAreaY) return;
 				contextMenu.Show(lvThreads, pos);
 			};
 			lvThreads.ContextMenuStrip = contextMenuStrip;

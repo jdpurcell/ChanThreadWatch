@@ -309,7 +309,7 @@ namespace JDP {
 		}
 	}
 
-	public class SiteHelper_TwitchVOD : SiteHelper, IThreadPostprocessor {
+	public class SiteHelper_TwitchVOD : SiteHelper, IFilePostprocessor {
 		public static string[] Hosts { get; } = {
 			"twitch.tv",
 			"hls.ttvnw.net",
@@ -373,7 +373,7 @@ namespace JDP {
 		}
 	}
 
-	public interface IThreadPostprocessor {
+	public interface IFilePostprocessor {
 		void Postprocess(string downloadDirectory);
 	}
 }

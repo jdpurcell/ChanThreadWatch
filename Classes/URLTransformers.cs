@@ -32,7 +32,12 @@ namespace JDP {
 			}
 			JsonVodAccessToken accessToken = JObject.Parse(General.DownloadPageToString($"{"https"}://api.twitch.tv/api/vods/{videoID}/access_token", withRequest: AddTwitchAPIHeaders)).ToObject<JsonVodAccessToken>();
 			string[] masterPlaylistLines = General.NormalizeNewLines(General.DownloadPageToString($"{"https"}://usher.ttvnw.net/vod/{videoID}?allow_source=true&allow_audio_only=true&allow_spectre=true&player=twitchweb&nauth={Uri.EscapeUriString(accessToken.Token)}&nauthsig={Uri.EscapeUriString(accessToken.Sig)}")).Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
-			return GetPreferredPlaylistFromMasterPlaylist(masterPlaylistLines);
+			Uri playlistURI = new Uri(GetPreferredPlaylistFromMasterPlaylist(masterPlaylistLines));
+			// VODs are served randomly from multiple hosts, but we'll limit it to one to keep
+			// our duplicate URL detection reliable. We'll use one of the akamaized.net hosts
+			// which is better for live steams, because the playlists on twitch.tv and
+			// ttvnw.net have some kind of caching or delay.
+			return "https://vod023-ttvnw.akamaized.net" + playlistURI.PathAndQuery;
 		}
 
 		private static string GetPreferredPlaylistFromMasterPlaylist(string[] lines) {

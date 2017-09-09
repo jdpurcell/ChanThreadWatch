@@ -54,6 +54,7 @@
     <Compile Include="Classes\SiteHelpers.cs" />
     <Compile Include="Classes\General.cs" />
     <Compile Include="Classes\ThreadWatcher.cs" />
+    <Compile Include="Classes\TwitchUserWatcher.cs" />
     <Compile Include="Classes\URLTransformers.cs" />
     <Compile Include="frmChanThreadWatch.cs">
       <SubType>Form</SubType>
