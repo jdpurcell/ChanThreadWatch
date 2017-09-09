@@ -16,6 +16,17 @@ using System.Web;
 
 namespace JDP {
 	public static class General {
+		static General() {
+			// HttpWebRequest uses ThreadPool for asynchronous calls
+			EnsureThreadPoolMaxThreads(500, 1000);
+
+			// Shouldn't matter since the limit is supposed to be per connection group
+			ServicePointManager.DefaultConnectionLimit = Int32.MaxValue;
+
+			// Ignore invalid certificates (workaround for Mono)
+			ServicePointManager.ServerCertificateValidationCallback = (s, cert, chain, errors) => true;
+		}
+
 		public static string Version {
 			get {
 				Version ver = Assembly.GetExecutingAssembly().GetName().Version;

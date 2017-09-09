@@ -37,17 +37,6 @@ namespace JDP {
 		private string _description = "";
 		private object _tag;
 
-		static ThreadWatcher() {
-			// HttpWebRequest uses ThreadPool for asynchronous calls
-			General.EnsureThreadPoolMaxThreads(500, 1000);
-
-			// Shouldn't matter since the limit is supposed to be per connection group
-			ServicePointManager.DefaultConnectionLimit = Int32.MaxValue;
-
-			// Ignore invalid certificates (workaround for Mono)
-			ServicePointManager.ServerCertificateValidationCallback = (s, cert, chain, errors) => true;
-		}
-
 		public ThreadWatcher(string pageURL) {
 			PageURL = pageURL;
 			PageHost = new Uri(pageURL).Host;
