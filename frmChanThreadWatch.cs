@@ -594,7 +594,7 @@ namespace JDP {
 			ListViewItem newListViewItem = null;
 
 			foreach (ThreadWatcher existingWatcher in ThreadWatchers) {
-				if (String.Equals(existingWatcher.PageURL, pageURL, StringComparison.OrdinalIgnoreCase)) {
+				if (General.AreURLsDuplicate(existingWatcher.PageURL, pageURL)) {
 					if (existingWatcher.IsRunning) return false;
 					watcher = existingWatcher;
 					break;

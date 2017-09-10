@@ -365,12 +365,27 @@ namespace JDP {
 			return true;
 		}
 
-		public static string GetAbsoluteURL(string baseURL, string relativeURL) {
+		public static bool AreURLsDuplicate(string a, string b) {
+			string StripProtocol(string n) =>
+				n.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ? n.Substring(7) :
+				n.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ? n.Substring(8) :
+				n;
+
+			return String.Equals(StripProtocol(a), StripProtocol(b), StringComparison.OrdinalIgnoreCase);
+		}
+
+		public static string GetAbsoluteURL(Uri baseURI, string relativeURL) {
 			// AbsoluteUri can throw undocumented Exception (e.g. for "mailto:+")
 			try {
-				return Uri.TryCreate(new Uri(baseURL), relativeURL, out Uri uri) ? uri.AbsoluteUri : null;
+				return Uri.TryCreate(baseURI, relativeURL, out Uri uri) ? uri.AbsoluteUri : null;
 			}
 			catch { return null; }
+		}
+
+		public static string[] GetURLPathComponents(Uri uri) {
+			string path = uri.AbsolutePath;
+			if (!path.StartsWith("/", StringComparison.Ordinal)) return new string[0];
+			return path.Substring(1).Split('/');
 		}
 
 		public static string StripFragmentFromURL(string url) {
@@ -588,7 +603,7 @@ namespace JDP {
 					HTMLAttribute attribute = tag.GetAttribute(usesHRefAttr ? "href" : usesSrcAttr ? "src" : null);
 					if (attribute != null && !existingOffsets.Contains(attribute.Offset)) {
 						// Make attribute's URL absolute
-						string newURL = GetAbsoluteURL(pageURL, HttpUtility.HtmlDecode(attribute.Value));
+						string newURL = GetAbsoluteURL(new Uri(pageURL), HttpUtility.HtmlDecode(attribute.Value));
 						// For links to anchors on the current page, use just the fragment
 						if (isATag && newURL != null && newURL.Length > pageURL.Length &&
 							newURL.StartsWith(pageURL, StringComparison.Ordinal) && newURL[pageURL.Length] == '#')

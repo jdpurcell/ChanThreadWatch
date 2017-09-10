@@ -11,6 +11,10 @@ namespace JDP {
 
 		protected string URL { get; private set; }
 
+		protected Uri URI { get; private set; }
+
+		protected string[] URLPathComponents { get; private set; }
+
 		protected HTMLParser Parser { get; private set; }
 
 		static SiteHelper() {
@@ -38,35 +42,27 @@ namespace JDP {
 
 		public void SetURL(string url) {
 			URL = url;
+			URI = new Uri(url);
+			URLPathComponents = General.GetURLPathComponents(URI);
 		}
 
 		public void SetHTMLParser(HTMLParser htmlParser) {
 			Parser = htmlParser;
 		}
 
-		protected string[] SplitURL() {
-			int pos = URL.IndexOf("://", StringComparison.Ordinal);
-			if (pos == -1) return new string[0];
-			return URL.Substring(pos + 3).Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
-		}
-
 		public virtual string GetSiteName() {
-			string[] hostSplit = (new Uri(URL)).Host.Split('.');
-			return (hostSplit.Length >= 2) ? hostSplit[hostSplit.Length - 2] : "";
+			string[] hostSplit = URI.Host.Split('.');
+			return hostSplit.Length >= 2 ? hostSplit[hostSplit.Length - 2] : "";
 		}
 
 		public virtual string GetBoardName() {
-			string[] urlSplit = SplitURL();
-			return (urlSplit.Length >= 3) ? urlSplit[1] : "";
+			return URLPathComponents.Length >= 2 ? URLPathComponents[0] : "";
 		}
 
 		public virtual string GetThreadName() {
-			string[] urlSplit = SplitURL();
-			if (urlSplit.Length >= 3) {
-				string page = urlSplit[urlSplit.Length - 1];
-				int pos = page.IndexOf('?');
-				if (pos != -1) page = page.Substring(0, pos);
-				pos = page.LastIndexOf('.');
+			if (URLPathComponents.Length >= 2) {
+				string page = URLPathComponents[URLPathComponents.Length - 1];
+				int pos = page.LastIndexOf('.');
 				if (pos != -1) page = page.Substring(0, pos);
 				return page;
 			}
@@ -92,7 +88,7 @@ namespace JDP {
 			foreach (HTMLTag linkTag in Parser.FindStartTags("a")) {
 				attribute = linkTag.GetAttribute("href");
 				if (attribute == null) continue;
-				url = General.GetAbsoluteURL(URL, HttpUtility.HtmlDecode(attribute.Value));
+				url = General.GetAbsoluteURL(URI, HttpUtility.HtmlDecode(attribute.Value));
 				if (url == null || url.IndexOf(ImageURLKeyword, StringComparison.OrdinalIgnoreCase) == -1) continue;
 
 				HTMLTag linkEndTag = Parser.FindCorrespondingEndTag(linkTag);
@@ -125,7 +121,7 @@ namespace JDP {
 				if (imageTag != null) {
 					attribute = imageTag.GetAttribute("src");
 					if (attribute != null) {
-						url = General.GetAbsoluteURL(URL, HttpUtility.HtmlDecode(attribute.Value));
+						url = General.GetAbsoluteURL(URI, HttpUtility.HtmlDecode(attribute.Value));
 						if (url != null) {
 							thumb = new ThumbnailInfo();
 							thumb.URL = url;
@@ -165,12 +161,8 @@ namespace JDP {
 		};
 
 		public override string GetThreadName() {
-			string[] urlSplit = SplitURL();
-			if (urlSplit.Length >= 4 && urlSplit[2].Equals("thread", StringComparison.Ordinal)) {
-				string page = urlSplit[3];
-				int pos = page.IndexOf('?');
-				if (pos != -1) page = page.Substring(0, pos);
-				return page;
+			if (URLPathComponents.Length >= 3 && URLPathComponents[1].Equals("thread", StringComparison.Ordinal)) {
+				return URLPathComponents[2];
 			}
 			return base.GetThreadName();
 		}
@@ -224,7 +216,7 @@ namespace JDP {
 				if (imageMD5 == null) continue;
 
 				ImageInfo image = new ImageInfo {
-					URL = General.GetAbsoluteURL(URL, HttpUtility.HtmlDecode(imageURL)),
+					URL = General.GetAbsoluteURL(URI, HttpUtility.HtmlDecode(imageURL)),
 					Referer = URL,
 					UnsanitizedOriginalFileName = HttpUtility.HtmlDecode(originalFileName),
 					HashType = HashType.MD5,
@@ -233,7 +225,7 @@ namespace JDP {
 				if (image.URL.Length == 0 || image.FileName.Length == 0 || image.Hash == null) continue;
 
 				ThumbnailInfo thumb = new ThumbnailInfo {
-					URL = General.GetAbsoluteURL(URL, HttpUtility.HtmlDecode(thumbURL)),
+					URL = General.GetAbsoluteURL(URI, HttpUtility.HtmlDecode(thumbURL)),
 					Referer = URL
 				};
 				if (thumb.URL == null || thumb.FileName.Length == 0) continue;
@@ -321,9 +313,8 @@ namespace JDP {
 		}
 
 		public override string GetThreadName() {
-			string[] urlSplit = SplitURL();
-			if (urlSplit.Length >= 2) {
-				string[] s = urlSplit[1].Split('_');
+			if (URLPathComponents.Length >= 1) {
+				string[] s = URLPathComponents[0].Split('_');
 				// Can have more than 4 items if the channel name contains an underscore. The item
 				// we're returning is what Twitch refers to as "broadcast_id".
 				if (s.Length >= 4) {
@@ -345,7 +336,7 @@ namespace JDP {
 			// We aren't really returning the "original" filenames; we just need to assign
 			// filenames that ensure correct chronological order when sorted.
 			return files.Select((f, i) => new ImageInfo {
-				URL = General.GetAbsoluteURL(URL, f.FileName),
+				URL = General.GetAbsoluteURL(URI, f.FileName),
 				UnsanitizedOriginalFileName = $"{i:D6}.ts",
 				ForceOriginalFileName = true
 			}).ToList();

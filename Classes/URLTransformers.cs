@@ -18,15 +18,25 @@ namespace JDP {
 		}
 
 		public static string Transform(string url, string auth) {
-			return _urlTransformers.Select(n => n.TransformIfRecognized(url, auth)).FirstOrDefault(n => n != null) ?? url;
+			Uri uri = new Uri(url);
+			return _urlTransformers.Select(n => n.TransformIfRecognized(uri, auth)).FirstOrDefault(n => n != null) ?? url;
 		}
 
-		public abstract string TransformIfRecognized(string url, string auth);
+		public abstract string TransformIfRecognized(Uri uri, string auth);
+	}
+
+	public class URLTransformer_4chan : URLTransformer {
+		public override string TransformIfRecognized(Uri uri, string auth) {
+			if (!uri.Host.Equals("boards.4chan.org", StringComparison.OrdinalIgnoreCase)) return null;
+			string[] pathComponents = General.GetURLPathComponents(uri);
+			if (pathComponents.Length < 3) return null;
+			return General.GetAbsoluteURL(uri, "/" + String.Join("/", pathComponents.Take(3)));
+		}
 	}
 
 	public class URLTransformer_TwitchVOD : URLTransformer {
-		public override string TransformIfRecognized(string url, string auth) {
-			long videoID = TryParseVideoIDFromURL(url) ?? 0;
+		public override string TransformIfRecognized(Uri uri, string auth) {
+			long videoID = TryParseVideoIDFromURL(uri) ?? 0;
 			if (videoID == 0) {
 				return null;
 			}
@@ -62,12 +72,8 @@ namespace JDP {
 			throw new Exception("Unable to find a suitable playlist.");
 		}
 
-		private static long? TryParseVideoIDFromURL(string s) {
+		private static long? TryParseVideoIDFromURL(Uri uri) {
 			string[] hosts = { "twitch.tv", "www.twitch.tv" };
-			if (!s.StartsWith("http", StringComparison.OrdinalIgnoreCase)) {
-				s = "https://" + s;
-			}
-			if (!Uri.TryCreate(s, UriKind.Absolute, out Uri uri)) return null;
 			if (!hosts.Any(h => uri.Host.Equals(h, StringComparison.OrdinalIgnoreCase))) return null;
 			if (!uri.AbsolutePath.StartsWith("/videos/", StringComparison.Ordinal)) return null;
 			return Int64.TryParse(uri.AbsolutePath.Substring(8), out long id) ? id : (long?)null;
