@@ -4,15 +4,20 @@ using System.Windows.Forms;
 
 namespace JDP {
 	public partial class frmDownloads : Form {
-		private frmChanThreadWatch _parentForm;
-		private Dictionary<long, ListViewItem> _items = new Dictionary<long, ListViewItem>();
-		private Dictionary<long, List<DownloadedSizeSnapshot>> _snapshotLists = new Dictionary<long, List<DownloadedSizeSnapshot>>();
+		private readonly frmChanThreadWatch _parentForm;
+		private readonly Dictionary<long, ListViewItem> _items = new Dictionary<long, ListViewItem>();
+		private readonly Dictionary<long, List<DownloadedSizeSnapshot>> _snapshotLists = new Dictionary<long, List<DownloadedSizeSnapshot>>();
 
 		public frmDownloads(frmChanThreadWatch parentForm) {
 			InitializeComponent();
 			GUI.SetFontAndScaling(this);
+			GUI.ScaleColumns(lvDownloads);
 			GUI.EnableDoubleBuffering(lvDownloads);
 			_parentForm = parentForm;
+		}
+
+		private void frmDownloads_Shown(object sender, EventArgs e) {
+			GUI.EnsureScrollBarVisible(lvDownloads);
 		}
 
 		private void tmrUpdateList_Tick(object sender, EventArgs e) {

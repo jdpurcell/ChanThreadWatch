@@ -60,7 +60,7 @@ namespace JDP {
 		}
 	}
 
-	public class PostprocessingTask {
+	public class FilePostprocessingTask {
 		public IFilePostprocessor SiteHelper { get; set; }
 		public string DownloadDirectory { get; set; }
 	}

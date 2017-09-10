@@ -336,8 +336,8 @@
 			// miPostprocessFiles
 			// 
 			this.miPostprocessFiles.Index = 10;
-			this.miPostprocessFiles.Text = "Postprocess Files";
-			this.miPostprocessFiles.Click += new System.EventHandler(this.miPostprocess_Click);
+			this.miPostprocessFiles.Text = "Post-process Files";
+			this.miPostprocessFiles.Click += new System.EventHandler(this.miPostprocessFiles_Click);
 			// 
 			// grpDoubleClick
 			// 

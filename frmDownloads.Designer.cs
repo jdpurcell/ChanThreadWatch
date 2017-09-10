@@ -25,20 +25,20 @@
 		private void InitializeComponent() {
 			this.components = new System.ComponentModel.Container();
 			this.lvDownloads = new System.Windows.Forms.ListView();
-			this.chURL = new System.Windows.Forms.ColumnHeader();
-			this.chSize = new System.Windows.Forms.ColumnHeader();
-			this.chPercent = new System.Windows.Forms.ColumnHeader();
-			this.chSpeed = new System.Windows.Forms.ColumnHeader();
+			this.chURL = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
+			this.chSize = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
+			this.chPercent = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
+			this.chSpeed = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
+			this.chTry = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
 			this.tmrUpdateList = new System.Windows.Forms.Timer(this.components);
-			this.chTry = new System.Windows.Forms.ColumnHeader();
 			this.SuspendLayout();
 			// 
 			// lvDownloads
 			// 
 			this.lvDownloads.AllowColumnReorder = true;
-			this.lvDownloads.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom)
-						| System.Windows.Forms.AnchorStyles.Left)
-						| System.Windows.Forms.AnchorStyles.Right)));
+			this.lvDownloads.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
 			this.lvDownloads.Columns.AddRange(new System.Windows.Forms.ColumnHeader[] {
             this.chURL,
             this.chSize,
@@ -76,16 +76,16 @@
 			this.chSpeed.TextAlign = System.Windows.Forms.HorizontalAlignment.Right;
 			this.chSpeed.Width = 80;
 			// 
-			// tmrUpdateList
-			// 
-			this.tmrUpdateList.Enabled = true;
-			this.tmrUpdateList.Tick += new System.EventHandler(this.tmrUpdateList_Tick);
-			// 
 			// chTry
 			// 
 			this.chTry.Text = "Try";
 			this.chTry.TextAlign = System.Windows.Forms.HorizontalAlignment.Right;
 			this.chTry.Width = 35;
+			// 
+			// tmrUpdateList
+			// 
+			this.tmrUpdateList.Enabled = true;
+			this.tmrUpdateList.Tick += new System.EventHandler(this.tmrUpdateList_Tick);
 			// 
 			// frmDownloads
 			// 
@@ -101,6 +101,7 @@
 			this.SizeGripStyle = System.Windows.Forms.SizeGripStyle.Hide;
 			this.StartPosition = System.Windows.Forms.FormStartPosition.Manual;
 			this.Text = "Downloads";
+			this.Shown += new System.EventHandler(this.frmDownloads_Shown);
 			this.ResumeLayout(false);
 
 		}
@@ -111,8 +112,8 @@
 		private System.Windows.Forms.ColumnHeader chURL;
 		private System.Windows.Forms.ColumnHeader chPercent;
 		private System.Windows.Forms.ColumnHeader chSize;
-		private System.Windows.Forms.Timer tmrUpdateList;
 		private System.Windows.Forms.ColumnHeader chSpeed;
 		private System.Windows.Forms.ColumnHeader chTry;
+		private System.Windows.Forms.Timer tmrUpdateList;
 	}
 }

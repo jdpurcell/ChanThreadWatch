@@ -351,7 +351,7 @@ namespace JDP {
 			}).ToList();
 		}
 
-		public void Postprocess(string downloadDirectory) {
+		public void PostprocessFiles(string downloadDirectory) {
 			List<string> files =
 				(from path in Directory.GetFiles(downloadDirectory, "*.ts")
 				 let name = Path.GetFileNameWithoutExtension(path)
@@ -374,6 +374,6 @@ namespace JDP {
 	}
 
 	public interface IFilePostprocessor {
-		void Postprocess(string downloadDirectory);
+		void PostprocessFiles(string downloadDirectory);
 	}
 }

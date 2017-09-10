@@ -20,21 +20,12 @@ namespace JDP {
 		private frmDownloads _downloadForm;
 		private bool _isExiting;
 		private bool _saveThreadList;
-		private int _itemAreaY;
-		private int[] _columnWidths;
 
 		public frmChanThreadWatch() {
 			InitializeComponent();
 			Icon = Resources.ChanThreadWatchIcon;
-			int initialWidth = ClientSize.Width;
 			GUI.SetFontAndScaling(this);
-			float scaleFactorX = (float)ClientSize.Width / initialWidth;
-			_columnWidths = new int[lvThreads.Columns.Count];
-			for (int iColumn = 0; iColumn < lvThreads.Columns.Count; iColumn++) {
-				ColumnHeader column = lvThreads.Columns[iColumn];
-				column.Width = Convert.ToInt32(column.Width * scaleFactorX);
-				_columnWidths[iColumn] = column.Width;
-			}
+			GUI.ScaleColumns(lvThreads);
 			GUI.EnableDoubleBuffering(lvThreads);
 
 			Settings.Load();
@@ -62,9 +53,7 @@ namespace JDP {
 			OnThreadDoubleClick = Settings.OnThreadDoubleClick ?? ThreadDoubleClickAction.OpenFolder;
 		}
 
-		public Dictionary<long, DownloadProgressInfo> DownloadProgresses {
-			get { return _downloadProgresses; }
-		}
+		public Dictionary<long, DownloadProgressInfo> DownloadProgresses => _downloadProgresses;
 
 		private ThreadDoubleClickAction OnThreadDoubleClick {
 			get {
@@ -86,9 +75,7 @@ namespace JDP {
 		}
 
 		private void frmChanThreadWatch_Shown(object sender, EventArgs e) {
-			lvThreads.Items.Add(new ListViewItem());
-			_itemAreaY = lvThreads.GetItemRect(0).Y;
-			lvThreads.Items.RemoveAt(0);
+			GUI.EnsureScrollBarVisible(lvThreads);
 
 			LoadThreadList();
 		}
@@ -188,7 +175,7 @@ namespace JDP {
 			catch {
 				return;
 			}
-			string[] urls = General.NormalizeNewLines(text).Split(new [] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
+			string[] urls = General.NormalizeNewLines(text).Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
 			for (int iURL = 0; iURL < urls.Length; iURL++) {
 				string url = General.CleanPageURL(urls[iURL]);
 				if (url == null) continue;
@@ -321,8 +308,8 @@ namespace JDP {
 			_saveThreadList = true;
 		}
 
-		private void miPostprocess_Click(object sender, EventArgs e) {
-			var tasks = new List<PostprocessingTask>();
+		private void miPostprocessFiles_Click(object sender, EventArgs e) {
+			var tasks = new List<FilePostprocessingTask>();
 
 			foreach (ThreadWatcher watcher in SelectedThreadWatchers) {
 				if (watcher.IsRunning) continue;
@@ -330,7 +317,7 @@ namespace JDP {
 				if (siteHelper == null) continue;
 				string downloadDirectory = watcher.ThreadDownloadDirectory;
 				if (downloadDirectory == null) continue;
-				tasks.Add(new PostprocessingTask {
+				tasks.Add(new FilePostprocessingTask {
 					SiteHelper = siteHelper,
 					DownloadDirectory = downloadDirectory
 				});
@@ -338,9 +325,9 @@ namespace JDP {
 
 			bool anyFailed = false;
 			frmWait.RunWork(this, () => {
-				foreach (PostprocessingTask task in tasks) {
+				foreach (FilePostprocessingTask task in tasks) {
 					try {
-						task.SiteHelper.Postprocess(task.DownloadDirectory);
+						task.SiteHelper.PostprocessFiles(task.DownloadDirectory);
 					}
 					catch {
 						anyFailed = true;
@@ -348,7 +335,7 @@ namespace JDP {
 				}
 			});
 			if (anyFailed) {
-				ShowErrorMessage("Postprocessing failed.", "Error");
+				ShowErrorMessage("File post-processing failed.", "Error");
 			}
 		}
 
@@ -723,12 +710,13 @@ namespace JDP {
 				menuItem.Click += (s, e) => {
 					int iColumn = (int)((MenuItem)s).Tag;
 					ColumnHeader column = lvThreads.Columns[iColumn];
-					if (column.Width != 0) {
-						_columnWidths[iColumn] = column.Width;
+					if (column.Tag == null) {
+						column.Tag = column.Width;
 						column.Width = 0;
 					}
 					else {
-						column.Width = _columnWidths[iColumn];
+						column.Width = (int)column.Tag;
+						column.Tag = null;
 					}
 				};
 				contextMenu.MenuItems.Add(menuItem);
@@ -737,7 +725,7 @@ namespace JDP {
 			contextMenuStrip.Opening += (s, e) => {
 				e.Cancel = true;
 				Point pos = lvThreads.PointToClient(MousePosition);
-				if (pos.Y < 0 || pos.Y >= _itemAreaY) return;
+				if (pos.X < 0 || pos.X > lvThreads.ClientSize.Width || pos.Y < 0 || pos.Y >= GUI.GetHeaderHeight(lvThreads)) return;
 				contextMenu.Show(lvThreads, pos);
 			};
 			lvThreads.ContextMenuStrip = contextMenuStrip;

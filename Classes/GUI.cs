@@ -59,6 +59,46 @@ namespace JDP {
 	}
 
 	public static class GUI {
+		static GUI() {
+			using (var form = new Form { AutoScaleMode = AutoScaleMode }) {
+				AutoScaleFactorX = form.CurrentAutoScaleDimensions.Width / AutoScaleBaseSize.Width;
+				AutoScaleFactorY = form.CurrentAutoScaleDimensions.Height / AutoScaleBaseSize.Height;
+			}
+		}
+
+		public static AutoScaleMode AutoScaleMode { get; } = AutoScaleMode.Font;
+
+		public static SizeF AutoScaleBaseSize { get; } = new SizeF(6F, 13F);
+
+		public static float AutoScaleFactorX { get; }
+
+		public static float AutoScaleFactorY { get; }
+
+		public static int ScaleX(int size) => Convert.ToInt32(size * AutoScaleFactorX);
+
+		public static int ScaleY(int size) => Convert.ToInt32(size * AutoScaleFactorY);
+
+		public static void ScaleColumns(ListView control) {
+			foreach (ColumnHeader column in control.Columns) {
+				column.Width = ScaleX(column.Width);
+			}
+		}
+
+		// Workaround for horizontal scroll bar not showing initially if no items have been added
+		public static void EnsureScrollBarVisible(ListView control) {
+			if (control.Items.Count != 0) return;
+			control.Items.Add(new ListViewItem());
+			control.Items.RemoveAt(0);
+		}
+
+		public static int GetHeaderHeight(ListView control) {
+			bool addItem = control.Items.Count == 0;
+			if (addItem) control.Items.Add(new ListViewItem());
+			int headerHeight = control.GetItemRect(0).Y;
+			if (addItem) control.Items.RemoveAt(0);
+			return headerHeight;
+		}
+
 		public static void CenterChildForm(Form parent, Form child) {
 			int centerX = ((parent.Left * 2) + parent.Width ) / 2;
 			int centerY = ((parent.Top  * 2) + parent.Height) / 2;
@@ -97,8 +137,8 @@ namespace JDP {
 			form.SuspendLayout();
 			form.Font = new Font("Tahoma", 8.25F);
 			if (form.Font.Name != "Tahoma") form.Font = new Font("Arial", 8.25F);
-			form.AutoScaleMode = AutoScaleMode.Font;
-			form.AutoScaleDimensions = new SizeF(6F, 13F);
+			form.AutoScaleMode = AutoScaleMode;
+			form.AutoScaleDimensions = AutoScaleBaseSize;
 			form.ResumeLayout(false);
 		}
 	}
