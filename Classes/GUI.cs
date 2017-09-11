@@ -5,14 +5,6 @@ using System.Reflection;
 using System.Windows.Forms;
 
 namespace JDP {
-	public class WatcherExtraData {
-		public ListViewItem ListViewItem { get; set; }
-		public DateTime AddedOn { get; set; }
-		public DateTime? LastImageOn { get; set; }
-		public bool HasDownloadedPage { get; set; }
-		public bool PreviousDownloadWasPage { get; set; }
-	}
-
 	public struct DownloadProgressInfo {
 		public long DownloadID { get; set; }
 		public string URL { get; set; }

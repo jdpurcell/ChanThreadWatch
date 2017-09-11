@@ -16,6 +16,8 @@ using JDP.Properties;
 
 namespace JDP {
 	public partial class frmChanThreadWatch : Form {
+		private const string _uiDateTimeFormat = "yyyy/MM/dd HH:mm:ss";
+
 		private readonly Dictionary<long, DownloadProgressInfo> _downloadProgresses = new Dictionary<long, DownloadProgressInfo>();
 		private frmDownloads _downloadForm;
 		private bool _isExiting;
@@ -34,43 +36,36 @@ namespace JDP {
 			BuildCheckEverySubMenu();
 			BuildColumnHeaderMenu();
 
-			if ((Settings.DownloadFolder == null) || !Directory.Exists(Settings.AbsoluteDownloadDirectory)) {
-				Settings.DownloadFolder = Path.Combine(Environment.GetFolderPath(
-					Environment.SpecialFolder.MyDocuments), "Watched Threads");
+			if (String.IsNullOrEmpty(Settings.DownloadFolder) || !Directory.Exists(Settings.AbsoluteDownloadDirectory)) {
+				Settings.DownloadFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Watched Threads");
 				Settings.DownloadFolderIsRelative = false;
 			}
-			if (Settings.CheckEvery == 1) {
-				Settings.CheckEvery = 0;
-			}
 
-			chkPageAuth.Checked = Settings.UsePageAuth ?? false;
-			txtPageAuth.Text = Settings.PageAuth ?? "";
-			chkImageAuth.Checked = Settings.UseImageAuth ?? false;
-			txtImageAuth.Text = Settings.ImageAuth ?? "";
-			chkOneTime.Checked = Settings.OneTimeDownload ?? false;
-			cboCheckEvery.SelectedValue = Settings.CheckEvery ?? 3;
+			chkPageAuth.Checked = Settings.UsePageAuth;
+			txtPageAuth.Text = Settings.PageAuth;
+			chkImageAuth.Checked = Settings.UseImageAuth;
+			txtImageAuth.Text = Settings.ImageAuth;
+			chkOneTime.Checked = Settings.OneTimeDownload;
+			cboCheckEvery.SelectedValue = Settings.CheckEvery;
 			if (cboCheckEvery.SelectedIndex == -1) cboCheckEvery.SelectedValue = 3;
-			OnThreadDoubleClick = Settings.OnThreadDoubleClick ?? ThreadDoubleClickAction.OpenFolder;
+			ThreadDoubleClickAction = Settings.ThreadDoubleClickAction;
 		}
 
 		public Dictionary<long, DownloadProgressInfo> DownloadProgresses => _downloadProgresses;
 
-		private ThreadDoubleClickAction OnThreadDoubleClick {
+		private ThreadDoubleClickAction ThreadDoubleClickAction {
 			get {
-				if (rbEditDescription.Checked)
-					return ThreadDoubleClickAction.EditDescription;
-				else if (rbOpenURL.Checked)
-					return ThreadDoubleClickAction.OpenURL;
-				else
-					return ThreadDoubleClickAction.OpenFolder;
+				return
+					rbEditDescription.Checked ? ThreadDoubleClickAction.EditDescription :
+					rbOpenURL.Checked ? ThreadDoubleClickAction.OpenURL :
+					ThreadDoubleClickAction.OpenFolder;
 			}
 			set {
-				if (value == ThreadDoubleClickAction.EditDescription)
-					rbEditDescription.Checked = true;
-				else if (value == ThreadDoubleClickAction.OpenURL)
-					rbOpenURL.Checked = true;
-				else
-					rbOpenFolder.Checked = true;
+				var item =
+					value == ThreadDoubleClickAction.EditDescription ? rbEditDescription :
+					value == ThreadDoubleClickAction.OpenURL ? rbOpenURL :
+					rbOpenFolder;
+				item.Checked = true;
 			}
 		}
 
@@ -87,13 +82,13 @@ namespace JDP {
 			Settings.ImageAuth = txtImageAuth.Text;
 			Settings.OneTimeDownload = chkOneTime.Checked;
 			Settings.CheckEvery = (int)cboCheckEvery.SelectedValue;
-			Settings.OnThreadDoubleClick = OnThreadDoubleClick;
+			Settings.ThreadDoubleClickAction = ThreadDoubleClickAction;
 			try {
 				Settings.Save();
 			}
 			catch { }
 
-			foreach (ThreadWatcher watcher in ThreadWatchers) {
+			foreach (ThreadWatcher watcher in ThreadList.Items) {
 				watcher.Stop(StopReason.Exiting);
 			}
 
@@ -101,15 +96,13 @@ namespace JDP {
 			SaveThreadList();
 
 			_isExiting = true;
-			foreach (ThreadWatcher watcher in ThreadWatchers) {
+			foreach (ThreadWatcher watcher in ThreadList.Items) {
 				while (!watcher.WaitUntilStopped(10)) {
 					Application.DoEvents();
 				}
 			}
 
 			SaveThreadList();
-
-			Program.ReleaseMutex();
 		}
 
 		private void frmChanThreadWatch_DragEnter(object sender, DragEventArgs e) {
@@ -139,7 +132,6 @@ namespace JDP {
 			url = General.CleanPageURL(url);
 			if (url != null) {
 				AddThread(url, silent: true);
-				_saveThreadList = true;
 			}
 		}
 
@@ -163,7 +155,6 @@ namespace JDP {
 			}
 			txtPageURL.Clear();
 			txtPageURL.Focus();
-			_saveThreadList = true;
 		}
 
 		private void btnAddFromClipboard_Click(object sender, EventArgs e) {
@@ -181,7 +172,6 @@ namespace JDP {
 				if (url == null) continue;
 				AddThread(url, silent: true);
 			}
-			_saveThreadList = true;
 		}
 
 		private void btnRemoveCompleted_Click(object sender, EventArgs e) {
@@ -313,7 +303,7 @@ namespace JDP {
 
 			foreach (ThreadWatcher watcher in SelectedThreadWatchers) {
 				if (watcher.IsRunning) continue;
-				IFilePostprocessor siteHelper = SiteHelper.GetInstance(watcher.PageHost) as IFilePostprocessor;
+				IFilePostprocessor siteHelper = SiteHelper.CreateByHost(watcher.PageHost) as IFilePostprocessor;
 				if (siteHelper == null) continue;
 				string downloadDirectory = watcher.ThreadDownloadDirectory;
 				if (downloadDirectory == null) continue;
@@ -389,7 +379,7 @@ namespace JDP {
 						bool isRunning = watcher.IsRunning;
 						anyRunning |= isRunning;
 						anyStopped |= !isRunning;
-						anyCanPostprocess |= !isRunning && SiteHelper.GetInstance(watcher.PageHost) is IFilePostprocessor;
+						anyCanPostprocess |= !isRunning && SiteHelper.CreateByHost(watcher.PageHost) is IFilePostprocessor;
 					}
 					miEditDescription.Visible = selectedCount == 1;
 					miStop.Visible = anyRunning;
@@ -405,10 +395,10 @@ namespace JDP {
 		}
 
 		private void lvThreads_MouseDoubleClick(object sender, MouseEventArgs e) {
-			if (OnThreadDoubleClick == ThreadDoubleClickAction.EditDescription) {
+			if (ThreadDoubleClickAction == ThreadDoubleClickAction.EditDescription) {
 				miEditDescription_Click(null, null);
 			}
-			else if (OnThreadDoubleClick == ThreadDoubleClickAction.OpenFolder) {
+			else if (ThreadDoubleClickAction == ThreadDoubleClickAction.OpenFolder) {
 				miOpenFolder_Click(null, null);
 			}
 			else {
@@ -471,32 +461,16 @@ namespace JDP {
 			}
 		}
 
+		private void ThreadWatcher_FoundNewImage(ThreadWatcher watcher, EventArgs args) {
+			this.BeginInvoke(() => {
+				DisplayLastImageOn(watcher);
+				_saveThreadList = true;
+			});
+		}
+
 		private void ThreadWatcher_DownloadStatus(ThreadWatcher watcher, DownloadStatusEventArgs args) {
-			WatcherExtraData extraData = (WatcherExtraData)watcher.Tag;
-			bool isInitialPageDownload = false;
-			bool isFirstImageUpdate = false;
-			if (args.DownloadType == DownloadType.Page) {
-				if (!extraData.HasDownloadedPage) {
-					extraData.HasDownloadedPage = true;
-					isInitialPageDownload = true;
-				}
-				extraData.PreviousDownloadWasPage = true;
-			}
-			if (args.DownloadType == DownloadType.Image && extraData.PreviousDownloadWasPage) {
-				extraData.LastImageOn = DateTime.Now;
-				extraData.PreviousDownloadWasPage = false;
-				isFirstImageUpdate = true;
-			}
 			this.BeginInvoke(() => {
 				SetDownloadStatus(watcher, args.DownloadType, args.CompleteCount, args.TotalCount);
-				if (isInitialPageDownload) {
-					DisplayDescription(watcher);
-					_saveThreadList = true;
-				}
-				if (isFirstImageUpdate) {
-					DisplayLastImageOn(watcher);
-					_saveThreadList = true;
-				}
 				SetupWaitTimer();
 			});
 		}
@@ -508,11 +482,11 @@ namespace JDP {
 			});
 		}
 
-		private void ThreadWatcher_StopStatus(ThreadWatcher watcher, StopStatusEventArgs args) {
+		private void ThreadWatcher_StopStatus(ThreadWatcher watcher, EventArgs args) {
 			this.BeginInvoke(() => {
-				SetStopStatus(watcher, args.StopReason);
+				SetStopStatus(watcher);
 				SetupWaitTimer();
-				if (args.StopReason != StopReason.UserRequest && args.StopReason != StopReason.Exiting) {
+				if (watcher.StopReason != StopReason.UserRequest && watcher.StopReason != StopReason.Exiting) {
 					_saveThreadList = true;
 				}
 			});
@@ -561,9 +535,9 @@ namespace JDP {
 		}
 
 		private bool AddThread(string pageURL, bool silent = false) {
-			string pageAuth = (chkPageAuth.Checked && (txtPageAuth.Text.IndexOf(':') != -1)) ? txtPageAuth.Text : "";
-			string imageAuth = (chkImageAuth.Checked && (txtImageAuth.Text.IndexOf(':') != -1)) ? txtImageAuth.Text : "";
-			int checkInterval = (int)cboCheckEvery.SelectedValue * 60;
+			string pageAuth = chkPageAuth.Checked && txtPageAuth.Text.IndexOf(':') != -1 ? txtPageAuth.Text : "";
+			string imageAuth = chkImageAuth.Checked && txtImageAuth.Text.IndexOf(':') != -1 ? txtImageAuth.Text : "";
+			int checkIntervalSeconds = (int)cboCheckEvery.SelectedValue * 60;
 
 			bool wasTransformSuccessful = false;
 			frmWait.RunWork(this, () => {
@@ -578,7 +552,7 @@ namespace JDP {
 				return false;
 			}
 
-			bool wasAdded = AddThread(pageURL, pageAuth, imageAuth, checkInterval, chkOneTime.Checked);
+			bool wasAdded = AddThread(pageURL, pageAuth, imageAuth, checkIntervalSeconds, chkOneTime.Checked);
 			if (!wasAdded) {
 				if (!silent) ShowErrorMessage("The same thread is already being watched or downloaded.", "Duplicate Thread");
 				return false;
@@ -587,69 +561,58 @@ namespace JDP {
 			return true;
 		}
 
-		private bool AddThread(string pageURL, string pageAuth, string imageAuth, int checkInterval, bool oneTime, string saveDir = null,
-			string description = "", StopReason? stopReason = null, WatcherExtraData extraData = null)
-		{
-			ThreadWatcher watcher = null;
-			ListViewItem newListViewItem = null;
-
-			foreach (ThreadWatcher existingWatcher in ThreadWatchers) {
-				if (General.AreURLsDuplicate(existingWatcher.PageURL, pageURL)) {
-					if (existingWatcher.IsRunning) return false;
-					watcher = existingWatcher;
-					break;
-				}
-			}
+		private bool AddThread(string pageURL, string pageAuth, string imageAuth, int checkIntervalSeconds, bool oneTimeDownload) {
+			string globalThreadID = SiteHelper.CreateByURL(pageURL).GetGlobalThreadID();
+			ThreadWatcher watcher = ThreadList.Items.FirstOrDefault(w => w.GlobalThreadID.Equals(globalThreadID, StringComparison.OrdinalIgnoreCase));
 
 			if (watcher == null) {
-				watcher = new ThreadWatcher(pageURL);
-				watcher.ThreadDownloadDirectory = saveDir;
-				watcher.Description = description;
-				watcher.DownloadStatus += ThreadWatcher_DownloadStatus;
-				watcher.WaitStatus += ThreadWatcher_WaitStatus;
-				watcher.StopStatus += ThreadWatcher_StopStatus;
-				watcher.ThreadDownloadDirectoryRename += ThreadWatcher_ThreadDownloadDirectoryRename;
-				watcher.DownloadStart += ThreadWatcher_DownloadStart;
-				watcher.DownloadProgress += ThreadWatcher_DownloadProgress;
-				watcher.DownloadEnd += ThreadWatcher_DownloadEnd;
+				watcher = ThreadWatcher.Create(pageURL, pageAuth, imageAuth, oneTimeDownload, checkIntervalSeconds);
 
-				newListViewItem = new ListViewItem("");
-				for (int i = 1; i < lvThreads.Columns.Count; i++) {
-					newListViewItem.SubItems.Add("");
-				}
-				newListViewItem.Tag = watcher;
-				lvThreads.Items.Add(newListViewItem);
-			}
+				AttachWatcherToUI(watcher);
+				DisplayDescription(watcher);
+				DisplayAddedOn(watcher);
 
-			watcher.PageAuth = pageAuth;
-			watcher.ImageAuth = imageAuth;
-			watcher.CheckIntervalSeconds = checkInterval;
-			watcher.OneTimeDownload = oneTime;
-
-			if (extraData == null) {
-				extraData = watcher.Tag as WatcherExtraData;
-				if (extraData == null) {
-					extraData = new WatcherExtraData {
-						AddedOn = DateTime.Now
-					};
-				}
-			}
-			if (newListViewItem != null) {
-				extraData.ListViewItem = newListViewItem;
-			}
-			watcher.Tag = extraData;
-
-			DisplayDescription(watcher);
-			DisplayAddedOn(watcher);
-			DisplayLastImageOn(watcher);
-			if (stopReason == null) {
-				watcher.Start();
+				ThreadList.Add(watcher);
 			}
 			else {
-				watcher.Stop(stopReason.Value);
+				if (watcher.IsRunning) {
+					return false;
+				}
+				watcher.PageAuth = pageAuth;
+				watcher.ImageAuth = imageAuth;
+				watcher.CheckIntervalSeconds = checkIntervalSeconds;
+				watcher.OneTimeDownload = oneTimeDownload;
 			}
 
+			watcher.Start();
+
+			_saveThreadList = true;
+
 			return true;
+		}
+
+		private void AttachWatcherToUI(ThreadWatcher watcher) {
+			if (watcher.Tag != null) {
+				throw new Exception("Watcher's tag is already set.");
+			}
+
+			watcher.FoundNewImage += ThreadWatcher_FoundNewImage;
+			watcher.DownloadStatus += ThreadWatcher_DownloadStatus;
+			watcher.WaitStatus += ThreadWatcher_WaitStatus;
+			watcher.StopStatus += ThreadWatcher_StopStatus;
+			watcher.ThreadDownloadDirectoryRename += ThreadWatcher_ThreadDownloadDirectoryRename;
+			watcher.DownloadStart += ThreadWatcher_DownloadStart;
+			watcher.DownloadProgress += ThreadWatcher_DownloadProgress;
+			watcher.DownloadEnd += ThreadWatcher_DownloadEnd;
+
+			ListViewItem newListViewItem = new ListViewItem("");
+			for (int i = 1; i < lvThreads.Columns.Count; i++) {
+				newListViewItem.SubItems.Add("");
+			}
+			newListViewItem.Tag = watcher;
+			lvThreads.Items.Add(newListViewItem);
+
+			watcher.Tag = newListViewItem;
 		}
 
 		private void RemoveThreads(bool removeCompleted, bool removeSelected, Action<ThreadWatcher> preRemoveAction = null) {
@@ -660,6 +623,7 @@ namespace JDP {
 					try { preRemoveAction?.Invoke(watcher); }
 					catch { }
 					lvThreads.Items.RemoveAt(i);
+					ThreadList.Remove(watcher);
 				}
 				else {
 					i++;
@@ -732,13 +696,7 @@ namespace JDP {
 		}
 
 		private void SetupWaitTimer() {
-			bool anyWaiting = false;
-			foreach (ThreadWatcher watcher in ThreadWatchers) {
-				if (watcher.IsWaiting) {
-					anyWaiting = true;
-					break;
-				}
-			}
+			bool anyWaiting = ThreadList.Items.Any(w => w.IsWaiting);
 			if (!tmrUpdateWaitStatus.Enabled && anyWaiting) {
 				tmrUpdateWaitStatus.Start();
 			}
@@ -748,7 +706,7 @@ namespace JDP {
 		}
 
 		private void UpdateWaitingWatcherStatuses() {
-			foreach (ThreadWatcher watcher in ThreadWatchers) {
+			foreach (ThreadWatcher watcher in ThreadList.Items) {
 				if (watcher.IsWaiting) {
 					SetWaitStatus(watcher);
 				}
@@ -756,7 +714,7 @@ namespace JDP {
 		}
 
 		private void SetSubItemText(ThreadWatcher watcher, ColumnIndex columnIndex, string text) {
-			ListViewItem item = ((WatcherExtraData)watcher.Tag).ListViewItem;
+			ListViewItem item = (ListViewItem)watcher.Tag;
 			var subItem = item.SubItems[(int)columnIndex];
 			if (subItem.Text != text) {
 				subItem.Text = text;
@@ -772,13 +730,11 @@ namespace JDP {
 		}
 
 		private void DisplayAddedOn(ThreadWatcher watcher) {
-			DateTime time = ((WatcherExtraData)watcher.Tag).AddedOn;
-			SetSubItemText(watcher, ColumnIndex.AddedOn, time.ToString("yyyy/MM/dd HH:mm:ss"));
+			SetSubItemText(watcher, ColumnIndex.AddedOn, watcher.AddedOn.ToLocalTime().ToString(_uiDateTimeFormat));
 		}
 
 		private void DisplayLastImageOn(ThreadWatcher watcher) {
-			DateTime? time = ((WatcherExtraData)watcher.Tag).LastImageOn;
-			SetSubItemText(watcher, ColumnIndex.LastImageOn, time != null ? time.Value.ToString("yyyy/MM/dd HH:mm:ss") : "");
+			SetSubItemText(watcher, ColumnIndex.LastImageOn, watcher.LastImageOn?.ToLocalTime().ToString(_uiDateTimeFormat));
 		}
 
 		private void SetDownloadStatus(ThreadWatcher watcher, DownloadType downloadType, int completeCount, int totalCount) {
@@ -807,9 +763,9 @@ namespace JDP {
 			DisplayStatus(watcher, $"Waiting {remainingSeconds} seconds");
 		}
 
-		private void SetStopStatus(ThreadWatcher watcher, StopReason stopReason) {
+		private void SetStopStatus(ThreadWatcher watcher) {
 			string status = "Stopped: ";
-			switch (stopReason) {
+			switch (watcher.StopReason) {
 				case StopReason.UserRequest:
 					status += "User requested";
 					break;
@@ -834,82 +790,22 @@ namespace JDP {
 
 		private void SaveThreadList() {
 			try {
-				// Prepare lines before writing file so that an exception can't result
-				// in a partially written file.
-				List<string> lines = new List<string>();
-				lines.Add("3"); // File version
-				foreach (ThreadWatcher watcher in ThreadWatchers) {
-					WatcherExtraData extraData = (WatcherExtraData)watcher.Tag;
-					lines.Add(watcher.PageURL);
-					lines.Add(watcher.PageAuth);
-					lines.Add(watcher.ImageAuth);
-					lines.Add(watcher.CheckIntervalSeconds.ToString());
-					lines.Add(watcher.OneTimeDownload ? "1" : "0");
-					lines.Add(watcher.ThreadDownloadDirectory != null ? General.GetRelativeDirectoryPath(watcher.ThreadDownloadDirectory, watcher.MainDownloadDirectory) : "");
-					lines.Add((watcher.IsStopping && watcher.StopReason != StopReason.Exiting) ? ((int)watcher.StopReason).ToString() : "");
-					lines.Add(watcher.Description);
-					lines.Add(extraData.AddedOn.ToUniversalTime().Ticks.ToString());
-					lines.Add(extraData.LastImageOn?.ToUniversalTime().Ticks.ToString() ?? "");
-				}
-				string path = Path.Combine(Settings.GetSettingsDirectory(), Settings.ThreadsFileName);
-				File.WriteAllLines(path, lines.ToArray());
+				ThreadList.Save();
 			}
 			catch { }
 		}
 
 		private void LoadThreadList() {
-			try {
-				string path = Path.Combine(Settings.GetSettingsDirectory(), Settings.ThreadsFileName);
-				if (!File.Exists(path)) return;
-				string[] lines = File.ReadAllLines(path);
-				if (lines.Length < 1) return;
-				int fileVersion = Int32.Parse(lines[0]);
-				int linesPerThread;
-				switch (fileVersion) {
-					case 1: linesPerThread = 6; break;
-					case 2: linesPerThread = 7; break;
-					case 3: linesPerThread = 10; break;
-					default: return;
+			ThreadList.Load((watcher) => {
+				AttachWatcherToUI(watcher);
+				DisplayDescription(watcher);
+				DisplayAddedOn(watcher);
+				DisplayLastImageOn(watcher);
+				if (watcher.IsStopping) {
+					SetStopStatus(watcher);
 				}
-				if (lines.Length < (1 + linesPerThread)) return;
-				int i = 1;
-				while (i <= lines.Length - linesPerThread) {
-					string pageURL = lines[i++];
-					string pageAuth = lines[i++];
-					string imageAuth = lines[i++];
-					int checkIntervalSeconds = Int32.Parse(lines[i++]);
-					bool oneTimeDownload = lines[i++] == "1";
-					string saveDir = lines[i++];
-					saveDir = saveDir.Length != 0 ? General.GetAbsoluteDirectoryPath(saveDir, Settings.AbsoluteDownloadDirectory) : null;
-					string description;
-					StopReason? stopReason = null;
-					WatcherExtraData extraData = new WatcherExtraData();
-					if (fileVersion >= 2) {
-						string stopReasonLine = lines[i++];
-						if (stopReasonLine.Length != 0) {
-							stopReason = (StopReason)Int32.Parse(stopReasonLine);
-						}
-					}
-					if (fileVersion >= 3) {
-						description = lines[i++];
-						extraData.AddedOn = new DateTime(Int64.Parse(lines[i++]), DateTimeKind.Utc).ToLocalTime();
-						string lastImageOn = lines[i++];
-						if (lastImageOn.Length != 0) {
-							extraData.LastImageOn = new DateTime(Int64.Parse(lastImageOn), DateTimeKind.Utc).ToLocalTime();
-						}
-					}
-					else {
-						description = "";
-						extraData.AddedOn = DateTime.Now;
-					}
-					AddThread(pageURL, pageAuth, imageAuth, checkIntervalSeconds, oneTimeDownload, saveDir, description, stopReason, extraData);
-				}
-			}
-			catch { }
+			});
 		}
-
-		private IEnumerable<ThreadWatcher> ThreadWatchers =>
-			lvThreads.Items.Cast<ListViewItem>().Select(n => (ThreadWatcher)n.Tag);
 
 		private IEnumerable<ThreadWatcher> SelectedThreadWatchers =>
 			lvThreads.SelectedItems.Cast<ListViewItem>().Select(n => (ThreadWatcher)n.Tag);

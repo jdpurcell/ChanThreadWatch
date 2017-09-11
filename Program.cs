@@ -18,6 +18,7 @@ namespace JDP {
 				return;
 			}
 			Application.Run(new frmChanThreadWatch());
+			ReleaseMutex();
 		}
 
 		private static bool ObtainMutex() {
@@ -53,7 +54,7 @@ namespace JDP {
 			return true;
 		}
 
-		public static void ReleaseMutex() {
+		private static void ReleaseMutex() {
 			if (_mutex == null) return;
 			try {
 				_mutex.ReleaseMutex();

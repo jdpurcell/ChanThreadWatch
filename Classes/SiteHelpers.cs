@@ -29,7 +29,7 @@ namespace JDP {
 				 }).ToDictionary(n => n.Host, n => n.Type, StringComparer.OrdinalIgnoreCase);
 		}
 
-		public static SiteHelper GetInstance(string host) {
+		public static SiteHelper CreateByHost(string host) {
 			List<string> hostSplit = host.Split('.').ToList();
 			while (hostSplit.Count > 0) {
 				if (_siteHelpersByHost.TryGetValue(String.Join(".", hostSplit), out Type type)) {
@@ -38,6 +38,12 @@ namespace JDP {
 				hostSplit.RemoveAt(0);
 			}
 			return new SiteHelper();
+		}
+
+		public static SiteHelper CreateByURL(string url) {
+			SiteHelper siteHelper = CreateByHost(new Uri(url).Host);
+			siteHelper.SetURL(url);
+			return siteHelper;
 		}
 
 		public void SetURL(string url) {
@@ -67,6 +73,10 @@ namespace JDP {
 				return page;
 			}
 			return "";
+		}
+
+		public string GetGlobalThreadID() {
+			return $"{GetSiteName()}_{GetBoardName()}_{GetThreadName()}";
 		}
 
 		public virtual bool IsBoardHighTurnover() {
@@ -308,8 +318,12 @@ namespace JDP {
 			"akamaized.net",
 		};
 
+		public override string GetSiteName() {
+			return "Twitch";
+		}
+
 		public override string GetBoardName() {
-			return "TwitchVOD";
+			return "VOD";
 		}
 
 		public override string GetThreadName() {

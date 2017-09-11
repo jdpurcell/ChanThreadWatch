@@ -11,19 +11,24 @@ namespace JDP {
 
 		private void frmSettings_Load(object sender, EventArgs e) {
 			txtDownloadFolder.Text = Settings.DownloadFolder;
-			chkRelativePath.Checked = Settings.DownloadFolderIsRelative ?? false;
-			chkCustomUserAgent.Checked = Settings.UseCustomUserAgent ?? false;
-			txtCustomUserAgent.Text = Settings.CustomUserAgent ?? "";
-			chkSaveThumbnails.Checked = Settings.SaveThumbnails ?? true;
-			chkRenameDownloadFolderWithDescription.Checked = Settings.RenameDownloadFolderWithDescription ?? false;
-			chkUseOriginalFileNames.Checked = Settings.UseOriginalFileNames ?? false;
-			chkVerifyImageHashes.Checked = Settings.VerifyImageHashes ?? true;
-			if (Settings.UseExeDirectoryForSettings == true) {
-				rbSettingsInExeFolder.Checked = true;
-			}
-			else {
-				rbSettingsInAppDataFolder.Checked = true;
-			}
+			chkRelativePath.Checked = Settings.DownloadFolderIsRelative;
+			chkCustomUserAgent.Checked = Settings.UseCustomUserAgent;
+			txtCustomUserAgent.Text = Settings.CustomUserAgent;
+			chkSaveThumbnails.Checked = Settings.SaveThumbnails;
+			DownloadFolderNamingMethod = Settings.DownloadFolderNamingMethod;
+			chkUseOriginalFileNames.Checked = Settings.UseOriginalFileNames;
+			chkVerifyImageHashes.Checked = Settings.VerifyImageHashes;
+			UseExeDirectoryForSettings = Settings.UseExeDirectoryForSettings;
+		}
+
+		private DownloadFolderNamingMethod DownloadFolderNamingMethod {
+			get => chkRenameDownloadFolderWithDescription.Checked ? DownloadFolderNamingMethod.Description : DownloadFolderNamingMethod.GlobalThreadID;
+			set => chkRenameDownloadFolderWithDescription.Checked = value == DownloadFolderNamingMethod.Description;
+		}
+
+		private bool UseExeDirectoryForSettings {
+			get => rbSettingsInExeFolder.Checked;
+			set => (value ? rbSettingsInExeFolder : rbSettingsInAppDataFolder).Checked = true;
 		}
 
 		private void btnOK_Click(object sender, EventArgs e) {
@@ -33,13 +38,11 @@ namespace JDP {
 				if (downloadFolder.Length == 0) {
 					throw new Exception("You must enter a download folder.");
 				}
-				if (!Directory.Exists(downloadFolder)) {
-					try {
-						Directory.CreateDirectory(downloadFolder);
-					}
-					catch {
-						throw new Exception("Unable to create the download folder.");
-					}
+				try {
+					Directory.CreateDirectory(downloadFolder);
+				}
+				catch {
+					throw new Exception("Unable to create the download folder.");
 				}
 
 				string oldSettingsFolder = Settings.GetSettingsDirectory();
@@ -74,10 +77,10 @@ namespace JDP {
 				Settings.UseCustomUserAgent = chkCustomUserAgent.Checked;
 				Settings.CustomUserAgent = txtCustomUserAgent.Text;
 				Settings.SaveThumbnails = chkSaveThumbnails.Checked;
-				Settings.RenameDownloadFolderWithDescription = chkRenameDownloadFolderWithDescription.Checked;
+				Settings.DownloadFolderNamingMethod = DownloadFolderNamingMethod;
 				Settings.UseOriginalFileNames = chkUseOriginalFileNames.Checked;
 				Settings.VerifyImageHashes = chkVerifyImageHashes.Checked;
-				Settings.UseExeDirectoryForSettings = rbSettingsInExeFolder.Checked;
+				Settings.UseExeDirectoryForSettings = UseExeDirectoryForSettings;
 
 				try {
 					Settings.Save();

@@ -35,9 +35,7 @@ namespace JDP {
 		}
 
 		public static string UserAgent {
-			get {
-				return Settings.UseCustomUserAgent == true ? Settings.CustomUserAgent : $"Chan Thread Watch {Version}";
-			}
+			get => Settings.UseCustomUserAgent ? Settings.CustomUserAgent : $"Chan Thread Watch {Version}";
 		}
 
 		public static string NormalizeNewLines(string str) {
@@ -365,15 +363,6 @@ namespace JDP {
 			return true;
 		}
 
-		public static bool AreURLsDuplicate(string a, string b) {
-			string StripProtocol(string n) =>
-				n.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ? n.Substring(7) :
-				n.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ? n.Substring(8) :
-				n;
-
-			return String.Equals(StripProtocol(a), StripProtocol(b), StringComparison.OrdinalIgnoreCase);
-		}
-
 		public static string GetAbsoluteURL(Uri baseURI, string relativeURL) {
 			// AbsoluteUri can throw undocumented Exception (e.g. for "mailto:+")
 			try {
@@ -448,20 +437,6 @@ namespace JDP {
 				filePath = Path.GetFullPath(Path.Combine(baseDir, filePath));
 			}
 			return filePath;
-		}
-
-		public static string GetLastDirectory(string dir) {
-			char[] separators = { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar };
-			dir = dir.TrimEnd(separators);
-			int pos = dir.LastIndexOfAny(separators);
-			return (pos == -1) ? dir : dir.Substring(pos + 1);
-		}
-
-		public static string RemoveLastDirectory(string dir) {
-			char[] separators = { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar };
-			dir = dir.TrimEnd(separators);
-			int pos = dir.LastIndexOfAny(separators);
-			return (pos == -1) ? "" : dir.Substring(0, pos);
 		}
 
 		public static int GetMaximumFileNameLength(string dir) {

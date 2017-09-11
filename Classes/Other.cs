@@ -636,6 +636,11 @@ namespace JDP {
 		EditDescription = 3
 	}
 
+	public enum DownloadFolderNamingMethod {
+		GlobalThreadID = 1,
+		Description = 2
+	}
+
 	public enum HashType {
 		None = 0,
 		MD5 = 1
