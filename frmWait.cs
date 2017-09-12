@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Windows.Forms;
 
@@ -34,27 +35,34 @@ namespace JDP {
 		public static void RunWork(Form owner, Action action) {
 			object sync = new object();
 			using (var waitForm = new frmWait(sync)) {
-				bool captured = false;
+				ExceptionDispatchInfo exception = null;
+				bool triggered = false;
 				Thread thread = new Thread(() => {
-					action();
+					try {
+						action();
+					}
+					catch (Exception ex) {
+						exception = ExceptionDispatchInfo.Capture(ex);
+					}
 					lock (sync) {
-						if (captured) {
+						if (triggered) {
 							waitForm.OnWorkComplete();
 						}
-						captured = true;
+						triggered = true;
 					}
 				});
 				thread.Start();
 				if (thread.Join(2)) return;
 				Monitor.Enter(sync);
-				if (captured) {
+				if (triggered) {
 					Monitor.Exit(sync);
 				}
 				else {
-					captured = true;
+					triggered = true;
 					waitForm.ShowDialog(owner);
 				}
 				thread.Join();
+				exception?.Throw();
 			}
 		}
 	}
