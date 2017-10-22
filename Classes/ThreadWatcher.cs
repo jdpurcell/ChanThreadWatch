@@ -310,6 +310,7 @@ namespace JDP {
 		private HashSet<string> _imageDiskFileNames;
 		private Dictionary<string, DownloadInfo> _completedImages;
 		private Dictionary<string, DownloadInfo> _completedThumbs;
+		private bool _anyPendingRetries;
 		private string _previousImageDir;
 		private int _maxImageFileNameLength;
 
@@ -355,9 +356,10 @@ namespace JDP {
 				}
 
 				int pageIndex = 0;
+				bool anyPageSkipped = false;
 				OnDownloadStatus(new DownloadStatusEventArgs(DownloadType.Page, 0, _pageList.Count));
 				while (pageIndex < _pageList.Count && !IsStopping) {
-					string saveFileName = PageBaseFileName + ((pageIndex == 0) ? "" : ("_" + (pageIndex + 1))) + ".html";
+					string saveFileName = PageBaseFileName + (pageIndex == 0 ? "" : $"_{pageIndex + 1}") + ".html";
 					HTMLParser pageParser = null;
 
 					PageInfo pageInfo = _pageList[pageIndex];
@@ -374,11 +376,14 @@ namespace JDP {
 						}
 						downloadEndEvent.Set();
 					};
-					DownloadPageAsync(pageInfo.Path, pageInfo.URL, PageAuth, pageInfo.CacheTime, downloadEnd);
+					DownloadPageAsync(pageInfo.Path, pageInfo.URL, PageAuth, _anyPendingRetries ? null : pageInfo.CacheTime, downloadEnd);
 					downloadEndEvent.WaitOne();
 					downloadEndEvent.Close();
 
-					if (pageParser != null) {
+					if (pageParser == null) {
+						anyPageSkipped = true;
+					}
+					else {
 						SiteHelper siteHelper = SiteHelper.CreateByURL(pageInfo.URL);
 
 						siteHelper.SetHTMLParser(pageParser);
@@ -450,6 +455,9 @@ namespace JDP {
 					pageIndex++;
 					OnDownloadStatus(new DownloadStatusEventArgs(DownloadType.Page, pageIndex, _pageList.Count));
 				}
+				if (!anyPageSkipped) {
+					_anyPendingRetries = false;
+				}
 
 				MillisecondsUntilNextCheck = CheckIntervalSeconds * 1000;
 
@@ -493,8 +501,8 @@ namespace JDP {
 						bool fileNameTaken;
 						string saveFileName;
 						do {
-							savePath = Path.Combine(imageDir, saveFileNameNoExtension + ((iSuffix == 1) ? "" : ("_" + iSuffix)) + saveExtension);
-							saveFileName = Path.GetFileName(savePath);
+							saveFileName = saveFileNameNoExtension + (iSuffix == 1 ? "" : $"_{iSuffix}") + saveExtension;
+							savePath = Path.Combine(imageDir, saveFileName);
 							fileNameTaken = _imageDiskFileNames.Contains(saveFileName);
 							iSuffix++;
 						}
@@ -515,13 +523,21 @@ namespace JDP {
 										FileName = saveFileName,
 										Skipped = (result == DownloadResult.Skipped)
 									};
-									if (result != DownloadResult.Skipped) {
+									if (result == DownloadResult.Completed) {
 										completedImageCount++;
 									}
-									else {
+									else if (result == DownloadResult.Skipped) {
 										totalImageCount--;
 									}
 									OnDownloadStatus(new DownloadStatusEventArgs(DownloadType.Image, completedImageCount, totalImageCount));
+								}
+							}
+							if (result == DownloadResult.Skipped || result == DownloadResult.RetryLater) {
+								lock (_imageDiskFileNames) {
+									_imageDiskFileNames.Remove(saveFileName);
+									if (result == DownloadResult.RetryLater) {
+										_anyPendingRetries = true;
+									}
 								}
 							}
 							downloadEndEvent.Set();
@@ -563,10 +579,10 @@ namespace JDP {
 											FileName = thumb.FileName,
 											Skipped = (result == DownloadResult.Skipped)
 										};
-										if (result != DownloadResult.Skipped) {
+										if (result == DownloadResult.Completed) {
 											completedThumbCount++;
 										}
-										else {
+										else if (result == DownloadResult.Skipped) {
 											totalThumbCount--;
 										}
 										OnDownloadStatus(new DownloadStatusEventArgs(DownloadType.Thumbnail, completedThumbCount, totalThumbCount));
@@ -890,7 +906,7 @@ namespace JDP {
 							Stop(StopReason.IOError);
 							endTryDownload(DownloadResult.Skipped);
 						}
-						else if (ex is HTTP404Exception || ex is IOException) {
+						else if (ex is HTTP404Exception) {
 							// Fatal problem with this file, skip
 							endTryDownload(DownloadResult.Skipped);
 						}
