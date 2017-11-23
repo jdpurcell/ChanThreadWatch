@@ -45,6 +45,10 @@ namespace JDP {
 			Uri playlistURI = new Uri(GetPreferredPlaylistFromMasterPlaylist(masterPlaylistLines));
 			// Use of one of the akamaized.net hosts - they are better for live steams because
 			// the playlists on twitch.tv and ttvnw.net have some kind of caching or delay.
+			// Also if the VOD gets muted, the unmuted segments are still available from
+			// akamaized.net (for 24 hours I believe) but not the other hosts. Once muted, the
+			// playlist is named like index-muted-XXXXXXXXXX.m3u8, whereas the original
+			// playlist is named index-dvr.m3u8.
 			return $"https://vod{new Random().Next(1, 200):D3}-ttvnw.akamaized.net{playlistURI.PathAndQuery}";
 		}
 
