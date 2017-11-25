@@ -53,18 +53,18 @@ namespace JDP {
 		}
 
 		private static string GetPreferredPlaylistFromMasterPlaylist(string[] lines) {
-			bool IsMetaDataForStreamName(string line, string name) {
-				if (!line.StartsWith("#EXT-X-MEDIA:", StringComparison.OrdinalIgnoreCase)) return false;
+			bool IsMetaDataForVideo(string line, string name) {
+				if (!line.StartsWith("#EXT-X-STREAM-INF:", StringComparison.OrdinalIgnoreCase)) return false;
 				string contents = "," + line.SubstringAfterFirst(":", StringComparison.Ordinal) + ",";
-				return contents.IndexOf($",NAME=\"{name}\",", StringComparison.OrdinalIgnoreCase) != -1;
+				return contents.IndexOf($",VIDEO=\"{name}\",", StringComparison.OrdinalIgnoreCase) != -1;
 			}
 			bool IsComment(string line) =>
 				line.StartsWith("#", StringComparison.Ordinal);
 
 			string playlist;
 
-			// Try to find the "Source" playlist
-			playlist = lines.SkipWhile(l => !IsMetaDataForStreamName(l, "Source")).FirstOrDefault(l => !IsComment(l));
+			// Try to find the "chunked" playlist
+			playlist = lines.SkipWhile(l => !IsMetaDataForVideo(l, "chunked")).FirstOrDefault(l => !IsComment(l));
 			if (playlist != null) return playlist;
 
 			// Otherwise, just get the first playlist
