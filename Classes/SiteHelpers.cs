@@ -323,11 +323,15 @@ namespace JDP {
 		}
 
 		public override string GetBoardName() {
-			return "VOD";
+			return URLPathComponents.Length >= 5 ? "Upload" : "VOD";
 		}
 
 		public override string GetThreadName() {
-			if (URLPathComponents.Length >= 1) {
+			if (URLPathComponents.Length >= 5) {
+				// For uploads, we're returning the video ID.
+				return URLPathComponents[1];
+			}
+			else if (URLPathComponents.Length >= 1) {
 				string[] s = URLPathComponents[0].Split('_');
 				// Can have more than 4 items if the channel name contains an underscore. The item
 				// we're returning is what Twitch refers to as "broadcast_id".

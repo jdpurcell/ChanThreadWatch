@@ -46,10 +46,22 @@ namespace JDP {
 			// Use of one of the akamaized.net hosts - they are better for live steams because
 			// the playlists on twitch.tv and ttvnw.net have some kind of caching or delay.
 			// Also if the VOD gets muted, the unmuted segments are still available from
-			// akamaized.net (for 24 hours I believe) but not the other hosts. Once muted, the
+			// akamaized.net (for at least 24 hours) but not the other hosts. Once muted, the
 			// playlist is named like index-muted-XXXXXXXXXX.m3u8, whereas the original
-			// playlist is named index-dvr.m3u8.
-			return $"https://vod{new Random().Next(1, 200):D3}-ttvnw.akamaized.net{playlistURI.PathAndQuery}";
+			// playlist is named index-dvr.m3u8. For uploads, however, the unmuted segments are
+			// never available.
+			string pathAndQuery = playlistURI.PathAndQuery;
+			string mutedSuffix = pathAndQuery.SubstringAfterLast("/index-muted-").SubstringBeforeFirst(".");
+			if (mutedSuffix.Length != 0) {
+				JsonVideo video = JObject.Parse(General.DownloadPageToString($"{"https"}://api.twitch.tv/kraken/videos/{videoID}", withRequest: AddTwitchAPIHeaders)).ToObject<JsonVideo>();
+				if ((video.BroadcastType.Equals("archive", StringComparison.OrdinalIgnoreCase) ||
+					 video.BroadcastType.Equals("highlight", StringComparison.OrdinalIgnoreCase)) &&
+					DateTime.UtcNow < video.RecordedAt.AddDays(1))
+				{
+					pathAndQuery = pathAndQuery.Replace($"/index-muted-{mutedSuffix}", "/index-dvr");
+				}
+			}
+			return $"https://vod{new Random().Next(1, 200):D3}-ttvnw.akamaized.net{pathAndQuery}";
 		}
 
 		private static string GetPreferredPlaylistFromMasterPlaylist(string[] lines) {
@@ -91,6 +103,13 @@ namespace JDP {
 			public string Token { get; set; }
 			[JsonProperty("sig")]
 			public string Sig { get; set; }
+		}
+
+		private class JsonVideo {
+			[JsonProperty("broadcast_type")]
+			public string BroadcastType { get; set; }
+			[JsonProperty("recorded_at")]
+			public DateTime RecordedAt { get; set; }
 		}
 	}
 }
