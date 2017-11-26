@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Net;
 using System.Threading;
 using Newtonsoft.Json;
@@ -15,7 +16,7 @@ namespace JDP {
 			_timer = new Timer(TimerCallback);
 			_userID = UserNameToID(userName);
 			_interval = interval;
-			_lastVideoID = GetCurrentVideoID(_userID);
+			_lastVideoID = GetCurrentVideoIDs(_userID, 1).FirstOrDefault();
 		}
 
 		public event EventHandler<TwitchUserWatcher, TwitchNewVODEventArgs> NewVOD;
@@ -26,18 +27,21 @@ namespace JDP {
 
 		private void TimerCallback(object state) {
 			try {
-				long currentVideoID;
+				long[] newVideoIDs;
 				try {
-					currentVideoID = GetCurrentVideoID(_userID);
+					newVideoIDs = GetCurrentVideoIDs(_userID, 3).Where(n => n > _lastVideoID).ToArray();
 				}
 				catch {
 					return;
 				}
 
-				if (currentVideoID <= _lastVideoID) return;
+				if (newVideoIDs.Length == 0) return;
 
-				OnNewVOD(new TwitchNewVODEventArgs("https://www.twitch.tv/videos/" + currentVideoID));
-				_lastVideoID = currentVideoID;
+				foreach (long videoID in newVideoIDs.Reverse()) {
+					OnNewVOD(new TwitchNewVODEventArgs("https://www.twitch.tv/videos/" + videoID));
+				}
+
+				_lastVideoID = newVideoIDs[0];
 			}
 			finally {
 				Start();
@@ -52,8 +56,9 @@ namespace JDP {
 			return JObject.Parse(General.DownloadPageToString($"{"https"}://api.twitch.tv/kraken/users?login={userName}", withRequest: AddTwitchAPIHeaders)).ToObject<JsonUsers>().Users[0].ID;
 		}
 
-		private static long GetCurrentVideoID(int userID) {
-			return Int64.Parse(JObject.Parse(General.DownloadPageToString($"{"https"}://api.twitch.tv/kraken/channels/{userID}/videos?limit=1", withRequest: AddTwitchAPIHeaders)).ToObject<JsonVideos>().Videos[0].ID.Substring(1));
+		private static long[] GetCurrentVideoIDs(int userID, int limit) {
+			return JObject.Parse(General.DownloadPageToString($"{"https"}://api.twitch.tv/kraken/channels/{userID}/videos?limit={limit}&broadcast_type=archive", withRequest: AddTwitchAPIHeaders))
+				.ToObject<JsonVideos>().Videos.Select(v => Int64.Parse(v.ID.Substring(1))).ToArray();
 		}
 
 		private static void AddTwitchAPIHeaders(HttpWebRequest request) {
