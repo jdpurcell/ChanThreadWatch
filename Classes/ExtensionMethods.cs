@@ -25,6 +25,10 @@ namespace JDP {
 			return Substring(str, delim, true, true, comparisonType, defaultValue);
 		}
 
+		public static int? TryParseInt32(this string str) {
+			return Int32.TryParse(str, out int n) ? n : (int?)null;
+		}
+
 		public static IAsyncResult BeginInvoke(this Control control, Action action) {
 			return control.BeginInvoke(action);
 		}

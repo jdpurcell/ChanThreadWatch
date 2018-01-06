@@ -73,6 +73,7 @@ namespace JDP {
 			GUI.EnsureScrollBarVisible(lvThreads);
 
 			LoadThreadList();
+			LoadTwitchUserWatchList();
 		}
 
 		private void frmChanThreadWatch_FormClosed(object sender, FormClosedEventArgs e) {
@@ -803,6 +804,42 @@ namespace JDP {
 				DisplayLastImageOn(watcher);
 				if (watcher.IsStopping) {
 					SetStopStatus(watcher);
+				}
+			});
+		}
+
+		private void LoadTwitchUserWatchList() {
+			void TwitchUserWatcher_NewVOD(TwitchUserWatcher s, TwitchNewVODEventArgs e) {
+				this.Invoke(() => {
+					AddThread(e.URL, silent: true);
+				});
+			}
+			void AddTwitchUserWatcher(string userName, TimeSpan interval) {
+				var watcher = new TwitchUserWatcher(userName, interval);
+				watcher.NewVOD += TwitchUserWatcher_NewVOD;
+				watcher.Start();
+			}
+			string path = Path.Combine(Settings.GetSettingsDirectory(), "twitch_watch.txt");
+			if (!File.Exists(path)) return;
+			ThreadPool.QueueUserWorkItem((s) => {
+				try {
+					foreach (string line in File.ReadLines(path)) {
+						if (line.StartsWith("#", StringComparison.Ordinal)) continue;
+						string[] p = line.Split(' ');
+						if (p.Length != 2) {
+							throw new Exception("Each line must contain 2 parameters separated by a space.");
+						}
+						string userName = p[0];
+						int intervalMinutes = p[1].TryParseInt32() ??
+							throw new Exception("Invalid number of minutes.");
+						AddTwitchUserWatcher(userName, TimeSpan.FromMinutes(Math.Max(intervalMinutes, 5)));
+					}
+				}
+				catch (Exception ex) {
+					if (IsDisposed) return;
+					this.BeginInvoke(() => {
+						MessageBox.Show(this, ex.Message, "Error loading Twitch User Watch List", MessageBoxButtons.OK, MessageBoxIcon.Error);
+					});
 				}
 			});
 		}
