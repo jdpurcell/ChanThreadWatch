@@ -11,14 +11,19 @@ namespace JDP {
 
 		[STAThread]
 		private static void Main() {
-			Application.EnableVisualStyles();
-			Application.SetCompatibleTextRenderingDefault(false);
-			if (!ObtainMutex()) {
-				MessageBox.Show("Another instance of this program is running.", "Already Running", MessageBoxButtons.OK, MessageBoxIcon.Information);
-				return;
+			try {
+				Application.EnableVisualStyles();
+				Application.SetCompatibleTextRenderingDefault(false);
+				if (!ObtainMutex()) {
+					MessageBox.Show("Another instance of this program is running.", "Already Running", MessageBoxButtons.OK, MessageBoxIcon.Information);
+					return;
+				}
+				Application.Run(new frmChanThreadWatch());
+				ReleaseMutex();
 			}
-			Application.Run(new frmChanThreadWatch());
-			ReleaseMutex();
+			catch (Exception ex) {
+				MessageBox.Show(ex.ToString(), "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+			}
 		}
 
 		private static bool ObtainMutex() {
