@@ -8,7 +8,6 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Net;
-using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
@@ -16,6 +15,9 @@ using System.Web;
 
 namespace JDP {
 	public static class General {
+		public const string Version = "1.7.0.6";
+		public const string Build = "20180107";
+
 		static General() {
 			// HttpWebRequest uses ThreadPool for asynchronous calls
 			EnsureThreadPoolMaxThreads(500, 1000);
@@ -27,15 +29,15 @@ namespace JDP {
 			ServicePointManager.ServerCertificateValidationCallback = (s, cert, chain, errors) => true;
 		}
 
-		public static string Version {
+		public static string DisplayVersion {
 			get {
-				Version ver = Assembly.GetExecutingAssembly().GetName().Version;
+				Version ver = new Version(Version);
 				return $"{ver.Major}.{ver.Minor}.{ver.Revision}";
 			}
 		}
 
 		public static string UserAgent {
-			get => Settings.UseCustomUserAgent ? Settings.CustomUserAgent : $"Chan Thread Watch {Version}";
+			get => Settings.UseCustomUserAgent ? Settings.CustomUserAgent : $"Chan Thread Watch {DisplayVersion}";
 		}
 
 		public static string NormalizeNewLines(string str) {

@@ -349,8 +349,8 @@ namespace JDP {
 		}
 
 		private void btnAbout_Click(object sender, EventArgs e) {
-			MessageBox.Show(this, String.Format("Chan Thread Watch{0}Version {1}{0}Author: J.D. Purcell",
-				Environment.NewLine, General.Version), "About", MessageBoxButtons.OK, MessageBoxIcon.Information);
+			MessageBox.Show(this, String.Format("Chan Thread Watch{0}Build: {1}{0}Author: J.D. Purcell",
+				Environment.NewLine, General.Build), "About", MessageBoxButtons.OK, MessageBoxIcon.Information);
 		}
 
 		private void lvThreads_KeyDown(object sender, KeyEventArgs e) {
