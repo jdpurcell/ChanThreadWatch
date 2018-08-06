@@ -29,6 +29,10 @@ namespace JDP {
 			return Int32.TryParse(str, out int n) ? n : (int?)null;
 		}
 
+		public static long? TryParseInt64(this string str) {
+			return Int64.TryParse(str, out long n) ? n : (long?)null;
+		}
+
 		public static IAsyncResult BeginInvoke(this Control control, Action action) {
 			return control.BeginInvoke(action);
 		}

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Reflection;
+using System.Text.RegularExpressions;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -43,9 +44,9 @@ namespace JDP {
 			JsonVodAccessToken accessToken = JObject.Parse(General.DownloadPageToString($"{"https"}://api.twitch.tv/api/vods/{videoID}/access_token", withRequest: AddTwitchAPIHeaders)).ToObject<JsonVodAccessToken>();
 			string[] masterPlaylistLines = General.NormalizeNewLines(General.DownloadPageToString($"{"https"}://usher.ttvnw.net/vod/{videoID}?allow_source=true&allow_audio_only=true&allow_spectre=true&player=twitchweb&nauth={Uri.EscapeUriString(accessToken.Token)}&nauthsig={Uri.EscapeUriString(accessToken.Sig)}")).Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
 			Uri playlistURI = new Uri(GetPreferredPlaylistFromMasterPlaylist(masterPlaylistLines));
-			// Use of one of the akamaized.net hosts - they are better for live steams because
-			// the playlists on twitch.tv and ttvnw.net have some kind of caching or delay.
-			return $"https://vod{new Random().Next(1, 200):D3}-ttvnw.akamaized.net{playlistURI.PathAndQuery}";
+			// Some of their servers are better in terms of caching/delay; last time I checked
+			// this one was good but maybe need to do some more testing.
+			return $"https://vod.edgecast.hls.ttvnw.net{playlistURI.PathAndQuery}";
 		}
 
 		private static string GetPreferredPlaylistFromMasterPlaylist(string[] lines) {
@@ -73,8 +74,9 @@ namespace JDP {
 		private static long? TryParseVideoIDFromURL(Uri uri) {
 			string[] hosts = { "twitch.tv", "www.twitch.tv" };
 			if (!hosts.Any(h => uri.Host.Equals(h, StringComparison.OrdinalIgnoreCase))) return null;
-			if (!uri.AbsolutePath.StartsWith("/videos/", StringComparison.Ordinal)) return null;
-			return Int64.TryParse(uri.AbsolutePath.Substring(8), out long id) ? id : (long?)null;
+			Match match = Regex.Match(uri.AbsolutePath, "^/(videos|[^/]+/video)/(?<videoId>[0-9]+)$");
+			if (!match.Success) return null;
+			return match.Groups["videoId"].Value.TryParseInt64();
 		}
 
 		private static void AddTwitchAPIHeaders(HttpWebRequest request) {
