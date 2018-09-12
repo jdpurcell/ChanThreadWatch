@@ -535,7 +535,7 @@ namespace JDP {
 			MessageBox.Show(this, message, title, MessageBoxButtons.OK, MessageBoxIcon.Error);
 		}
 
-		private bool AddThread(string pageURL, bool silent = false) {
+		private bool AddThread(string pageURL, bool silent = false, string description = null) {
 			string pageAuth = chkPageAuth.Checked && txtPageAuth.Text.IndexOf(':') != -1 ? txtPageAuth.Text : "";
 			string imageAuth = chkImageAuth.Checked && txtImageAuth.Text.IndexOf(':') != -1 ? txtImageAuth.Text : "";
 			int checkIntervalSeconds = (int)cboCheckEvery.SelectedValue * 60;
@@ -553,7 +553,7 @@ namespace JDP {
 				return false;
 			}
 
-			bool wasAdded = AddThread(pageURL, pageAuth, imageAuth, checkIntervalSeconds, chkOneTime.Checked);
+			bool wasAdded = AddThread(pageURL, pageAuth, imageAuth, checkIntervalSeconds, chkOneTime.Checked, description);
 			if (!wasAdded) {
 				if (!silent) ShowErrorMessage("The same thread is already being watched or downloaded.", "Duplicate Thread");
 				return false;
@@ -562,12 +562,12 @@ namespace JDP {
 			return true;
 		}
 
-		private bool AddThread(string pageURL, string pageAuth, string imageAuth, int checkIntervalSeconds, bool oneTimeDownload) {
+		private bool AddThread(string pageURL, string pageAuth, string imageAuth, int checkIntervalSeconds, bool oneTimeDownload, string description = null) {
 			string globalThreadID = SiteHelper.CreateByURL(pageURL).GetGlobalThreadID();
 			ThreadWatcher watcher = ThreadList.Items.FirstOrDefault(w => w.GlobalThreadID.Equals(globalThreadID, StringComparison.OrdinalIgnoreCase));
 
 			if (watcher == null) {
-				watcher = ThreadWatcher.Create(pageURL, pageAuth, imageAuth, oneTimeDownload, checkIntervalSeconds);
+				watcher = ThreadWatcher.Create(pageURL, pageAuth, imageAuth, oneTimeDownload, checkIntervalSeconds, description);
 
 				AttachWatcherToUI(watcher);
 				DisplayDescription(watcher);
@@ -579,10 +579,16 @@ namespace JDP {
 				if (watcher.IsRunning) {
 					return false;
 				}
+
 				watcher.PageAuth = pageAuth;
 				watcher.ImageAuth = imageAuth;
 				watcher.CheckIntervalSeconds = checkIntervalSeconds;
 				watcher.OneTimeDownload = oneTimeDownload;
+
+				if (description != null) {
+					watcher.Description = description;
+					DisplayDescription(watcher);
+				}
 			}
 
 			watcher.Start();
@@ -811,7 +817,7 @@ namespace JDP {
 		private void LoadTwitchUserWatchList() {
 			void TwitchUserWatcher_NewVOD(TwitchUserWatcher s, TwitchNewVODEventArgs e) {
 				this.Invoke(() => {
-					AddThread(e.URL, silent: true);
+					AddThread(e.URL, silent: true, description: $"Twitch VOD {e.VideoID}");
 				});
 			}
 			void AddTwitchUserWatcher(string userName, TimeSpan interval) {

@@ -44,7 +44,6 @@ namespace JDP {
 			AddedOn = config.AddedOn;
 			BaseDownloadDirectory = Settings.AbsoluteDownloadDirectory;
 			PageBaseFileName = config.PageBaseFileName;
-			_threadDownloadDirectory = General.GetAbsoluteDirectoryPath(config.RelativeDownloadDirectory, BaseDownloadDirectory);
 			_pageAuth = config.PageAuth;
 			_imageAuth = config.ImageAuth;
 			_oneTimeDownload = config.OneTimeDownload;
@@ -52,12 +51,15 @@ namespace JDP {
 			_checkIntervalSeconds = Math.Max(config.CheckIntervalSeconds, _minCheckIntervalSeconds);
 			_description = config.Description;
 			_lastImageOn = config.LastImageOn;
+			_threadDownloadDirectory = config.RelativeDownloadDirectory != null ?
+				General.GetAbsoluteDirectoryPath(config.RelativeDownloadDirectory, BaseDownloadDirectory) :
+				GetDesiredThreadDownloadDirectory();
 			if (config.StopReason != null) {
 				Stop(config.StopReason.Value);
 			}
 		}
 
-		public static ThreadWatcher Create(string pageURL, string pageAuth, string imageAuth, bool oneTimeDownload, int checkIntervalSeconds) {
+		public static ThreadWatcher Create(string pageURL, string pageAuth, string imageAuth, bool oneTimeDownload, int checkIntervalSeconds, string description = null) {
 			SiteHelper siteHelper = SiteHelper.CreateByURL(pageURL);
 			string globalThreadID = siteHelper.GetGlobalThreadID();
 			return new ThreadWatcher(new ThreadWatcherConfig {
@@ -68,9 +70,8 @@ namespace JDP {
 				ImageAuth = imageAuth,
 				OneTimeDownload = oneTimeDownload,
 				CheckIntervalSeconds = checkIntervalSeconds,
-				RelativeDownloadDirectory = General.CleanFileName(globalThreadID),
 				PageBaseFileName = General.CleanFileName(siteHelper.GetThreadName()),
-				Description = globalThreadID
+				Description = description ?? globalThreadID
 			});
 		}
 

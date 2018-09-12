@@ -38,7 +38,7 @@ namespace JDP {
 				if (newVideoIDs.Length == 0) return;
 
 				foreach (long videoID in newVideoIDs.Reverse()) {
-					OnNewVOD(new TwitchNewVODEventArgs("https://www.twitch.tv/videos/" + videoID));
+					OnNewVOD(new TwitchNewVODEventArgs("https://www.twitch.tv/videos/" + videoID, videoID));
 				}
 
 				_lastVideoID = newVideoIDs[0];
@@ -89,9 +89,11 @@ namespace JDP {
 
 	public class TwitchNewVODEventArgs : EventArgs {
 		public string URL { get; }
+		public long VideoID { get; }
 
-		public TwitchNewVODEventArgs(string url) {
+		public TwitchNewVODEventArgs(string url, long videoID) {
 			URL = url;
+			VideoID = videoID;
 		}
 	}
 }
