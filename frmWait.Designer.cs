@@ -23,7 +23,9 @@
 		/// the contents of this method with the code editor.
 		/// </summary>
 		private void InitializeComponent() {
+			this.components = new System.ComponentModel.Container();
 			this.lblMessage = new System.Windows.Forms.Label();
+			this.tmrUpdateProgress = new System.Windows.Forms.Timer(this.components);
 			this.SuspendLayout();
 			// 
 			// lblMessage
@@ -35,10 +37,15 @@
 			this.lblMessage.Text = "Please wait...";
 			this.lblMessage.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
 			// 
+			// tmrUpdateProgress
+			// 
+			this.tmrUpdateProgress.Enabled = true;
+			this.tmrUpdateProgress.Tick += new System.EventHandler(this.tmrUpdateProgress_Tick);
+			// 
 			// frmWait
 			// 
 			this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
-			this.ClientSize = new System.Drawing.Size(200, 44);
+			this.ClientSize = new System.Drawing.Size(196, 40);
 			this.ControlBox = false;
 			this.Controls.Add(this.lblMessage);
 			this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle;
@@ -58,5 +65,6 @@
 		#endregion
 
 		private System.Windows.Forms.Label lblMessage;
+		private System.Windows.Forms.Timer tmrUpdateProgress;
 	}
 }

@@ -44,9 +44,7 @@ namespace JDP {
 			JsonVodAccessToken accessToken = JObject.Parse(General.DownloadPageToString($"{"https"}://api.twitch.tv/api/vods/{videoID}/access_token", withRequest: AddTwitchAPIHeaders)).ToObject<JsonVodAccessToken>();
 			string[] masterPlaylistLines = General.NormalizeNewLines(General.DownloadPageToString($"{"https"}://usher.ttvnw.net/vod/{videoID}?allow_source=true&allow_audio_only=true&allow_spectre=true&player=twitchweb&nauth={Uri.EscapeUriString(accessToken.Token)}&nauthsig={Uri.EscapeUriString(accessToken.Sig)}")).Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
 			Uri playlistURI = new Uri(GetPreferredPlaylistFromMasterPlaylist(masterPlaylistLines));
-			// Some of their servers are better in terms of caching/delay; last time I checked
-			// this one was good but maybe need to do some more testing.
-			return $"https://vod.edgecast.hls.ttvnw.net{playlistURI.PathAndQuery}";
+			return playlistURI.ToString();
 		}
 
 		private static string GetPreferredPlaylistFromMasterPlaylist(string[] lines) {

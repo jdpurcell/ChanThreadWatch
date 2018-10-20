@@ -30,15 +30,17 @@
 			this.chLastImageOn = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
 			this.chAddedOn = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
 			this.grpAddThread = new System.Windows.Forms.GroupBox();
-			this.lblCheckEvery = new System.Windows.Forms.Label();
-			this.cboCheckEvery = new System.Windows.Forms.ComboBox();
-			this.txtImageAuth = new System.Windows.Forms.TextBox();
+			this.lblPageURL = new System.Windows.Forms.Label();
+			this.txtPageURL = new System.Windows.Forms.TextBox();
+			this.lblDescription = new System.Windows.Forms.Label();
+			this.txtDescription = new System.Windows.Forms.TextBox();
+			this.chkPageAuth = new System.Windows.Forms.CheckBox();
 			this.txtPageAuth = new System.Windows.Forms.TextBox();
 			this.chkImageAuth = new System.Windows.Forms.CheckBox();
-			this.chkPageAuth = new System.Windows.Forms.CheckBox();
+			this.txtImageAuth = new System.Windows.Forms.TextBox();
 			this.chkOneTime = new System.Windows.Forms.CheckBox();
-			this.lblURL = new System.Windows.Forms.Label();
-			this.txtPageURL = new System.Windows.Forms.TextBox();
+			this.lblCheckEvery = new System.Windows.Forms.Label();
+			this.cboCheckEvery = new System.Windows.Forms.ComboBox();
 			this.btnAdd = new System.Windows.Forms.Button();
 			this.btnRemoveCompleted = new System.Windows.Forms.Button();
 			this.btnAbout = new System.Windows.Forms.Button();
@@ -115,113 +117,132 @@
 			// grpAddThread
 			// 
 			this.grpAddThread.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
-			this.grpAddThread.Controls.Add(this.lblCheckEvery);
-			this.grpAddThread.Controls.Add(this.cboCheckEvery);
-			this.grpAddThread.Controls.Add(this.txtImageAuth);
+			this.grpAddThread.Controls.Add(this.lblPageURL);
+			this.grpAddThread.Controls.Add(this.txtPageURL);
+			this.grpAddThread.Controls.Add(this.lblDescription);
+			this.grpAddThread.Controls.Add(this.txtDescription);
+			this.grpAddThread.Controls.Add(this.chkPageAuth);
 			this.grpAddThread.Controls.Add(this.txtPageAuth);
 			this.grpAddThread.Controls.Add(this.chkImageAuth);
-			this.grpAddThread.Controls.Add(this.chkPageAuth);
+			this.grpAddThread.Controls.Add(this.txtImageAuth);
 			this.grpAddThread.Controls.Add(this.chkOneTime);
-			this.grpAddThread.Controls.Add(this.lblURL);
-			this.grpAddThread.Controls.Add(this.txtPageURL);
+			this.grpAddThread.Controls.Add(this.lblCheckEvery);
+			this.grpAddThread.Controls.Add(this.cboCheckEvery);
 			this.grpAddThread.Controls.Add(this.btnAdd);
 			this.grpAddThread.Location = new System.Drawing.Point(8, 208);
 			this.grpAddThread.Name = "grpAddThread";
-			this.grpAddThread.Size = new System.Drawing.Size(360, 157);
+			this.grpAddThread.Size = new System.Drawing.Size(360, 181);
 			this.grpAddThread.TabIndex = 1;
 			this.grpAddThread.TabStop = false;
 			this.grpAddThread.Text = "Add Thread";
 			// 
+			// lblPageURL
+			// 
+			this.lblPageURL.AutoSize = true;
+			this.lblPageURL.Location = new System.Drawing.Point(10, 24);
+			this.lblPageURL.Name = "lblPageURL";
+			this.lblPageURL.Size = new System.Drawing.Size(32, 13);
+			this.lblPageURL.TabIndex = 0;
+			this.lblPageURL.Text = "URL:";
+			// 
+			// txtPageURL
+			// 
+			this.txtPageURL.Location = new System.Drawing.Point(48, 20);
+			this.txtPageURL.Name = "txtPageURL";
+			this.txtPageURL.Size = new System.Drawing.Size(300, 20);
+			this.txtPageURL.TabIndex = 1;
+			this.txtPageURL.KeyDown += new System.Windows.Forms.KeyEventHandler(this.txtPageURL_KeyDown);
+			// 
+			// lblDescription
+			// 
+			this.lblDescription.AutoSize = true;
+			this.lblDescription.Location = new System.Drawing.Point(10, 50);
+			this.lblDescription.Name = "lblDescription";
+			this.lblDescription.Size = new System.Drawing.Size(63, 13);
+			this.lblDescription.TabIndex = 2;
+			this.lblDescription.Text = "Description:";
+			// 
+			// txtDescription
+			// 
+			this.txtDescription.Location = new System.Drawing.Point(80, 46);
+			this.txtDescription.Name = "txtDescription";
+			this.txtDescription.Size = new System.Drawing.Size(268, 20);
+			this.txtDescription.TabIndex = 3;
+			this.txtDescription.KeyDown += new System.Windows.Forms.KeyEventHandler(this.txtDescription_KeyDown);
+			// 
+			// chkPageAuth
+			// 
+			this.chkPageAuth.AutoSize = true;
+			this.chkPageAuth.Location = new System.Drawing.Point(12, 74);
+			this.chkPageAuth.Name = "chkPageAuth";
+			this.chkPageAuth.Size = new System.Drawing.Size(132, 17);
+			this.chkPageAuth.TabIndex = 4;
+			this.chkPageAuth.Text = "Page auth (user:pass):";
+			this.chkPageAuth.UseVisualStyleBackColor = true;
+			this.chkPageAuth.CheckedChanged += new System.EventHandler(this.chkPageAuth_CheckedChanged);
+			// 
+			// txtPageAuth
+			// 
+			this.txtPageAuth.Enabled = false;
+			this.txtPageAuth.Location = new System.Drawing.Point(164, 72);
+			this.txtPageAuth.Name = "txtPageAuth";
+			this.txtPageAuth.Size = new System.Drawing.Size(184, 20);
+			this.txtPageAuth.TabIndex = 5;
+			// 
+			// chkImageAuth
+			// 
+			this.chkImageAuth.AutoSize = true;
+			this.chkImageAuth.Location = new System.Drawing.Point(12, 100);
+			this.chkImageAuth.Name = "chkImageAuth";
+			this.chkImageAuth.Size = new System.Drawing.Size(136, 17);
+			this.chkImageAuth.TabIndex = 6;
+			this.chkImageAuth.Text = "Image auth (user:pass):";
+			this.chkImageAuth.UseVisualStyleBackColor = true;
+			this.chkImageAuth.CheckedChanged += new System.EventHandler(this.chkImageAuth_CheckedChanged);
+			// 
+			// txtImageAuth
+			// 
+			this.txtImageAuth.Enabled = false;
+			this.txtImageAuth.Location = new System.Drawing.Point(164, 98);
+			this.txtImageAuth.Name = "txtImageAuth";
+			this.txtImageAuth.Size = new System.Drawing.Size(184, 20);
+			this.txtImageAuth.TabIndex = 7;
+			// 
+			// chkOneTime
+			// 
+			this.chkOneTime.AutoSize = true;
+			this.chkOneTime.Location = new System.Drawing.Point(12, 126);
+			this.chkOneTime.Name = "chkOneTime";
+			this.chkOneTime.Size = new System.Drawing.Size(181, 17);
+			this.chkOneTime.TabIndex = 8;
+			this.chkOneTime.Text = "Don\'t watch (one-time download)";
+			this.chkOneTime.UseVisualStyleBackColor = true;
+			this.chkOneTime.CheckedChanged += new System.EventHandler(this.chkOneTime_CheckedChanged);
+			// 
 			// lblCheckEvery
 			// 
 			this.lblCheckEvery.AutoSize = true;
-			this.lblCheckEvery.Location = new System.Drawing.Point(10, 128);
+			this.lblCheckEvery.Location = new System.Drawing.Point(10, 154);
 			this.lblCheckEvery.Name = "lblCheckEvery";
 			this.lblCheckEvery.Size = new System.Drawing.Size(115, 13);
-			this.lblCheckEvery.TabIndex = 7;
+			this.lblCheckEvery.TabIndex = 9;
 			this.lblCheckEvery.Text = "Check every (minutes):";
 			// 
 			// cboCheckEvery
 			// 
 			this.cboCheckEvery.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
 			this.cboCheckEvery.FormattingEnabled = true;
-			this.cboCheckEvery.Location = new System.Drawing.Point(140, 124);
+			this.cboCheckEvery.Location = new System.Drawing.Point(140, 150);
 			this.cboCheckEvery.Name = "cboCheckEvery";
 			this.cboCheckEvery.Size = new System.Drawing.Size(64, 21);
-			this.cboCheckEvery.TabIndex = 8;
-			// 
-			// txtImageAuth
-			// 
-			this.txtImageAuth.Enabled = false;
-			this.txtImageAuth.Location = new System.Drawing.Point(164, 72);
-			this.txtImageAuth.Name = "txtImageAuth";
-			this.txtImageAuth.Size = new System.Drawing.Size(184, 20);
-			this.txtImageAuth.TabIndex = 5;
-			// 
-			// txtPageAuth
-			// 
-			this.txtPageAuth.Enabled = false;
-			this.txtPageAuth.Location = new System.Drawing.Point(164, 44);
-			this.txtPageAuth.Name = "txtPageAuth";
-			this.txtPageAuth.Size = new System.Drawing.Size(184, 20);
-			this.txtPageAuth.TabIndex = 3;
-			// 
-			// chkImageAuth
-			// 
-			this.chkImageAuth.AutoSize = true;
-			this.chkImageAuth.Location = new System.Drawing.Point(12, 74);
-			this.chkImageAuth.Name = "chkImageAuth";
-			this.chkImageAuth.Size = new System.Drawing.Size(136, 17);
-			this.chkImageAuth.TabIndex = 4;
-			this.chkImageAuth.Text = "Image auth (user:pass):";
-			this.chkImageAuth.UseVisualStyleBackColor = true;
-			this.chkImageAuth.CheckedChanged += new System.EventHandler(this.chkImageAuth_CheckedChanged);
-			// 
-			// chkPageAuth
-			// 
-			this.chkPageAuth.AutoSize = true;
-			this.chkPageAuth.Location = new System.Drawing.Point(12, 46);
-			this.chkPageAuth.Name = "chkPageAuth";
-			this.chkPageAuth.Size = new System.Drawing.Size(132, 17);
-			this.chkPageAuth.TabIndex = 2;
-			this.chkPageAuth.Text = "Page auth (user:pass):";
-			this.chkPageAuth.UseVisualStyleBackColor = true;
-			this.chkPageAuth.CheckedChanged += new System.EventHandler(this.chkPageAuth_CheckedChanged);
-			// 
-			// chkOneTime
-			// 
-			this.chkOneTime.AutoSize = true;
-			this.chkOneTime.Location = new System.Drawing.Point(12, 100);
-			this.chkOneTime.Name = "chkOneTime";
-			this.chkOneTime.Size = new System.Drawing.Size(181, 17);
-			this.chkOneTime.TabIndex = 6;
-			this.chkOneTime.Text = "Don\'t watch (one-time download)";
-			this.chkOneTime.UseVisualStyleBackColor = true;
-			this.chkOneTime.CheckedChanged += new System.EventHandler(this.chkOneTime_CheckedChanged);
-			// 
-			// lblURL
-			// 
-			this.lblURL.AutoSize = true;
-			this.lblURL.Location = new System.Drawing.Point(10, 22);
-			this.lblURL.Name = "lblURL";
-			this.lblURL.Size = new System.Drawing.Size(32, 13);
-			this.lblURL.TabIndex = 0;
-			this.lblURL.Text = "URL:";
-			// 
-			// txtPageURL
-			// 
-			this.txtPageURL.Location = new System.Drawing.Point(48, 18);
-			this.txtPageURL.Name = "txtPageURL";
-			this.txtPageURL.Size = new System.Drawing.Size(300, 20);
-			this.txtPageURL.TabIndex = 1;
-			this.txtPageURL.KeyDown += new System.Windows.Forms.KeyEventHandler(this.txtPageURL_KeyDown);
+			this.cboCheckEvery.TabIndex = 10;
 			// 
 			// btnAdd
 			// 
-			this.btnAdd.Location = new System.Drawing.Point(264, 122);
+			this.btnAdd.Location = new System.Drawing.Point(264, 148);
 			this.btnAdd.Name = "btnAdd";
 			this.btnAdd.Size = new System.Drawing.Size(84, 23);
-			this.btnAdd.TabIndex = 9;
+			this.btnAdd.TabIndex = 11;
 			this.btnAdd.Text = "Add Thread";
 			this.btnAdd.UseVisualStyleBackColor = true;
 			this.btnAdd.Click += new System.EventHandler(this.btnAdd_Click);
@@ -240,7 +261,7 @@
 			// btnAbout
 			// 
 			this.btnAbout.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-			this.btnAbout.Location = new System.Drawing.Point(568, 342);
+			this.btnAbout.Location = new System.Drawing.Point(568, 366);
 			this.btnAbout.Name = "btnAbout";
 			this.btnAbout.Size = new System.Drawing.Size(60, 23);
 			this.btnAbout.TabIndex = 7;
@@ -251,7 +272,7 @@
 			// btnSettings
 			// 
 			this.btnSettings.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-			this.btnSettings.Location = new System.Drawing.Point(492, 342);
+			this.btnSettings.Location = new System.Drawing.Point(492, 366);
 			this.btnSettings.Name = "btnSettings";
 			this.btnSettings.Size = new System.Drawing.Size(67, 23);
 			this.btnSettings.TabIndex = 6;
@@ -407,7 +428,7 @@
 			// btnDownloads
 			// 
 			this.btnDownloads.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-			this.btnDownloads.Location = new System.Drawing.Point(400, 342);
+			this.btnDownloads.Location = new System.Drawing.Point(400, 366);
 			this.btnDownloads.Name = "btnDownloads";
 			this.btnDownloads.Size = new System.Drawing.Size(84, 23);
 			this.btnDownloads.TabIndex = 5;
@@ -425,7 +446,7 @@
 			// 
 			this.AllowDrop = true;
 			this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
-			this.ClientSize = new System.Drawing.Size(636, 373);
+			this.ClientSize = new System.Drawing.Size(636, 397);
 			this.Controls.Add(this.btnDownloads);
 			this.Controls.Add(this.btnAddFromClipboard);
 			this.Controls.Add(this.grpDoubleClick);
@@ -456,8 +477,10 @@
 		private System.Windows.Forms.ColumnHeader chStatus;
 		private System.Windows.Forms.GroupBox grpAddThread;
 		private System.Windows.Forms.CheckBox chkOneTime;
-		private System.Windows.Forms.Label lblURL;
+		private System.Windows.Forms.Label lblPageURL;
 		private System.Windows.Forms.TextBox txtPageURL;
+		private System.Windows.Forms.Label lblDescription;
+		private System.Windows.Forms.TextBox txtDescription;
 		private System.Windows.Forms.Button btnAdd;
 		private System.Windows.Forms.Button btnRemoveCompleted;
 		private System.Windows.Forms.Button btnAbout;

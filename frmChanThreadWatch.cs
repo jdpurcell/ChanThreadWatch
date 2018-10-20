@@ -138,7 +138,14 @@ namespace JDP {
 
 		private void txtPageURL_KeyDown(object sender, KeyEventArgs e) {
 			if (e.KeyCode == Keys.Enter) {
-				btnAdd_Click(txtPageURL, null);
+				btnAdd_Click(null, null);
+				e.SuppressKeyPress = true;
+			}
+		}
+
+		private void txtDescription_KeyDown(object sender, KeyEventArgs e) {
+			if (e.KeyCode == Keys.Enter) {
+				btnAdd_Click(null, null);
 				e.SuppressKeyPress = true;
 			}
 		}
@@ -147,14 +154,16 @@ namespace JDP {
 			if (_isExiting) return;
 			if (txtPageURL.Text.Trim().Length == 0) return;
 			string pageURL = General.CleanPageURL(txtPageURL.Text);
+			string description = txtDescription.Text.Trim().NullIfEmpty();
 			if (pageURL == null) {
 				ShowErrorMessage("The specified URL is invalid.", "Invalid URL");
 				return;
 			}
-			if (!AddThread(pageURL)) {
+			if (!AddThread(pageURL, description: description)) {
 				return;
 			}
 			txtPageURL.Clear();
+			txtDescription.Clear();
 			txtPageURL.Focus();
 		}
 
@@ -315,10 +324,10 @@ namespace JDP {
 			}
 
 			bool anyFailed = false;
-			frmWait.RunWork(this, () => {
+			frmWait.RunWork(this, (onProgress) => {
 				foreach (FilePostprocessingTask task in tasks) {
 					try {
-						task.SiteHelper.PostprocessFiles(task.DownloadDirectory);
+						task.SiteHelper.PostprocessFiles(task.DownloadDirectory, onProgress);
 					}
 					catch {
 						anyFailed = true;
@@ -541,7 +550,7 @@ namespace JDP {
 			int checkIntervalSeconds = (int)cboCheckEvery.SelectedValue * 60;
 
 			bool wasTransformSuccessful = false;
-			frmWait.RunWork(this, () => {
+			frmWait.RunWork(this, (onProgress) => {
 				try {
 					pageURL = URLTransformer.Transform(pageURL, pageAuth);
 					wasTransformSuccessful = true;
@@ -816,7 +825,7 @@ namespace JDP {
 
 		private void LoadTwitchUserWatchList() {
 			void TwitchUserWatcher_NewVOD(TwitchUserWatcher s, TwitchNewVODEventArgs e) {
-				this.Invoke(() => {
+				this.TryInvoke(() => {
 					AddThread(e.URL, silent: true, description: $"Twitch VOD {e.VideoID}");
 				});
 			}
@@ -842,8 +851,7 @@ namespace JDP {
 					}
 				}
 				catch (Exception ex) {
-					if (IsDisposed) return;
-					this.BeginInvoke(() => {
+					this.TryBeginInvoke(() => {
 						MessageBox.Show(this, ex.Message, "Error loading Twitch User Watch List", MessageBoxButtons.OK, MessageBoxIcon.Error);
 					});
 				}

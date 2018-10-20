@@ -624,6 +624,8 @@ namespace JDP {
 		}
 	}
 
+	public delegate void ProgressReporter(double progress);
+
 	public delegate void EventHandler<TSender, TArgs>(TSender sender, TArgs e) where TArgs : EventArgs;
 
 	public delegate void DownloadFileEndCallback(DownloadResult result);

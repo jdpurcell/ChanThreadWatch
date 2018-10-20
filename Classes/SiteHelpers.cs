@@ -360,7 +360,7 @@ namespace JDP {
 			}).ToList();
 		}
 
-		public void PostprocessFiles(string downloadDirectory) {
+		public void PostprocessFiles(string downloadDirectory, ProgressReporter onProgress) {
 			List<string> files =
 				(from path in Directory.GetFiles(downloadDirectory, "*.ts")
 				 let name = Path.GetFileNameWithoutExtension(path)
@@ -370,8 +370,9 @@ namespace JDP {
 				 select path).ToList();
 			if (files.Count == 0) return;
 			using (FileStream dst = File.Create(Path.Combine(downloadDirectory, "stream.ts"))) {
-				foreach (string path in files) {
-					using (FileStream src = File.OpenRead(path)) {
+				for (int iFile = 0; iFile < files.Count; iFile++) {
+					onProgress((double)iFile / files.Count);
+					using (FileStream src = File.OpenRead(files[iFile])) {
 						src.CopyTo(dst);
 					}
 				}
@@ -383,6 +384,6 @@ namespace JDP {
 	}
 
 	public interface IFilePostprocessor {
-		void PostprocessFiles(string downloadDirectory);
+		void PostprocessFiles(string downloadDirectory, ProgressReporter onProgress);
 	}
 }
