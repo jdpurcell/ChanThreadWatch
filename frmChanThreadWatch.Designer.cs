@@ -85,7 +85,7 @@
 			this.lvThreads.HideSelection = false;
 			this.lvThreads.Location = new System.Drawing.Point(8, 8);
 			this.lvThreads.Name = "lvThreads";
-			this.lvThreads.Size = new System.Drawing.Size(620, 196);
+			this.lvThreads.Size = new System.Drawing.Size(620, 216);
 			this.lvThreads.TabIndex = 0;
 			this.lvThreads.UseCompatibleStateImageBehavior = false;
 			this.lvThreads.View = System.Windows.Forms.View.Details;
@@ -129,7 +129,7 @@
 			this.grpAddThread.Controls.Add(this.lblCheckEvery);
 			this.grpAddThread.Controls.Add(this.cboCheckEvery);
 			this.grpAddThread.Controls.Add(this.btnAdd);
-			this.grpAddThread.Location = new System.Drawing.Point(8, 208);
+			this.grpAddThread.Location = new System.Drawing.Point(8, 228);
 			this.grpAddThread.Name = "grpAddThread";
 			this.grpAddThread.Size = new System.Drawing.Size(360, 181);
 			this.grpAddThread.TabIndex = 1;
@@ -250,7 +250,7 @@
 			// btnRemoveCompleted
 			// 
 			this.btnRemoveCompleted.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-			this.btnRemoveCompleted.Location = new System.Drawing.Point(508, 212);
+			this.btnRemoveCompleted.Location = new System.Drawing.Point(508, 232);
 			this.btnRemoveCompleted.Name = "btnRemoveCompleted";
 			this.btnRemoveCompleted.Size = new System.Drawing.Size(120, 23);
 			this.btnRemoveCompleted.TabIndex = 3;
@@ -261,7 +261,7 @@
 			// btnAbout
 			// 
 			this.btnAbout.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-			this.btnAbout.Location = new System.Drawing.Point(568, 366);
+			this.btnAbout.Location = new System.Drawing.Point(568, 386);
 			this.btnAbout.Name = "btnAbout";
 			this.btnAbout.Size = new System.Drawing.Size(60, 23);
 			this.btnAbout.TabIndex = 7;
@@ -272,7 +272,7 @@
 			// btnSettings
 			// 
 			this.btnSettings.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-			this.btnSettings.Location = new System.Drawing.Point(492, 366);
+			this.btnSettings.Location = new System.Drawing.Point(492, 386);
 			this.btnSettings.Name = "btnSettings";
 			this.btnSettings.Size = new System.Drawing.Size(67, 23);
 			this.btnSettings.TabIndex = 6;
@@ -366,7 +366,7 @@
 			this.grpDoubleClick.Controls.Add(this.rbEditDescription);
 			this.grpDoubleClick.Controls.Add(this.rbOpenURL);
 			this.grpDoubleClick.Controls.Add(this.rbOpenFolder);
-			this.grpDoubleClick.Location = new System.Drawing.Point(376, 208);
+			this.grpDoubleClick.Location = new System.Drawing.Point(376, 228);
 			this.grpDoubleClick.Name = "grpDoubleClick";
 			this.grpDoubleClick.Size = new System.Drawing.Size(124, 84);
 			this.grpDoubleClick.TabIndex = 2;
@@ -411,7 +411,7 @@
 			// btnAddFromClipboard
 			// 
 			this.btnAddFromClipboard.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-			this.btnAddFromClipboard.Location = new System.Drawing.Point(508, 244);
+			this.btnAddFromClipboard.Location = new System.Drawing.Point(508, 264);
 			this.btnAddFromClipboard.Name = "btnAddFromClipboard";
 			this.btnAddFromClipboard.Size = new System.Drawing.Size(120, 23);
 			this.btnAddFromClipboard.TabIndex = 4;
@@ -428,7 +428,7 @@
 			// btnDownloads
 			// 
 			this.btnDownloads.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-			this.btnDownloads.Location = new System.Drawing.Point(400, 366);
+			this.btnDownloads.Location = new System.Drawing.Point(400, 386);
 			this.btnDownloads.Name = "btnDownloads";
 			this.btnDownloads.Size = new System.Drawing.Size(84, 23);
 			this.btnDownloads.TabIndex = 5;
@@ -446,7 +446,7 @@
 			// 
 			this.AllowDrop = true;
 			this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
-			this.ClientSize = new System.Drawing.Size(636, 397);
+			this.ClientSize = new System.Drawing.Size(636, 417);
 			this.Controls.Add(this.btnDownloads);
 			this.Controls.Add(this.btnAddFromClipboard);
 			this.Controls.Add(this.grpDoubleClick);
@@ -455,7 +455,7 @@
 			this.Controls.Add(this.btnRemoveCompleted);
 			this.Controls.Add(this.grpAddThread);
 			this.Controls.Add(this.lvThreads);
-			this.MinimumSize = new System.Drawing.Size(644, 300);
+			this.MinimumSize = new System.Drawing.Size(652, 302);
 			this.Name = "frmChanThreadWatch";
 			this.SizeGripStyle = System.Windows.Forms.SizeGripStyle.Hide;
 			this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
