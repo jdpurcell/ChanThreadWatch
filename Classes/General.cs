@@ -16,7 +16,7 @@ using System.Web;
 namespace JDP {
 	public static class General {
 		public const string Version = "1.7.0.6";
-		public const string Build = "20181020";
+		public const string Build = "20181121";
 
 		static General() {
 			// HttpWebRequest uses ThreadPool for asynchronous calls

@@ -167,7 +167,8 @@ namespace JDP {
 
 	public class SiteHelper_4chan : SiteHelper {
 		public static string[] Hosts { get; } = {
-			"4chan.org"
+			"4chan.org",
+			"4channel.org"
 		};
 
 		public override string GetThreadName() {
