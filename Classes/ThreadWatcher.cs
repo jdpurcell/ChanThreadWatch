@@ -47,7 +47,7 @@ namespace JDP {
 			_pageAuth = config.PageAuth;
 			_imageAuth = config.ImageAuth;
 			_oneTimeDownload = config.OneTimeDownload;
-			_minCheckIntervalSeconds = siteHelper.IsBoardHighTurnover() ? 30 : 60;
+			_minCheckIntervalSeconds = siteHelper.MinCheckIntervalSeconds;
 			_checkIntervalSeconds = Math.Max(config.CheckIntervalSeconds, _minCheckIntervalSeconds);
 			_description = config.Description;
 			_lastImageOn = config.LastImageOn;
@@ -325,9 +325,7 @@ namespace JDP {
 
 						if (!_hasInitialized) {
 							_pageList = new List<PageInfo> {
-								new PageInfo {
-									Url = PageUrl
-								}
+								new PageInfo(PageUrl)
 							};
 							_imageDiskFileNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 							_completedImages = new Dictionary<string, DownloadInfo>(StringComparer.OrdinalIgnoreCase);
@@ -385,9 +383,9 @@ namespace JDP {
 						anyPageSkipped = true;
 					}
 					else {
-						SiteHelper siteHelper = SiteHelper.CreateByUrl(pageInfo.Url);
+						SiteHelper siteHelper = pageInfo.SiteHelper;
 
-						siteHelper.SetHtmlParser(pageParser);
+						siteHelper.SetParameters(pageParser, threadDir);
 
 						List<ThumbnailInfo> thumbs = new List<ThumbnailInfo>();
 						List<ImageInfo> images = siteHelper.GetImages(pageInfo.ReplaceList, thumbs);
@@ -438,9 +436,7 @@ namespace JDP {
 
 						string nextPageUrl = siteHelper.GetNextPageUrl();
 						if (!String.IsNullOrEmpty(nextPageUrl)) {
-							PageInfo nextPageInfo = new PageInfo {
-								Url = nextPageUrl
-							};
+							PageInfo nextPageInfo = new PageInfo(nextPageUrl);
 							if (pageIndex == _pageList.Count - 1) {
 								_pageList.Add(nextPageInfo);
 							}
@@ -491,7 +487,7 @@ namespace JDP {
 						}
 
 					MakeImagePath:
-						if (!String.IsNullOrEmpty(image.OriginalFileName) && (image.ForceOriginalFileName || (Settings.UseOriginalFileNames && !pathTooLong))) {
+						if (!String.IsNullOrEmpty(image.OriginalFileName) && Settings.UseOriginalFileNames && !pathTooLong) {
 							ConfigureSaveFileName(image.OriginalFileName);
 						}
 						else {

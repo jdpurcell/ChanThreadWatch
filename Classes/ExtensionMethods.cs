@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Text;
 using System.Windows.Forms;
 
 namespace JDP {
@@ -35,6 +36,14 @@ namespace JDP {
 
 		public static string NullIfEmpty(this string str) {
 			return str.Length != 0 ? str : null;
+		}
+
+		public static string ToHexString(this byte[] bytes, bool upperCase) {
+			var sb = new StringBuilder(bytes.Length * 2);
+			foreach (byte b in bytes) {
+				sb.Append(b.ToString(upperCase ? "X2" : "x2"));
+			}
+			return sb.ToString();
 		}
 
 		public static IAsyncResult BeginInvoke(this Control control, Action action) {

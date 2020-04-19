@@ -6,7 +6,7 @@ using System.Web;
 
 namespace JDP {
 	public class SiteHelper {
-		private static readonly Dictionary<string, Type> _siteHelpersByHost;
+		private static readonly List<(Type Type, Func<Uri, bool> CanHandle)> _siteHelpers;
 
 		protected string Url { get; private set; }
 
@@ -16,33 +16,34 @@ namespace JDP {
 
 		protected HtmlParser Parser { get; private set; }
 
+		protected string ThreadDir { get; private set; }
+
 		static SiteHelper() {
-			_siteHelpersByHost =
+			_siteHelpers =
 				(from t in Assembly.GetExecutingAssembly().GetTypes()
 				 where t.IsSubclassOf(typeof(SiteHelper))
-				 let hosts = (string[])t.InvokeMember("Hosts", BindingFlags.GetProperty, null, null, null)
-				 from host in hosts
-				 select new {
-					 Host = host,
-					 Type = t
-				 }).ToDictionary(n => n.Host, n => n.Type, StringComparer.OrdinalIgnoreCase);
-		}
-
-		public static SiteHelper CreateByHost(string host) {
-			List<string> hostSplit = host.Split('.').ToList();
-			while (hostSplit.Count > 0) {
-				if (_siteHelpersByHost.TryGetValue(String.Join(".", hostSplit), out Type type)) {
-					return (SiteHelper)Activator.CreateInstance(type);
-				}
-				hostSplit.RemoveAt(0);
-			}
-			return new SiteHelper();
+				 select (
+					 Type: t,
+					 CanHandle: (Func<Uri, bool>)t.GetMethod("CanHandle", BindingFlags.Static | BindingFlags.Public).CreateDelegate(typeof(Func<Uri, bool>))
+				 )).ToList();
 		}
 
 		public static SiteHelper CreateByUrl(string url) {
-			SiteHelper siteHelper = CreateByHost(new Uri(url).Host);
-			siteHelper.SetUrl(url);
-			return siteHelper;
+			Uri uri = new Uri(url);
+			Type helperType = _siteHelpers.Where(h => h.CanHandle(uri)).Select(h => h.Type).FirstOrDefault();
+			SiteHelper helper = helperType != null ? (SiteHelper)Activator.CreateInstance(helperType) : new SiteHelper();
+			helper.SetUrl(url);
+			return helper;
+		}
+
+		public static bool IsMatchByHost(Uri uri, string[] hosts) {
+			string uriHost = uri.Host;
+			return hosts.Any(h => uriHost.Equals(h, StringComparison.OrdinalIgnoreCase) || uriHost.EndsWith("." + h, StringComparison.OrdinalIgnoreCase));
+		}
+
+		public static bool IsMatchByExtension(Uri uri, string[] extensions) {
+			string uriPath = uri.AbsolutePath;
+			return extensions.Any(e => uriPath.EndsWith(e, StringComparison.OrdinalIgnoreCase));
 		}
 
 		public void SetUrl(string url) {
@@ -51,8 +52,9 @@ namespace JDP {
 			UrlPathComponents = General.GetUrlPathComponents(Uri);
 		}
 
-		public void SetHtmlParser(HtmlParser htmlParser) {
+		public void SetParameters(HtmlParser htmlParser, string threadDir) {
 			Parser = htmlParser;
+			ThreadDir = threadDir;
 		}
 
 		public virtual string GetSiteName() {
@@ -75,16 +77,17 @@ namespace JDP {
 		}
 
 		public string GetGlobalThreadID() {
-			return $"{GetSiteName()}_{GetBoardName()}_{GetThreadName()}";
+			string siteName = GetSiteName();
+			string boardName = GetBoardName();
+			string threadName = GetThreadName();
+			return !String.IsNullOrEmpty(boardName) ? $"{siteName}_{boardName}_{threadName}" : $"{siteName}_{threadName}";
 		}
 
-		public virtual bool IsBoardHighTurnover() {
-			return false;
-		}
+		public virtual int MinCheckIntervalSeconds =>
+			30;
 
-		protected virtual string ImageUrlKeyword {
-			get { return "/src/"; }
-		}
+		protected virtual string ImageUrlKeyword =>
+			"/src/";
 
 		public virtual List<ImageInfo> GetImages(List<ReplaceInfo> replaceList, List<ThumbnailInfo> thumbnailList) {
 			HashSet<string> imageFileNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);

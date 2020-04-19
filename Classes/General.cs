@@ -505,10 +505,15 @@ namespace JDP {
 			catch { return null; }
 		}
 
-		public static ulong Calculate64BitMD5(byte[] bytes) {
-			using (MD5CryptoServiceProvider hashAlgo = new MD5CryptoServiceProvider()) {
-				return BytesTo64BitXor(hashAlgo.ComputeHash(bytes));
-			}
+		public static byte[] CalculateMD5(byte[] bytes) =>
+			CalculateHash<MD5CryptoServiceProvider>(bytes);
+
+		public static byte[] CalculateSha1(byte[] bytes) =>
+			CalculateHash<SHA1CryptoServiceProvider>(bytes);
+
+		public static byte[] CalculateHash<T>(byte[] bytes) where T : HashAlgorithm, new() {
+			using var hashAlgo = new T();
+			return hashAlgo.ComputeHash(bytes);
 		}
 
 		public static ulong BytesTo64BitXor(byte[] bytes) {
@@ -606,6 +611,7 @@ namespace JDP {
 		}
 
 		public static string CleanFileName(string src) {
+			if (src == null) return null;
 			char[] dst = new char[src.Length];
 			char[] inv = Path.GetInvalidFileNameChars();
 			int iDst = 0;

@@ -43,8 +43,8 @@ namespace JDP {
 				// Workaround for Mono
 				useDefaultSecurity = true;
 			}
-			string name = @"Global\ChanThreadWatch_" + General.Calculate64BitMD5(Encoding.UTF8.GetBytes(
-				settingsFolder.ToUpperInvariant())).ToString("X16");
+			string folderHash = General.CalculateMD5(Encoding.UTF8.GetBytes(settingsFolder.ToUpperInvariant())).ToHexString(true);
+			string name = @"Global\ChanThreadWatch_" + folderHash;
 			Mutex mutex = !useDefaultSecurity ?
 				new Mutex(false, name, out bool _, security) :
 				new Mutex(false, name);

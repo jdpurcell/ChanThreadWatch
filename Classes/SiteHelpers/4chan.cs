@@ -5,10 +5,13 @@ using System.Web;
 
 namespace JDP {
 	public class SiteHelper_4chan : SiteHelper {
-		public static string[] Hosts { get; } = {
+		private static readonly string[] _hosts = {
 			"4chan.org",
 			"4channel.org"
 		};
+
+		public static bool CanHandle(Uri uri) =>
+			IsMatchByHost(uri, _hosts);
 
 		public override string GetThreadName() {
 			if (UrlPathComponents.Length >= 3 && UrlPathComponents[1].Equals("thread", StringComparison.Ordinal)) {
@@ -126,10 +129,6 @@ namespace JDP {
 			}
 
 			return imageList;
-		}
-
-		public override bool IsBoardHighTurnover() {
-			return String.Equals(GetBoardName(), "b", StringComparison.Ordinal);
 		}
 	}
 }

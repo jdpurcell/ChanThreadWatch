@@ -58,7 +58,7 @@
     <Compile Include="Classes\SiteHelper.cs" />
     <Compile Include="Classes\General.cs" />
     <Compile Include="Classes\SiteHelpers\4chan.cs" />
-    <Compile Include="Classes\SiteHelpers\TwitchVod.cs" />
+    <Compile Include="Classes\SiteHelpers\Playlist.cs" />
     <Compile Include="Classes\ThreadList.cs" />
     <Compile Include="Classes\ThreadWatcher.cs" />
     <Compile Include="Classes\TwitchUserWatcher.cs" />

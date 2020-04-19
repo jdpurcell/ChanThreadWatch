@@ -313,7 +313,7 @@ namespace JDP {
 
 			foreach (ThreadWatcher watcher in SelectedThreadWatchers) {
 				if (watcher.IsRunning) continue;
-				IFilePostprocessor siteHelper = SiteHelper.CreateByHost(watcher.PageHost) as IFilePostprocessor;
+				IFilePostprocessor siteHelper = SiteHelper.CreateByUrl(watcher.PageUrl) as IFilePostprocessor;
 				if (siteHelper == null) continue;
 				string downloadDirectory = watcher.ThreadDownloadDirectory;
 				if (downloadDirectory == null) continue;
@@ -389,7 +389,7 @@ namespace JDP {
 						bool isRunning = watcher.IsRunning;
 						anyRunning |= isRunning;
 						anyStopped |= !isRunning;
-						anyCanPostprocess |= !isRunning && SiteHelper.CreateByHost(watcher.PageHost) is IFilePostprocessor;
+						anyCanPostprocess |= !isRunning && SiteHelper.CreateByUrl(watcher.PageUrl) is IFilePostprocessor;
 					}
 					miEditDescription.Visible = selectedCount == 1;
 					miStop.Visible = anyRunning;
@@ -652,7 +652,8 @@ namespace JDP {
 			cboCheckEvery.ValueMember = "Value";
 			cboCheckEvery.DisplayMember = "Text";
 			cboCheckEvery.DataSource = new[] {
-				new ListItemInt32(0, "1 or <"),
+				new ListItemInt32(0, "Frequent"),
+				new ListItemInt32(1, "1"),
 				new ListItemInt32(2, "2"),
 				new ListItemInt32(3, "3"),
 				new ListItemInt32(5, "5"),
@@ -667,7 +668,7 @@ namespace JDP {
 				MenuItem menuItem = new MenuItem {
 					Index = i,
 					Tag = minutes,
-					Text = minutes > 0 ? minutes + " Minutes" : "1 Minute or <"
+					Text = minutes == 0 ? "Frequent" : minutes == 1 ? "1 Minute" : $"{minutes} Minutes"
 				};
 				menuItem.Click += miCheckEvery_Click;
 				miCheckEvery.MenuItems.Add(menuItem);

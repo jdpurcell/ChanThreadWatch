@@ -21,23 +21,30 @@ namespace JDP {
 	}
 
 	public class PageInfo {
-		public string Url { get; set; }
+		public string Url { get; }
+		public SiteHelper SiteHelper { get; }
+
 		public DateTime? CacheTime { get; set; }
 		public bool IsFresh { get; set; }
 		public string Path { get; set; }
 		public Encoding Encoding { get; set; }
 		public List<ReplaceInfo> ReplaceList { get; set; }
+
+		public PageInfo(string url) {
+			Url = url;
+			SiteHelper = SiteHelper.CreateByUrl(url);
+		}
 	}
 
 	public class ImageInfo {
 		public string Url { get; set; }
 		public string Referer { get; set; }
+		public string UnsanitizedFileNameCustom { get; set; }
 		public string UnsanitizedOriginalFileName { get; set; }
-		public bool ForceOriginalFileName { get; set; }
 		public HashType HashType { get; set; }
 		public byte[] Hash { get; set; }
 
-		public string UnsanitizedFileName => General.UrlFileName(Url);
+		public string UnsanitizedFileName => UnsanitizedFileNameCustom ?? General.UrlFileName(Url);
 
 		public string FileName => General.CleanFileName(UnsanitizedFileName);
 

@@ -234,7 +234,7 @@
 			this.cboCheckEvery.FormattingEnabled = true;
 			this.cboCheckEvery.Location = new System.Drawing.Point(140, 150);
 			this.cboCheckEvery.Name = "cboCheckEvery";
-			this.cboCheckEvery.Size = new System.Drawing.Size(64, 21);
+			this.cboCheckEvery.Size = new System.Drawing.Size(72, 21);
 			this.cboCheckEvery.TabIndex = 10;
 			// 
 			// btnAdd
