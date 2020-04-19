@@ -10,14 +10,14 @@ namespace JDP {
 
 		public frmDownloads(frmChanThreadWatch parentForm) {
 			InitializeComponent();
-			GUI.SetFontAndScaling(this);
-			GUI.ScaleColumns(lvDownloads);
-			GUI.EnableDoubleBuffering(lvDownloads);
+			Gui.SetFontAndScaling(this);
+			Gui.ScaleColumns(lvDownloads);
+			Gui.EnableDoubleBuffering(lvDownloads);
 			_parentForm = parentForm;
 		}
 
 		private void frmDownloads_Shown(object sender, EventArgs e) {
-			GUI.EnsureScrollBarVisible(lvDownloads);
+			Gui.EnsureScrollBarVisible(lvDownloads);
 		}
 
 		private void tmrUpdateList_Tick(object sender, EventArgs e) {
@@ -84,7 +84,7 @@ namespace JDP {
 				for (int i = 1; i < lvDownloads.Columns.Count; i++) {
 					item.SubItems.Add("");
 				}
-				SetSubItemText(item, ColumnIndex.URL, info.URL);
+				SetSubItemText(item, ColumnIndex.Url, info.Url);
 				SetSubItemText(item, ColumnIndex.Size, GetKilobytesString(info.TotalSize, "KB"));
 				SetSubItemText(item, ColumnIndex.Try, info.TryNumber.ToString());
 				lvDownloads.Items.Add(item);
@@ -119,7 +119,7 @@ namespace JDP {
 		}
 
 		private enum ColumnIndex {
-			URL = 0,
+			Url = 0,
 			Size = 1,
 			Percent = 2,
 			Speed = 3,

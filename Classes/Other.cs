@@ -21,7 +21,7 @@ namespace JDP {
 	}
 
 	public class PageInfo {
-		public string URL { get; set; }
+		public string Url { get; set; }
 		public DateTime? CacheTime { get; set; }
 		public bool IsFresh { get; set; }
 		public string Path { get; set; }
@@ -30,14 +30,14 @@ namespace JDP {
 	}
 
 	public class ImageInfo {
-		public string URL { get; set; }
+		public string Url { get; set; }
 		public string Referer { get; set; }
 		public string UnsanitizedOriginalFileName { get; set; }
 		public bool ForceOriginalFileName { get; set; }
 		public HashType HashType { get; set; }
 		public byte[] Hash { get; set; }
 
-		public string UnsanitizedFileName => General.URLFileName(URL);
+		public string UnsanitizedFileName => General.UrlFileName(Url);
 
 		public string FileName => General.CleanFileName(UnsanitizedFileName);
 
@@ -50,12 +50,12 @@ namespace JDP {
 	}
 
 	public class ThumbnailInfo {
-		public string URL { get; set; }
+		public string Url { get; set; }
 		public string Referer { get; set; }
 
 		public string FileName {
 			get {
-				return General.CleanFileName(General.URLFileName(URL));
+				return General.CleanFileName(General.UrlFileName(Url));
 			}
 		}
 	}
@@ -65,10 +65,10 @@ namespace JDP {
 		public string DownloadDirectory { get; set; }
 	}
 
-	public class HTTP404Exception : Exception {
+	public class Http404Exception : Exception {
 	}
 
-	public class HTTP304Exception : Exception {
+	public class Http304Exception : Exception {
 	}
 
 	public static class TickCount {
@@ -95,7 +95,7 @@ namespace JDP {
 
 		private static readonly Dictionary<string, ConnectionManager> _connectionManagers = new Dictionary<string, ConnectionManager>(StringComparer.OrdinalIgnoreCase);
 
-		private readonly FIFOSemaphore _semaphore = new FIFOSemaphore(_maxConnectionsPerHost, _maxConnectionsPerHost);
+		private readonly FifoSemaphore _semaphore = new FifoSemaphore(_maxConnectionsPerHost, _maxConnectionsPerHost);
 		private readonly Stack<string> _groupNames = new Stack<string>();
 
 		public static ConnectionManager GetInstance(string url) {
@@ -140,13 +140,13 @@ namespace JDP {
 		}
 	}
 
-	public class FIFOSemaphore {
+	public class FifoSemaphore {
 		private readonly object _mainSync = new object();
 		private readonly Queue<QueueSync> _queueSyncs = new Queue<QueueSync>();
 		private int _currentCount;
 		private int _maximumCount;
 
-		public FIFOSemaphore(int initialCount, int maximumCount) {
+		public FifoSemaphore(int initialCount, int maximumCount) {
 			if (initialCount > maximumCount) {
 				throw new ArgumentException();
 			}
@@ -365,7 +365,7 @@ namespace JDP {
 		private static readonly Dictionary<string, ThreadPoolManager> _threadPoolManagers = new Dictionary<string, ThreadPoolManager>(StringComparer.OrdinalIgnoreCase);
 
 		private readonly object _sync = new object();
-		private readonly FIFOSemaphore _semaphore = new FIFOSemaphore(0, Int32.MaxValue);
+		private readonly FifoSemaphore _semaphore = new FifoSemaphore(0, Int32.MaxValue);
 		private readonly Stack<ThreadPoolThread> _idleThreads = new Stack<ThreadPoolThread>();
 		private readonly ThreadPoolThread _schedulerThread = new ThreadPoolThread(null);
 
@@ -590,13 +590,13 @@ namespace JDP {
 
 	public class DownloadStartEventArgs : EventArgs {
 		public long DownloadID { get; }
-		public string URL { get; }
+		public string Url { get; }
 		public int TryNumber { get; }
 		public long? TotalSize { get; }
 
 		public DownloadStartEventArgs(long downloadID, string url, int tryNumber, long? totalSize) {
 			DownloadID = downloadID;
-			URL = url;
+			Url = url;
 			TryNumber = tryNumber;
 			TotalSize = totalSize;
 		}
@@ -634,7 +634,7 @@ namespace JDP {
 
 	public enum ThreadDoubleClickAction {
 		OpenFolder = 1,
-		OpenURL = 2,
+		OpenUrl = 2,
 		EditDescription = 3
 	}
 
@@ -675,10 +675,10 @@ namespace JDP {
 		IOError = 5
 	}
 
-	public enum BOMType {
+	public enum BomType {
 		None = 0,
-		UTF8 = 1,
-		UTF16LE = 2,
-		UTF16BE = 3
+		Utf8 = 1,
+		Utf16LE = 2,
+		Utf16BE = 3
 	}
 }

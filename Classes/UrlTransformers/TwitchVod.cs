@@ -1,50 +1,21 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Net;
-using System.Reflection;
 using System.Text.RegularExpressions;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace JDP {
-	public abstract class URLTransformer {
-		private static List<URLTransformer> _urlTransformers;
-
-		static URLTransformer() {
-			_urlTransformers =
-				(from t in Assembly.GetExecutingAssembly().GetTypes()
-				 where t.IsSubclassOf(typeof(URLTransformer))
-				 select (URLTransformer)Activator.CreateInstance(t)).ToList();
-		}
-
-		public static string Transform(string url, string auth) {
-			Uri uri = new Uri(url);
-			return _urlTransformers.Select(n => n.TransformIfRecognized(uri, auth)).FirstOrDefault(n => n != null) ?? url;
-		}
-
-		public abstract string TransformIfRecognized(Uri uri, string auth);
-	}
-
-	public class URLTransformer_4chan : URLTransformer {
+	public class UrlTransformer_TwitchVod : UrlTransformer {
 		public override string TransformIfRecognized(Uri uri, string auth) {
-			if (!uri.Host.Equals("boards.4chan.org", StringComparison.OrdinalIgnoreCase)) return null;
-			string[] pathComponents = General.GetURLPathComponents(uri);
-			if (pathComponents.Length < 3) return null;
-			return General.GetAbsoluteURL(uri, "/" + String.Join("/", pathComponents.Take(3)));
-		}
-	}
-
-	public class URLTransformer_TwitchVOD : URLTransformer {
-		public override string TransformIfRecognized(Uri uri, string auth) {
-			long videoID = TryParseVideoIDFromURL(uri) ?? 0;
+			long videoID = TryParseVideoIDFromUrl(uri) ?? 0;
 			if (videoID == 0) {
 				return null;
 			}
-			JsonVodAccessToken accessToken = JObject.Parse(General.DownloadPageToString($"{"https"}://api.twitch.tv/api/vods/{videoID}/access_token", withRequest: AddTwitchAPIHeaders)).ToObject<JsonVodAccessToken>();
+			JsonVodAccessToken accessToken = JObject.Parse(General.DownloadPageToString($"{"https"}://api.twitch.tv/api/vods/{videoID}/access_token", withRequest: AddTwitchApiHeaders)).ToObject<JsonVodAccessToken>();
 			string[] masterPlaylistLines = General.NormalizeNewLines(General.DownloadPageToString($"{"https"}://usher.ttvnw.net/vod/{videoID}?allow_source=true&allow_audio_only=true&allow_spectre=true&player=twitchweb&nauth={Uri.EscapeUriString(accessToken.Token)}&nauthsig={Uri.EscapeUriString(accessToken.Sig)}")).Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
-			Uri playlistURI = new Uri(GetPreferredPlaylistFromMasterPlaylist(masterPlaylistLines));
-			return playlistURI.ToString();
+			Uri playlistUri = new Uri(GetPreferredPlaylistFromMasterPlaylist(masterPlaylistLines));
+			return playlistUri.ToString();
 		}
 
 		private static string GetPreferredPlaylistFromMasterPlaylist(string[] lines) {
@@ -69,7 +40,7 @@ namespace JDP {
 			throw new Exception("Unable to find a suitable playlist.");
 		}
 
-		private static long? TryParseVideoIDFromURL(Uri uri) {
+		private static long? TryParseVideoIDFromUrl(Uri uri) {
 			string[] hosts = { "twitch.tv", "www.twitch.tv" };
 			if (!hosts.Any(h => uri.Host.Equals(h, StringComparison.OrdinalIgnoreCase))) return null;
 			Match match = Regex.Match(uri.AbsolutePath, "^/(videos|[^/]+/video)/(?<videoId>[0-9]+)$");
@@ -77,7 +48,7 @@ namespace JDP {
 			return match.Groups["videoId"].Value.TryParseInt64();
 		}
 
-		private static void AddTwitchAPIHeaders(HttpWebRequest request) {
+		private static void AddTwitchApiHeaders(HttpWebRequest request) {
 			request.Accept = "application/vnd.twitchtv.v5+json";
 			request.Headers.Add("Client-ID", "jzkbprff40iqj646a697cyrvl0zt2m6");
 		}

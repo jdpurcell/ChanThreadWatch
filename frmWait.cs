@@ -13,7 +13,7 @@ namespace JDP {
 
 		public frmWait(object workSync) {
 			InitializeComponent();
-			GUI.SetFontAndScaling(this);
+			Gui.SetFontAndScaling(this);
 
 			_workSync = workSync;
 		}

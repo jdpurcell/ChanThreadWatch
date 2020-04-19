@@ -5,7 +5,7 @@ namespace JDP {
 	public partial class frmThreadDescription : Form {
 		public frmThreadDescription() {
 			InitializeComponent();
-			GUI.SetFontAndScaling(this);
+			Gui.SetFontAndScaling(this);
 		}
 
 		public string Description {

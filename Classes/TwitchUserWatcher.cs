@@ -19,10 +19,10 @@ namespace JDP {
 			_lastVideoID = GetCurrentVideoIDs(_userID, 1).FirstOrDefault();
 		}
 
-		public event EventHandler<TwitchUserWatcher, TwitchNewVODEventArgs> NewVOD;
+		public event EventHandler<TwitchUserWatcher, TwitchNewVodEventArgs> NewVod;
 
-		private void OnNewVOD(TwitchNewVODEventArgs e) {
-			try { NewVOD?.Invoke(this, e); } catch { }
+		private void OnNewVod(TwitchNewVodEventArgs e) {
+			try { NewVod?.Invoke(this, e); } catch { }
 		}
 
 		private void TimerCallback(object state) {
@@ -38,7 +38,7 @@ namespace JDP {
 				if (newVideoIDs.Length == 0) return;
 
 				foreach (long videoID in newVideoIDs.Reverse()) {
-					OnNewVOD(new TwitchNewVODEventArgs("https://www.twitch.tv/videos/" + videoID, videoID));
+					OnNewVod(new TwitchNewVodEventArgs("https://www.twitch.tv/videos/" + videoID, videoID));
 				}
 
 				_lastVideoID = newVideoIDs[0];
@@ -53,15 +53,15 @@ namespace JDP {
 		}
 
 		private static int UserNameToID(string userName) {
-			return JObject.Parse(General.DownloadPageToString($"{"https"}://api.twitch.tv/kraken/users?login={userName}", withRequest: AddTwitchAPIHeaders)).ToObject<JsonUsers>().Users[0].ID;
+			return JObject.Parse(General.DownloadPageToString($"{"https"}://api.twitch.tv/kraken/users?login={userName}", withRequest: AddTwitchApiHeaders)).ToObject<JsonUsers>().Users[0].ID;
 		}
 
 		private static long[] GetCurrentVideoIDs(int userID, int limit) {
-			return JObject.Parse(General.DownloadPageToString($"{"https"}://api.twitch.tv/kraken/channels/{userID}/videos?limit={limit}&broadcast_type=archive", withRequest: AddTwitchAPIHeaders))
+			return JObject.Parse(General.DownloadPageToString($"{"https"}://api.twitch.tv/kraken/channels/{userID}/videos?limit={limit}&broadcast_type=archive", withRequest: AddTwitchApiHeaders))
 				.ToObject<JsonVideos>().Videos.Select(v => Int64.Parse(v.ID.Substring(1))).ToArray();
 		}
 
-		private static void AddTwitchAPIHeaders(HttpWebRequest request) {
+		private static void AddTwitchApiHeaders(HttpWebRequest request) {
 			request.Accept = "application/vnd.twitchtv.v5+json";
 			request.Headers.Add("Client-ID", "jzkbprff40iqj646a697cyrvl0zt2m6");
 		}
@@ -87,12 +87,12 @@ namespace JDP {
 		}
 	}
 
-	public class TwitchNewVODEventArgs : EventArgs {
-		public string URL { get; }
+	public class TwitchNewVodEventArgs : EventArgs {
+		public string Url { get; }
 		public long VideoID { get; }
 
-		public TwitchNewVODEventArgs(string url, long videoID) {
-			URL = url;
+		public TwitchNewVodEventArgs(string url, long videoID) {
+			Url = url;
 			VideoID = videoID;
 		}
 	}

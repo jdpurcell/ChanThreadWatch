@@ -26,9 +26,9 @@ namespace JDP {
 		public frmChanThreadWatch() {
 			InitializeComponent();
 			Icon = Resources.ChanThreadWatchIcon;
-			GUI.SetFontAndScaling(this);
-			GUI.ScaleColumns(lvThreads);
-			GUI.EnableDoubleBuffering(lvThreads);
+			Gui.SetFontAndScaling(this);
+			Gui.ScaleColumns(lvThreads);
+			Gui.EnableDoubleBuffering(lvThreads);
 
 			Settings.Load();
 
@@ -57,20 +57,20 @@ namespace JDP {
 			get {
 				return
 					rbEditDescription.Checked ? ThreadDoubleClickAction.EditDescription :
-					rbOpenURL.Checked ? ThreadDoubleClickAction.OpenURL :
+					rbOpenUrl.Checked ? ThreadDoubleClickAction.OpenUrl :
 					ThreadDoubleClickAction.OpenFolder;
 			}
 			set {
 				var item =
 					value == ThreadDoubleClickAction.EditDescription ? rbEditDescription :
-					value == ThreadDoubleClickAction.OpenURL ? rbOpenURL :
+					value == ThreadDoubleClickAction.OpenUrl ? rbOpenUrl :
 					rbOpenFolder;
 				item.Checked = true;
 			}
 		}
 
 		private void frmChanThreadWatch_Shown(object sender, EventArgs e) {
-			GUI.EnsureScrollBarVisible(lvThreads);
+			Gui.EnsureScrollBarVisible(lvThreads);
 
 			LoadThreadList();
 			LoadTwitchUserWatchList();
@@ -130,13 +130,13 @@ namespace JDP {
 				byte[] data = ((MemoryStream)e.Data.GetData("UniformResourceLocator")).ToArray();
 				url = Encoding.Default.GetString(data, 0, General.StrLen(data));
 			}
-			url = General.CleanPageURL(url);
+			url = General.CleanPageUrl(url);
 			if (url != null) {
 				AddThread(url, silent: true);
 			}
 		}
 
-		private void txtPageURL_KeyDown(object sender, KeyEventArgs e) {
+		private void txtPageUrl_KeyDown(object sender, KeyEventArgs e) {
 			if (e.KeyCode == Keys.Enter) {
 				btnAdd_Click(null, null);
 				e.SuppressKeyPress = true;
@@ -152,19 +152,19 @@ namespace JDP {
 
 		private void btnAdd_Click(object sender, EventArgs e) {
 			if (_isExiting) return;
-			if (txtPageURL.Text.Trim().Length == 0) return;
-			string pageURL = General.CleanPageURL(txtPageURL.Text);
+			if (txtPageUrl.Text.Trim().Length == 0) return;
+			string pageUrl = General.CleanPageUrl(txtPageUrl.Text);
 			string description = txtDescription.Text.Trim().NullIfEmpty();
-			if (pageURL == null) {
+			if (pageUrl == null) {
 				ShowErrorMessage("The specified URL is invalid.", "Invalid URL");
 				return;
 			}
-			if (!AddThread(pageURL, description: description)) {
+			if (!AddThread(pageUrl, description: description)) {
 				return;
 			}
-			txtPageURL.Clear();
+			txtPageUrl.Clear();
 			txtDescription.Clear();
-			txtPageURL.Focus();
+			txtPageUrl.Focus();
 		}
 
 		private void btnAddFromClipboard_Click(object sender, EventArgs e) {
@@ -177,8 +177,8 @@ namespace JDP {
 				return;
 			}
 			string[] urls = General.NormalizeNewLines(text).Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
-			for (int iURL = 0; iURL < urls.Length; iURL++) {
-				string url = General.CleanPageURL(urls[iURL]);
+			for (int iUrl = 0; iUrl < urls.Length; iUrl++) {
+				string url = General.CleanPageUrl(urls[iUrl]);
 				if (url == null) continue;
 				AddThread(url, silent: true);
 			}
@@ -239,7 +239,7 @@ namespace JDP {
 			}
 		}
 
-		private void miOpenURL_Click(object sender, EventArgs e) {
+		private void miOpenUrl_Click(object sender, EventArgs e) {
 			int selectedCount = lvThreads.SelectedItems.Count;
 			if (selectedCount > 5 && MessageBox.Show(this, $"Do you want to open the URLs of all {selectedCount} selected items?",
 				"Open URLs", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
@@ -247,7 +247,7 @@ namespace JDP {
 				return;
 			}
 			foreach (ThreadWatcher watcher in SelectedThreadWatchers) {
-				string url = watcher.PageURL;
+				string url = watcher.PageUrl;
 				ThreadPool.QueueUserWorkItem((s) => {
 					try {
 						using (Process.Start(url)) { }
@@ -257,11 +257,11 @@ namespace JDP {
 			}
 		}
 
-		private void miCopyURL_Click(object sender, EventArgs e) {
+		private void miCopyUrl_Click(object sender, EventArgs e) {
 			StringBuilder sb = new StringBuilder();
 			foreach (ThreadWatcher watcher in SelectedThreadWatchers) {
 				if (sb.Length != 0) sb.Append(Environment.NewLine);
-				sb.Append(watcher.PageURL);
+				sb.Append(watcher.PageUrl);
 			}
 			try {
 				Clipboard.Clear();
@@ -345,7 +345,7 @@ namespace JDP {
 			}
 			else {
 				_downloadForm = new frmDownloads(this);
-				GUI.CenterChildForm(this, _downloadForm);
+				Gui.CenterChildForm(this, _downloadForm);
 				_downloadForm.Show(this);
 			}
 		}
@@ -412,7 +412,7 @@ namespace JDP {
 				miOpenFolder_Click(null, null);
 			}
 			else {
-				miOpenURL_Click(null, null);
+				miOpenUrl_Click(null, null);
 			}
 		}
 
@@ -511,7 +511,7 @@ namespace JDP {
 		private void ThreadWatcher_DownloadStart(ThreadWatcher watcher, DownloadStartEventArgs args) {
 			DownloadProgressInfo info = new DownloadProgressInfo();
 			info.DownloadID = args.DownloadID;
-			info.URL = args.URL;
+			info.Url = args.Url;
 			info.TryNumber = args.TryNumber;
 			info.StartTicks = TickCount.Now;
 			info.TotalSize = args.TotalSize;
@@ -544,7 +544,7 @@ namespace JDP {
 			MessageBox.Show(this, message, title, MessageBoxButtons.OK, MessageBoxIcon.Error);
 		}
 
-		private bool AddThread(string pageURL, bool silent = false, string description = null) {
+		private bool AddThread(string pageUrl, bool silent = false, string description = null) {
 			string pageAuth = chkPageAuth.Checked && txtPageAuth.Text.IndexOf(':') != -1 ? txtPageAuth.Text : "";
 			string imageAuth = chkImageAuth.Checked && txtImageAuth.Text.IndexOf(':') != -1 ? txtImageAuth.Text : "";
 			int checkIntervalSeconds = (int)cboCheckEvery.SelectedValue * 60;
@@ -552,7 +552,7 @@ namespace JDP {
 			bool wasTransformSuccessful = false;
 			frmWait.RunWork(this, (onProgress) => {
 				try {
-					pageURL = URLTransformer.Transform(pageURL, pageAuth);
+					pageUrl = UrlTransformer.Transform(pageUrl, pageAuth);
 					wasTransformSuccessful = true;
 				}
 				catch { }
@@ -562,7 +562,7 @@ namespace JDP {
 				return false;
 			}
 
-			bool wasAdded = AddThread(pageURL, pageAuth, imageAuth, checkIntervalSeconds, chkOneTime.Checked, description);
+			bool wasAdded = AddThread(pageUrl, pageAuth, imageAuth, checkIntervalSeconds, chkOneTime.Checked, description);
 			if (!wasAdded) {
 				if (!silent) ShowErrorMessage("The same thread is already being watched or downloaded.", "Duplicate Thread");
 				return false;
@@ -571,12 +571,12 @@ namespace JDP {
 			return true;
 		}
 
-		private bool AddThread(string pageURL, string pageAuth, string imageAuth, int checkIntervalSeconds, bool oneTimeDownload, string description = null) {
-			string globalThreadID = SiteHelper.CreateByURL(pageURL).GetGlobalThreadID();
+		private bool AddThread(string pageUrl, string pageAuth, string imageAuth, int checkIntervalSeconds, bool oneTimeDownload, string description = null) {
+			string globalThreadID = SiteHelper.CreateByUrl(pageUrl).GetGlobalThreadID();
 			ThreadWatcher watcher = ThreadList.Items.FirstOrDefault(w => w.GlobalThreadID.Equals(globalThreadID, StringComparison.OrdinalIgnoreCase));
 
 			if (watcher == null) {
-				watcher = ThreadWatcher.Create(pageURL, pageAuth, imageAuth, oneTimeDownload, checkIntervalSeconds, description);
+				watcher = ThreadWatcher.Create(pageUrl, pageAuth, imageAuth, oneTimeDownload, checkIntervalSeconds, description);
 
 				AttachWatcherToUI(watcher);
 				DisplayDescription(watcher);
@@ -705,7 +705,7 @@ namespace JDP {
 			contextMenuStrip.Opening += (s, e) => {
 				e.Cancel = true;
 				Point pos = lvThreads.PointToClient(MousePosition);
-				if (pos.X < 0 || pos.X > lvThreads.ClientSize.Width || pos.Y < 0 || pos.Y >= GUI.GetHeaderHeight(lvThreads)) return;
+				if (pos.X < 0 || pos.X > lvThreads.ClientSize.Width || pos.Y < 0 || pos.Y >= Gui.GetHeaderHeight(lvThreads)) return;
 				contextMenu.Show(lvThreads, pos);
 			};
 			lvThreads.ContextMenuStrip = contextMenuStrip;
@@ -824,14 +824,14 @@ namespace JDP {
 		}
 
 		private void LoadTwitchUserWatchList() {
-			void TwitchUserWatcher_NewVOD(TwitchUserWatcher s, TwitchNewVODEventArgs e) {
+			void TwitchUserWatcher_NewVod(TwitchUserWatcher s, TwitchNewVodEventArgs e) {
 				this.TryInvoke(() => {
-					AddThread(e.URL, silent: true, description: $"Twitch VOD {e.VideoID}");
+					AddThread(e.Url, silent: true, description: $"Twitch VOD {e.VideoID}");
 				});
 			}
 			void AddTwitchUserWatcher(string userName, TimeSpan interval) {
 				var watcher = new TwitchUserWatcher(userName, interval);
-				watcher.NewVOD += TwitchUserWatcher_NewVOD;
+				watcher.NewVod += TwitchUserWatcher_NewVod;
 				watcher.Start();
 			}
 			string path = Path.Combine(Settings.GetSettingsDirectory(), "twitch_watch.txt");

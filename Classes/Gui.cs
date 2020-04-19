@@ -7,7 +7,7 @@ using System.Windows.Forms;
 namespace JDP {
 	public struct DownloadProgressInfo {
 		public long DownloadID { get; set; }
-		public string URL { get; set; }
+		public string Url { get; set; }
 		public int TryNumber { get; set; }
 		public long StartTicks { get; set; }
 		public long? EndTicks { get; set; }
@@ -50,8 +50,8 @@ namespace JDP {
 		}
 	}
 
-	public static class GUI {
-		static GUI() {
+	public static class Gui {
+		static Gui() {
 			using (var form = new Form { AutoScaleMode = AutoScaleMode }) {
 				AutoScaleFactorX = form.CurrentAutoScaleDimensions.Width / AutoScaleBaseSize.Width;
 				AutoScaleFactorY = form.CurrentAutoScaleDimensions.Height / AutoScaleBaseSize.Height;

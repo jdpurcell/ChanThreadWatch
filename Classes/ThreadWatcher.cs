@@ -37,9 +37,9 @@ namespace JDP {
 		private object _tag;
 
 		private ThreadWatcher(ThreadWatcherConfig config) {
-			SiteHelper siteHelper = SiteHelper.CreateByURL(config.PageURL);
-			PageURL = config.PageURL;
-			PageHost = new Uri(PageURL).Host;
+			SiteHelper siteHelper = SiteHelper.CreateByUrl(config.PageUrl);
+			PageUrl = config.PageUrl;
+			PageHost = new Uri(PageUrl).Host;
 			GlobalThreadID = config.GlobalThreadID;
 			AddedOn = config.AddedOn;
 			BaseDownloadDirectory = Settings.AbsoluteDownloadDirectory;
@@ -59,11 +59,11 @@ namespace JDP {
 			}
 		}
 
-		public static ThreadWatcher Create(string pageURL, string pageAuth, string imageAuth, bool oneTimeDownload, int checkIntervalSeconds, string description = null) {
-			SiteHelper siteHelper = SiteHelper.CreateByURL(pageURL);
+		public static ThreadWatcher Create(string pageUrl, string pageAuth, string imageAuth, bool oneTimeDownload, int checkIntervalSeconds, string description = null) {
+			SiteHelper siteHelper = SiteHelper.CreateByUrl(pageUrl);
 			string globalThreadID = siteHelper.GetGlobalThreadID();
 			return new ThreadWatcher(new ThreadWatcherConfig {
-				PageURL = pageURL,
+				PageUrl = pageUrl,
 				GlobalThreadID = globalThreadID,
 				AddedOn = DateTime.UtcNow,
 				PageAuth = pageAuth,
@@ -79,7 +79,7 @@ namespace JDP {
 			return new ThreadWatcher(config);
 		}
 
-		public string PageURL { get; }
+		public string PageUrl { get; }
 
 		public string PageHost { get; }
 
@@ -326,7 +326,7 @@ namespace JDP {
 						if (!_hasInitialized) {
 							_pageList = new List<PageInfo> {
 								new PageInfo {
-									URL = PageURL
+									Url = PageUrl
 								}
 							};
 							_imageDiskFileNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -361,7 +361,7 @@ namespace JDP {
 				OnDownloadStatus(new DownloadStatusEventArgs(DownloadType.Page, 0, _pageList.Count));
 				while (pageIndex < _pageList.Count && !IsStopping) {
 					string saveFileName = PageBaseFileName + (pageIndex == 0 ? "" : $"_{pageIndex + 1}") + ".html";
-					HTMLParser pageParser = null;
+					HtmlParser pageParser = null;
 
 					PageInfo pageInfo = _pageList[pageIndex];
 					pageInfo.Path = Path.Combine(threadDir, saveFileName);
@@ -370,14 +370,14 @@ namespace JDP {
 					DownloadPageEndCallback downloadEnd = (result, content, lastModifiedTime, encoding) => {
 						if (result == DownloadResult.Completed) {
 							pageInfo.IsFresh = true;
-							pageParser = new HTMLParser(content);
+							pageParser = new HtmlParser(content);
 							pageInfo.CacheTime = lastModifiedTime;
 							pageInfo.Encoding = encoding;
 							pageInfo.ReplaceList = Settings.SaveThumbnails ? new List<ReplaceInfo>() : null;
 						}
 						downloadEndEvent.Set();
 					};
-					DownloadPageAsync(pageInfo.Path, pageInfo.URL, PageAuth, _anyPendingRetries ? null : pageInfo.CacheTime, downloadEnd);
+					DownloadPageAsync(pageInfo.Path, pageInfo.Url, PageAuth, _anyPendingRetries ? null : pageInfo.CacheTime, downloadEnd);
 					downloadEndEvent.WaitOne();
 					downloadEndEvent.Close();
 
@@ -385,9 +385,9 @@ namespace JDP {
 						anyPageSkipped = true;
 					}
 					else {
-						SiteHelper siteHelper = SiteHelper.CreateByURL(pageInfo.URL);
+						SiteHelper siteHelper = SiteHelper.CreateByUrl(pageInfo.Url);
 
-						siteHelper.SetHTMLParser(pageParser);
+						siteHelper.SetHtmlParser(pageParser);
 
 						List<ThumbnailInfo> thumbs = new List<ThumbnailInfo>();
 						List<ImageInfo> images = siteHelper.GetImages(pageInfo.ReplaceList, thumbs);
@@ -436,15 +436,15 @@ namespace JDP {
 							}
 						}
 
-						string nextPageURL = siteHelper.GetNextPageURL();
-						if (!String.IsNullOrEmpty(nextPageURL)) {
+						string nextPageUrl = siteHelper.GetNextPageUrl();
+						if (!String.IsNullOrEmpty(nextPageUrl)) {
 							PageInfo nextPageInfo = new PageInfo {
-								URL = nextPageURL
+								Url = nextPageUrl
 							};
 							if (pageIndex == _pageList.Count - 1) {
 								_pageList.Add(nextPageInfo);
 							}
-							else if (_pageList[pageIndex + 1].URL != nextPageURL) {
+							else if (_pageList[pageIndex + 1].Url != nextPageUrl) {
 								_pageList[pageIndex + 1] = nextPageInfo;
 							}
 						}
@@ -544,7 +544,7 @@ namespace JDP {
 							downloadEndEvent.Set();
 						};
 						downloadEndEvents.Add(downloadEndEvent);
-						DownloadFileAsync(savePath, image.URL, ImageAuth, image.Referer, hashType, image.Hash, onDownloadEnd);
+						DownloadFileAsync(savePath, image.Url, ImageAuth, image.Referer, hashType, image.Hash, onDownloadEnd);
 					}
 					foreach (ManualResetEvent downloadEndEvent in downloadEndEvents) {
 						downloadEndEvent.WaitOne();
@@ -592,7 +592,7 @@ namespace JDP {
 								downloadEndEvent.Set();
 							};
 							downloadEndEvents.Add(downloadEndEvent);
-							DownloadFileAsync(savePath, thumb.URL, PageAuth, thumb.Referer, HashType.None, null, onDownloadEnd);
+							DownloadFileAsync(savePath, thumb.Url, PageAuth, thumb.Referer, HashType.None, null, onDownloadEnd);
 						}
 						foreach (ManualResetEvent downloadEndEvent in downloadEndEvents) {
 							downloadEndEvent.WaitOne();
@@ -603,7 +603,7 @@ namespace JDP {
 					if (!IsStopping || StopReason != StopReason.IOError) {
 						foreach (PageInfo pageInfo in _pageList) {
 							if (!pageInfo.IsFresh) continue;
-							HTMLParser htmlParser = new HTMLParser(File.ReadAllText(pageInfo.Path, pageInfo.Encoding));
+							HtmlParser htmlParser = new HtmlParser(File.ReadAllText(pageInfo.Path, pageInfo.Encoding));
 							for (int i = 0; i < pageInfo.ReplaceList.Count; i++) {
 								ReplaceInfo replace = pageInfo.ReplaceList[i];
 								DownloadInfo downloadInfo = null;
@@ -618,9 +618,9 @@ namespace JDP {
 									replace.Value = "src=\"" + HttpUtility.HtmlAttributeEncode(getRelativeDownloadPath(thumbDir)) + "\"";
 								}
 							}
-							General.AddOtherReplaces(htmlParser, pageInfo.URL, pageInfo.ReplaceList);
+							General.AddOtherReplaces(htmlParser, pageInfo.Url, pageInfo.ReplaceList);
 							using (StreamWriter sw = new StreamWriter(pageInfo.Path, false, pageInfo.Encoding)) {
-								General.WriteReplacedString(htmlParser.PreprocessedHTML, pageInfo.ReplaceList, sw);
+								General.WriteReplacedString(htmlParser.PreprocessedHtml, pageInfo.ReplaceList, sw);
 							}
 							if (htmlParser.FindEndTag("html") != null && File.Exists(pageInfo.Path + ".bak")) {
 								try { File.Delete(pageInfo.Path + ".bak"); }
@@ -783,18 +783,18 @@ namespace JDP {
 						}
 						cleanup(true);
 						OnDownloadEnd(new DownloadEndEventArgs(downloadID, downloadedFileSize, true));
-						encoding = General.DetectHTMLEncoding(pageBytes, httpContentType);
+						encoding = General.DetectHtmlEncoding(pageBytes, httpContentType);
 						content = encoding.GetString(pageBytes);
 						endTryDownload(DownloadResult.Completed);
 					},
 					(ex) => {
 						cleanup(false);
 						OnDownloadEnd(new DownloadEndEventArgs(downloadID, downloadedFileSize, false));
-						if (ex is HTTP304Exception) {
+						if (ex is Http304Exception) {
 							// Page not modified, skip
 							endTryDownload(DownloadResult.Skipped);
 						}
-						else if (ex is HTTP404Exception) {
+						else if (ex is Http404Exception) {
 							// Page not found, stop
 							Stop(StopReason.PageNotFound);
 							endTryDownload(DownloadResult.Skipped);
@@ -907,7 +907,7 @@ namespace JDP {
 							Stop(StopReason.IOError);
 							endTryDownload(DownloadResult.Skipped);
 						}
-						else if (ex is HTTP404Exception) {
+						else if (ex is Http404Exception) {
 							// Fatal problem with this file, skip
 							endTryDownload(DownloadResult.Skipped);
 						}

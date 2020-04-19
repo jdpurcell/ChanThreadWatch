@@ -8,32 +8,32 @@ using System.Linq;
 using System.Collections.Generic;
 
 namespace JDP {
-	public class HTMLParser {
-		private readonly string _preprocessedHTML;
-		private readonly List<HTMLTag> _tags;
+	public class HtmlParser {
+		private readonly string _preprocessedHtml;
+		private readonly List<HtmlTag> _tags;
 		private readonly Dictionary<int, int> _offsetToIndex = new Dictionary<int, int>();
 
-		public HTMLParser(string html) {
-			_preprocessedHTML = General.NormalizeNewLines(html);
-			_tags = new List<HTMLTag>(ParseTags(_preprocessedHTML, 0, _preprocessedHTML.Length));
+		public HtmlParser(string html) {
+			_preprocessedHtml = General.NormalizeNewLines(html);
+			_tags = new List<HtmlTag>(ParseTags(_preprocessedHtml, 0, _preprocessedHtml.Length));
 			for (int i = 0; i < _tags.Count; i++) {
 				_offsetToIndex.Add(_tags[i].Offset, i);
 			}
 		}
 
-		public string PreprocessedHTML => _preprocessedHTML;
+		public string PreprocessedHtml => _preprocessedHtml;
 
-		public IList<HTMLTag> Tags => _tags.AsReadOnly();
+		public IList<HtmlTag> Tags => _tags.AsReadOnly();
 
-		public string GetInnerHTML(HTMLTag startTag, HTMLTag endTag) {
-			return startTag.IsSelfClosing ? "" : GetSection(_preprocessedHTML, startTag.EndOffset, endTag.Offset);
+		public string GetInnerHtml(HtmlTag startTag, HtmlTag endTag) {
+			return startTag.IsSelfClosing ? "" : GetSection(_preprocessedHtml, startTag.EndOffset, endTag.Offset);
 		}
 
-		public string GetInnerHTML(HTMLTagRange tagRange) {
-			return GetInnerHTML(tagRange.StartTag, tagRange.EndTag);
+		public string GetInnerHtml(HtmlTagRange tagRange) {
+			return GetInnerHtml(tagRange.StartTag, tagRange.EndTag);
 		}
 
-		public IEnumerable<HTMLTag> EnumerateTags(HTMLTag startAfterTag, HTMLTag stopBeforeTag) {
+		public IEnumerable<HtmlTag> EnumerateTags(HtmlTag startAfterTag, HtmlTag stopBeforeTag) {
 			int startIndex = startAfterTag != null ? (GetTagIndex(startAfterTag) + 1) : 0;
 			int stopIndex = stopBeforeTag != null ? (GetTagIndex(stopBeforeTag) - 1) : (_tags.Count - 1);
 			for (int i = startIndex; i <= stopIndex; i++) {
@@ -41,83 +41,83 @@ namespace JDP {
 			}
 		}
 
-		public IEnumerable<HTMLTag> EnumerateTags(HTMLTagRange containingTagRange) {
+		public IEnumerable<HtmlTag> EnumerateTags(HtmlTagRange containingTagRange) {
 			return EnumerateTags(containingTagRange.StartTag, containingTagRange.EndTag);
 		}
 
-		public IEnumerable<HTMLTag> FindTags(bool isEndTag, HTMLTag startAfterTag, HTMLTag stopBeforeTag, params string[] names) {
+		public IEnumerable<HtmlTag> FindTags(bool isEndTag, HtmlTag startAfterTag, HtmlTag stopBeforeTag, params string[] names) {
 			return EnumerateTags(startAfterTag, stopBeforeTag)
 				.Where(tag => tag.IsEnd == isEndTag && tag.NameEqualsAny(names));
 		}
 
-		public IEnumerable<HTMLTag> FindTags(bool isEndTag, HTMLTagRange containingTagRange, params string[] names) {
+		public IEnumerable<HtmlTag> FindTags(bool isEndTag, HtmlTagRange containingTagRange, params string[] names) {
 			return FindTags(isEndTag, containingTagRange.StartTag, containingTagRange.EndTag, names);
 		}
 
-		public HTMLTag FindTag(bool isEndTag, HTMLTag startAfterTag, HTMLTag stopBeforeTag, params string[] names) {
-			foreach (HTMLTag tag in FindTags(isEndTag, startAfterTag, stopBeforeTag, names)) {
+		public HtmlTag FindTag(bool isEndTag, HtmlTag startAfterTag, HtmlTag stopBeforeTag, params string[] names) {
+			foreach (HtmlTag tag in FindTags(isEndTag, startAfterTag, stopBeforeTag, names)) {
 				return tag;
 			}
 			return null;
 		}
 
-		public HTMLTag FindTag(bool isEndTag, HTMLTagRange containingTagRange, params string[] names) {
+		public HtmlTag FindTag(bool isEndTag, HtmlTagRange containingTagRange, params string[] names) {
 			return FindTag(isEndTag, containingTagRange.StartTag, containingTagRange.EndTag, names);
 		}
 
-		public IEnumerable<HTMLTag> FindStartTags(HTMLTag startAfterTag, HTMLTag stopBeforeTag, params string[] names) {
+		public IEnumerable<HtmlTag> FindStartTags(HtmlTag startAfterTag, HtmlTag stopBeforeTag, params string[] names) {
 			return FindTags(false, startAfterTag, stopBeforeTag, names);
 		}
 
-		public IEnumerable<HTMLTag> FindStartTags(HTMLTagRange containingTagRange, params string[] names) {
+		public IEnumerable<HtmlTag> FindStartTags(HtmlTagRange containingTagRange, params string[] names) {
 			return FindStartTags(containingTagRange.StartTag, containingTagRange.EndTag, names);
 		}
 
-		public IEnumerable<HTMLTag> FindStartTags(params string[] names) {
+		public IEnumerable<HtmlTag> FindStartTags(params string[] names) {
 			return FindTags(false, null, null, names);
 		}
 
-		public HTMLTag FindStartTag(HTMLTag startAfterTag, HTMLTag stopBeforeTag, params string[] names) {
+		public HtmlTag FindStartTag(HtmlTag startAfterTag, HtmlTag stopBeforeTag, params string[] names) {
 			return FindTag(false, startAfterTag, stopBeforeTag, names);
 		}
 
-		public HTMLTag FindStartTag(HTMLTagRange containingTagRange, params string[] names) {
+		public HtmlTag FindStartTag(HtmlTagRange containingTagRange, params string[] names) {
 			return FindStartTag(containingTagRange.StartTag, containingTagRange.EndTag, names);
 		}
 
-		public HTMLTag FindStartTag(params string[] names) {
+		public HtmlTag FindStartTag(params string[] names) {
 			return FindTag(false, null, null, names);
 		}
 
-		public IEnumerable<HTMLTag> FindEndTags(HTMLTag startAfterTag, HTMLTag stopBeforeTag, params string[] names) {
+		public IEnumerable<HtmlTag> FindEndTags(HtmlTag startAfterTag, HtmlTag stopBeforeTag, params string[] names) {
 			return FindTags(true, startAfterTag, stopBeforeTag, names);
 		}
 
-		public IEnumerable<HTMLTag> FindEndTags(HTMLTagRange containingTagRange, params string[] names) {
+		public IEnumerable<HtmlTag> FindEndTags(HtmlTagRange containingTagRange, params string[] names) {
 			return FindEndTags(containingTagRange.StartTag, containingTagRange.EndTag, names);
 		}
 
-		public IEnumerable<HTMLTag> FindEndTags(params string[] names) {
+		public IEnumerable<HtmlTag> FindEndTags(params string[] names) {
 			return FindTags(true, null, null, names);
 		}
 
-		public HTMLTag FindEndTag(HTMLTag startAfterTag, HTMLTag stopBeforeTag, params string[] names) {
+		public HtmlTag FindEndTag(HtmlTag startAfterTag, HtmlTag stopBeforeTag, params string[] names) {
 			return FindTag(true, startAfterTag, stopBeforeTag, names);
 		}
 
-		public HTMLTag FindEndTag(HTMLTagRange containingTagRange, params string[] names) {
+		public HtmlTag FindEndTag(HtmlTagRange containingTagRange, params string[] names) {
 			return FindEndTag(containingTagRange.StartTag, containingTagRange.EndTag, names);
 		}
 
-		public HTMLTag FindEndTag(params string[] names) {
+		public HtmlTag FindEndTag(params string[] names) {
 			return FindTag(true, null, null, names);
 		}
 
-		public HTMLTag FindCorrespondingEndTag(HTMLTag tag) {
+		public HtmlTag FindCorrespondingEndTag(HtmlTag tag) {
 			return FindCorrespondingEndTag(tag, null);
 		}
 
-		public HTMLTag FindCorrespondingEndTag(HTMLTag tag, HTMLTag stopBeforeTag) {
+		public HtmlTag FindCorrespondingEndTag(HtmlTag tag, HtmlTag stopBeforeTag) {
 			if (tag == null) {
 				return null;
 			}
@@ -131,7 +131,7 @@ namespace JDP {
 			int stopIndex = stopBeforeTag != null ? (GetTagIndex(stopBeforeTag) - 1) : (_tags.Count - 1);
 			int depth = 1;
 			for (int i = startIndex; i <= stopIndex; i++) {
-				HTMLTag tag2 = _tags[i];
+				HtmlTag tag2 = _tags[i];
 				if (!tag2.IsSelfClosing && tag2.NameEquals(tag.Name)) {
 					depth += tag2.IsEnd ? -1 : 1;
 					if (depth == 0) {
@@ -142,26 +142,26 @@ namespace JDP {
 			return null;
 		}
 
-		public HTMLTagRange CreateTagRange(HTMLTag tag) {
+		public HtmlTagRange CreateTagRange(HtmlTag tag) {
 			return CreateTagRange(tag, null);
 		}
 
-		public HTMLTagRange CreateTagRange(HTMLTag tag, HTMLTag stopBeforeTag) {
-			HTMLTag endTag = FindCorrespondingEndTag(tag, stopBeforeTag);
-			return (tag != null && endTag != null) ? new HTMLTagRange(tag, endTag) : null;
+		public HtmlTagRange CreateTagRange(HtmlTag tag, HtmlTag stopBeforeTag) {
+			HtmlTag endTag = FindCorrespondingEndTag(tag, stopBeforeTag);
+			return (tag != null && endTag != null) ? new HtmlTagRange(tag, endTag) : null;
 		}
 
-		private int GetTagIndex(HTMLTag tag) {
+		private int GetTagIndex(HtmlTag tag) {
 			return _offsetToIndex.TryGetValue(tag.Offset, out int i) ? i :
 				throw new Exception("Unable to locate the specified tag.");
 		}
 
-		private static IEnumerable<HTMLTag> ParseTags(string html, int htmlStart, int htmlEnd) {
+		private static IEnumerable<HtmlTag> ParseTags(string html, int htmlStart, int htmlEnd) {
 			while (htmlStart < htmlEnd) {
 				int pos = IndexOf(html, htmlStart, htmlEnd, '<');
 				if (pos == -1) yield break;
 
-				HTMLTag tag = new HTMLTag();
+				HtmlTag tag = new HtmlTag();
 				tag.Offset = pos;
 				htmlStart = pos + 1;
 				tag.IsEnd = StartsWith(html, htmlStart, htmlEnd, '/');
@@ -185,7 +185,7 @@ namespace JDP {
 						}
 						else if (tag.IsSelfClosing) { }
 						else {
-							HTMLAttribute attribute = new HTMLAttribute();
+							HtmlAttribute attribute = new HtmlAttribute();
 							attribute.Offset = htmlStart;
 
 							// Parse attribute name
@@ -376,22 +376,22 @@ namespace JDP {
 			return Array.Exists(assignedClassNames, n => n.Equals(targetClassName, StringComparison.Ordinal));
 		}
 
-		public static bool ClassAttributeValueHas(HTMLTag tag, string targetClassName) {
+		public static bool ClassAttributeValueHas(HtmlTag tag, string targetClassName) {
 			string attributeValue = tag.GetAttributeValue("class");
 			return attributeValue != null && ClassAttributeValueHas(attributeValue, targetClassName);
 		}
 	}
 
-	public class HTMLTag {
+	public class HtmlTag {
 		public string Name { get; set; }
 		public bool IsEnd { get; set; }
 		public bool IsSelfClosing { get; set; }
-		public List<HTMLAttribute> Attributes { get; set; }
+		public List<HtmlAttribute> Attributes { get; set; }
 		public int Offset { get; set; }
 		public int Length { get; set; }
 
-		public HTMLTag() {
-			Attributes  = new List<HTMLAttribute>();
+		public HtmlTag() {
+			Attributes  = new List<HtmlAttribute>();
 		}
 
 		public int EndOffset {
@@ -413,8 +413,8 @@ namespace JDP {
 			return false;
 		}
 
-		public HTMLAttribute GetAttribute(string name) {
-			foreach (HTMLAttribute attribute in Attributes) {
+		public HtmlAttribute GetAttribute(string name) {
+			foreach (HtmlAttribute attribute in Attributes) {
 				if (attribute.NameEquals(name)) {
 					return attribute;
 				}
@@ -431,7 +431,7 @@ namespace JDP {
 		}
 	}
 
-	public class HTMLAttribute {
+	public class HtmlAttribute {
 		public string Name { get; set; }
 		public string Value { get; set; }
 		public int Offset { get; set; }
@@ -442,11 +442,11 @@ namespace JDP {
 		}
 	}
 
-	public class HTMLTagRange {
-		public HTMLTag StartTag { get; }
-		public HTMLTag EndTag { get; }
+	public class HtmlTagRange {
+		public HtmlTag StartTag { get; }
+		public HtmlTag EndTag { get; }
 
-		public HTMLTagRange(HTMLTag startTag, HTMLTag endTag) {
+		public HtmlTagRange(HtmlTag startTag, HtmlTag endTag) {
 			StartTag = startTag;
 			EndTag = endTag;
 		}

@@ -6,7 +6,7 @@ namespace JDP {
 	public partial class frmSettings : Form {
 		public frmSettings() {
 			InitializeComponent();
-			GUI.SetFontAndScaling(this);
+			Gui.SetFontAndScaling(this);
 		}
 
 		private void frmSettings_Load(object sender, EventArgs e) {

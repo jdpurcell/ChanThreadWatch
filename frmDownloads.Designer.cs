@@ -25,7 +25,7 @@
 		private void InitializeComponent() {
 			this.components = new System.ComponentModel.Container();
 			this.lvDownloads = new System.Windows.Forms.ListView();
-			this.chURL = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
+			this.chUrl = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
 			this.chSize = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
 			this.chPercent = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
 			this.chSpeed = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
@@ -40,7 +40,7 @@
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
 			this.lvDownloads.Columns.AddRange(new System.Windows.Forms.ColumnHeader[] {
-            this.chURL,
+            this.chUrl,
             this.chSize,
             this.chPercent,
             this.chSpeed,
@@ -54,10 +54,10 @@
 			this.lvDownloads.UseCompatibleStateImageBehavior = false;
 			this.lvDownloads.View = System.Windows.Forms.View.Details;
 			// 
-			// chURL
+			// chUrl
 			// 
-			this.chURL.Text = "URL";
-			this.chURL.Width = 355;
+			this.chUrl.Text = "URL";
+			this.chUrl.Width = 355;
 			// 
 			// chSize
 			// 
@@ -109,7 +109,7 @@
 		#endregion
 
 		private System.Windows.Forms.ListView lvDownloads;
-		private System.Windows.Forms.ColumnHeader chURL;
+		private System.Windows.Forms.ColumnHeader chUrl;
 		private System.Windows.Forms.ColumnHeader chPercent;
 		private System.Windows.Forms.ColumnHeader chSize;
 		private System.Windows.Forms.ColumnHeader chSpeed;

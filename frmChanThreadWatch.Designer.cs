@@ -30,8 +30,8 @@
 			this.chLastImageOn = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
 			this.chAddedOn = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
 			this.grpAddThread = new System.Windows.Forms.GroupBox();
-			this.lblPageURL = new System.Windows.Forms.Label();
-			this.txtPageURL = new System.Windows.Forms.TextBox();
+			this.lblPageUrl = new System.Windows.Forms.Label();
+			this.txtPageUrl = new System.Windows.Forms.TextBox();
 			this.lblDescription = new System.Windows.Forms.Label();
 			this.txtDescription = new System.Windows.Forms.TextBox();
 			this.chkPageAuth = new System.Windows.Forms.CheckBox();
@@ -48,10 +48,10 @@
 			this.cmThreads = new System.Windows.Forms.ContextMenu();
 			this.miEditDescription = new System.Windows.Forms.MenuItem();
 			this.miOpenFolder = new System.Windows.Forms.MenuItem();
-			this.miOpenURL = new System.Windows.Forms.MenuItem();
+			this.miOpenUrl = new System.Windows.Forms.MenuItem();
 			this.miStop = new System.Windows.Forms.MenuItem();
 			this.miStart = new System.Windows.Forms.MenuItem();
-			this.miCopyURL = new System.Windows.Forms.MenuItem();
+			this.miCopyUrl = new System.Windows.Forms.MenuItem();
 			this.miRemove = new System.Windows.Forms.MenuItem();
 			this.miRemoveAndDeleteFolder = new System.Windows.Forms.MenuItem();
 			this.miCheckNow = new System.Windows.Forms.MenuItem();
@@ -59,7 +59,7 @@
 			this.miPostprocessFiles = new System.Windows.Forms.MenuItem();
 			this.grpDoubleClick = new System.Windows.Forms.GroupBox();
 			this.rbEditDescription = new System.Windows.Forms.RadioButton();
-			this.rbOpenURL = new System.Windows.Forms.RadioButton();
+			this.rbOpenUrl = new System.Windows.Forms.RadioButton();
 			this.rbOpenFolder = new System.Windows.Forms.RadioButton();
 			this.tmrUpdateWaitStatus = new System.Windows.Forms.Timer(this.components);
 			this.btnAddFromClipboard = new System.Windows.Forms.Button();
@@ -117,8 +117,8 @@
 			// grpAddThread
 			// 
 			this.grpAddThread.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
-			this.grpAddThread.Controls.Add(this.lblPageURL);
-			this.grpAddThread.Controls.Add(this.txtPageURL);
+			this.grpAddThread.Controls.Add(this.lblPageUrl);
+			this.grpAddThread.Controls.Add(this.txtPageUrl);
 			this.grpAddThread.Controls.Add(this.lblDescription);
 			this.grpAddThread.Controls.Add(this.txtDescription);
 			this.grpAddThread.Controls.Add(this.chkPageAuth);
@@ -136,22 +136,22 @@
 			this.grpAddThread.TabStop = false;
 			this.grpAddThread.Text = "Add Thread";
 			// 
-			// lblPageURL
+			// lblPageUrl
 			// 
-			this.lblPageURL.AutoSize = true;
-			this.lblPageURL.Location = new System.Drawing.Point(10, 24);
-			this.lblPageURL.Name = "lblPageURL";
-			this.lblPageURL.Size = new System.Drawing.Size(32, 13);
-			this.lblPageURL.TabIndex = 0;
-			this.lblPageURL.Text = "URL:";
+			this.lblPageUrl.AutoSize = true;
+			this.lblPageUrl.Location = new System.Drawing.Point(10, 24);
+			this.lblPageUrl.Name = "lblPageUrl";
+			this.lblPageUrl.Size = new System.Drawing.Size(32, 13);
+			this.lblPageUrl.TabIndex = 0;
+			this.lblPageUrl.Text = "URL:";
 			// 
-			// txtPageURL
+			// txtPageUrl
 			// 
-			this.txtPageURL.Location = new System.Drawing.Point(48, 20);
-			this.txtPageURL.Name = "txtPageURL";
-			this.txtPageURL.Size = new System.Drawing.Size(300, 20);
-			this.txtPageURL.TabIndex = 1;
-			this.txtPageURL.KeyDown += new System.Windows.Forms.KeyEventHandler(this.txtPageURL_KeyDown);
+			this.txtPageUrl.Location = new System.Drawing.Point(48, 20);
+			this.txtPageUrl.Name = "txtPageUrl";
+			this.txtPageUrl.Size = new System.Drawing.Size(300, 20);
+			this.txtPageUrl.TabIndex = 1;
+			this.txtPageUrl.KeyDown += new System.Windows.Forms.KeyEventHandler(this.txtPageUrl_KeyDown);
 			// 
 			// lblDescription
 			// 
@@ -285,10 +285,10 @@
 			this.cmThreads.MenuItems.AddRange(new System.Windows.Forms.MenuItem[] {
             this.miEditDescription,
             this.miOpenFolder,
-            this.miOpenURL,
+            this.miOpenUrl,
             this.miStop,
             this.miStart,
-            this.miCopyURL,
+            this.miCopyUrl,
             this.miRemove,
             this.miRemoveAndDeleteFolder,
             this.miCheckNow,
@@ -307,11 +307,11 @@
 			this.miOpenFolder.Text = "Open Folder";
 			this.miOpenFolder.Click += new System.EventHandler(this.miOpenFolder_Click);
 			// 
-			// miOpenURL
+			// miOpenUrl
 			// 
-			this.miOpenURL.Index = 2;
-			this.miOpenURL.Text = "Open URL";
-			this.miOpenURL.Click += new System.EventHandler(this.miOpenURL_Click);
+			this.miOpenUrl.Index = 2;
+			this.miOpenUrl.Text = "Open URL";
+			this.miOpenUrl.Click += new System.EventHandler(this.miOpenUrl_Click);
 			// 
 			// miStop
 			// 
@@ -325,11 +325,11 @@
 			this.miStart.Text = "Start";
 			this.miStart.Click += new System.EventHandler(this.miStart_Click);
 			// 
-			// miCopyURL
+			// miCopyUrl
 			// 
-			this.miCopyURL.Index = 5;
-			this.miCopyURL.Text = "Copy URL";
-			this.miCopyURL.Click += new System.EventHandler(this.miCopyURL_Click);
+			this.miCopyUrl.Index = 5;
+			this.miCopyUrl.Text = "Copy URL";
+			this.miCopyUrl.Click += new System.EventHandler(this.miCopyUrl_Click);
 			// 
 			// miRemove
 			// 
@@ -364,7 +364,7 @@
 			// 
 			this.grpDoubleClick.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
 			this.grpDoubleClick.Controls.Add(this.rbEditDescription);
-			this.grpDoubleClick.Controls.Add(this.rbOpenURL);
+			this.grpDoubleClick.Controls.Add(this.rbOpenUrl);
 			this.grpDoubleClick.Controls.Add(this.rbOpenFolder);
 			this.grpDoubleClick.Location = new System.Drawing.Point(376, 228);
 			this.grpDoubleClick.Name = "grpDoubleClick";
@@ -383,15 +383,15 @@
 			this.rbEditDescription.Text = "Edit Description";
 			this.rbEditDescription.UseVisualStyleBackColor = true;
 			// 
-			// rbOpenURL
+			// rbOpenUrl
 			// 
-			this.rbOpenURL.Location = new System.Drawing.Point(12, 38);
-			this.rbOpenURL.Name = "rbOpenURL";
-			this.rbOpenURL.Size = new System.Drawing.Size(100, 17);
-			this.rbOpenURL.TabIndex = 1;
-			this.rbOpenURL.TabStop = true;
-			this.rbOpenURL.Text = "Open URL";
-			this.rbOpenURL.UseVisualStyleBackColor = true;
+			this.rbOpenUrl.Location = new System.Drawing.Point(12, 38);
+			this.rbOpenUrl.Name = "rbOpenUrl";
+			this.rbOpenUrl.Size = new System.Drawing.Size(100, 17);
+			this.rbOpenUrl.TabIndex = 1;
+			this.rbOpenUrl.TabStop = true;
+			this.rbOpenUrl.Text = "Open URL";
+			this.rbOpenUrl.UseVisualStyleBackColor = true;
 			// 
 			// rbOpenFolder
 			// 
@@ -477,8 +477,8 @@
 		private System.Windows.Forms.ColumnHeader chStatus;
 		private System.Windows.Forms.GroupBox grpAddThread;
 		private System.Windows.Forms.CheckBox chkOneTime;
-		private System.Windows.Forms.Label lblPageURL;
-		private System.Windows.Forms.TextBox txtPageURL;
+		private System.Windows.Forms.Label lblPageUrl;
+		private System.Windows.Forms.TextBox txtPageUrl;
 		private System.Windows.Forms.Label lblDescription;
 		private System.Windows.Forms.TextBox txtDescription;
 		private System.Windows.Forms.Button btnAdd;
@@ -493,14 +493,14 @@
 		private System.Windows.Forms.Button btnSettings;
 		private System.Windows.Forms.ContextMenu cmThreads;
 		private System.Windows.Forms.MenuItem miOpenFolder;
-		private System.Windows.Forms.MenuItem miOpenURL;
+		private System.Windows.Forms.MenuItem miOpenUrl;
 		private System.Windows.Forms.MenuItem miCheckNow;
 		private System.Windows.Forms.MenuItem miStop;
-		private System.Windows.Forms.MenuItem miCopyURL;
+		private System.Windows.Forms.MenuItem miCopyUrl;
 		private System.Windows.Forms.MenuItem miCheckEvery;
 		private System.Windows.Forms.MenuItem miPostprocessFiles;
 		private System.Windows.Forms.GroupBox grpDoubleClick;
-		private System.Windows.Forms.RadioButton rbOpenURL;
+		private System.Windows.Forms.RadioButton rbOpenUrl;
 		private System.Windows.Forms.RadioButton rbOpenFolder;
 		private System.Windows.Forms.MenuItem miStart;
 		private System.Windows.Forms.Timer tmrUpdateWaitStatus;

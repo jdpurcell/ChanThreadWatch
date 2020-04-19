@@ -157,10 +157,10 @@ namespace JDP {
 									if (webEx.Status == WebExceptionStatus.ProtocolError) {
 										HttpStatusCode code = ((HttpWebResponse)webEx.Response).StatusCode;
 										if (code == HttpStatusCode.NotFound) {
-											ex = new HTTP404Exception();
+											ex = new Http404Exception();
 										}
 										else if (code == HttpStatusCode.NotModified) {
-											ex = new HTTP304Exception();
+											ex = new Http304Exception();
 										}
 									}
 								}
@@ -194,7 +194,7 @@ namespace JDP {
 				memoryStream = new MemoryStream();
 				responseStream.CopyTo(memoryStream);
 				byte[] pageBytes = memoryStream.ToArray();
-				Encoding encoding = DetectHTMLEncoding(pageBytes, response.ContentType);
+				Encoding encoding = DetectHtmlEncoding(pageBytes, response.ContentType);
 				return encoding.GetString(pageBytes);
 			}
 			finally {
@@ -220,17 +220,17 @@ namespace JDP {
 			return lastModified;
 		}
 
-		public static Encoding DetectHTMLEncoding(byte[] bytes, string httpContentType) {
+		public static Encoding DetectHtmlEncoding(byte[] bytes, string httpContentType) {
 			string charSet =
 				GetCharSetFromContentType(httpContentType) ??
-				DetectCharacterSetFromBOM(bytes) ??
+				DetectCharacterSetFromBom(bytes) ??
 				DetectCharacterSetFromContent(bytes, httpContentType);
 			if (charSet != null) {
-				if (IsUTF8(charSet)) {
-					return new UTF8Encoding(HasBOM(bytes));
+				if (IsUtf8(charSet)) {
+					return new UTF8Encoding(HasBom(bytes));
 				}
-				else if (IsUTF16(charSet)) {
-					return new UnicodeEncoding(IsUTFBigEndian(charSet) ?? false, HasBOM(bytes));
+				else if (IsUtf16(charSet)) {
+					return new UnicodeEncoding(IsUtfBigEndian(charSet) ?? false, HasBom(bytes));
 				}
 				else {
 					try {
@@ -242,19 +242,19 @@ namespace JDP {
 			return Encoding.GetEncoding("Windows-1252");
 		}
 
-		private static string DetectCharacterSetFromBOM(byte[] bytes) {
-			switch (GetBOMType(bytes)) {
-				case BOMType.UTF8: return "UTF-8";
-				case BOMType.UTF16LE: return "UTF-16LE";
-				case BOMType.UTF16BE: return "UTF-16BE";
+		private static string DetectCharacterSetFromBom(byte[] bytes) {
+			switch (GetBomType(bytes)) {
+				case BomType.Utf8: return "UTF-8";
+				case BomType.Utf16LE: return "UTF-16LE";
+				case BomType.Utf16BE: return "UTF-16BE";
 				default: return null;
 			}
 		}
 
 		private static string DetectCharacterSetFromContent(byte[] bytes, string httpContentType) {
 			string text = UnknownEncodingToString(bytes, 4096);
-			HTMLParser htmlParser = new HTMLParser(text);
-			string mimeType = GetMIMETypeFromContentType(httpContentType) ?? "";
+			HtmlParser htmlParser = new HtmlParser(text);
+			string mimeType = GetMimeTypeFromContentType(httpContentType) ?? "";
 			string charSet;
 
 			if (mimeType.Equals("application/xhtml+xml", StringComparison.OrdinalIgnoreCase) ||
@@ -263,8 +263,8 @@ namespace JDP {
 			{
 				if (text.StartsWith("<?xml", StringComparison.OrdinalIgnoreCase)) {
 					// XML declaration
-					HTMLParser xmlParser = new HTMLParser("<" + text.Substring(2));
-					HTMLTag xmlTag = xmlParser.Tags.Count >= 1 ? xmlParser.Tags[0] : null;
+					HtmlParser xmlParser = new HtmlParser("<" + text.Substring(2));
+					HtmlTag xmlTag = xmlParser.Tags.Count >= 1 ? xmlParser.Tags[0] : null;
 					if (xmlTag != null && xmlTag.NameEquals("xml") && xmlTag.Offset == 0) {
 						charSet = xmlTag.GetAttributeValue("encoding");
 						if (!String.IsNullOrEmpty(charSet)) return charSet;
@@ -275,7 +275,7 @@ namespace JDP {
 				return "UTF-8";
 			}
 
-			foreach (HTMLTag tag in htmlParser.FindStartTags("meta")) {
+			foreach (HtmlTag tag in htmlParser.FindStartTags("meta")) {
 				// charset attribute
 				charSet = tag.GetAttributeValue("charset");
 				if (!String.IsNullOrEmpty(charSet)) return charSet;
@@ -290,7 +290,7 @@ namespace JDP {
 			return null;
 		}
 
-		public static string GetMIMETypeFromContentType(string contentType) {
+		public static string GetMimeTypeFromContentType(string contentType) {
 			if (contentType == null) return null;
 			int pos = contentType.IndexOf(';');
 			if (pos != -1) {
@@ -330,28 +330,28 @@ namespace JDP {
 			return Encoding.ASCII.GetString(dst, 0, iDst);
 		}
 
-		private static BOMType GetBOMType(byte[] bytes) {
-			if (bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF) return BOMType.UTF8;
-			if (bytes.Length >= 2 && bytes[0] == 0xFF && bytes[1] == 0xFE) return BOMType.UTF16LE;
-			if (bytes.Length >= 2 && bytes[0] == 0xFE && bytes[1] == 0xFF) return BOMType.UTF16BE;
-			return BOMType.None;
+		private static BomType GetBomType(byte[] bytes) {
+			if (bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF) return BomType.Utf8;
+			if (bytes.Length >= 2 && bytes[0] == 0xFF && bytes[1] == 0xFE) return BomType.Utf16LE;
+			if (bytes.Length >= 2 && bytes[0] == 0xFE && bytes[1] == 0xFF) return BomType.Utf16BE;
+			return BomType.None;
 		}
 
-		private static bool HasBOM(byte[] bytes) {
-			return GetBOMType(bytes) != BOMType.None;
+		private static bool HasBom(byte[] bytes) {
+			return GetBomType(bytes) != BomType.None;
 		}
 
-		private static bool IsUTF8(string charSet) {
+		private static bool IsUtf8(string charSet) {
 			return charSet.Equals("UTF-8", StringComparison.OrdinalIgnoreCase);
 		}
 
-		private static bool IsUTF16(string charSet) {
+		private static bool IsUtf16(string charSet) {
 			return charSet.Equals("UTF-16", StringComparison.OrdinalIgnoreCase) ||
 				   charSet.Equals("UTF-16BE", StringComparison.OrdinalIgnoreCase) ||
 				   charSet.Equals("UTF-16LE", StringComparison.OrdinalIgnoreCase);
 		}
 
-		private static bool? IsUTFBigEndian(string charSet) {
+		private static bool? IsUtfBigEndian(string charSet) {
 			if (charSet.EndsWith("BE", StringComparison.OrdinalIgnoreCase)) return true;
 			if (charSet.EndsWith("LE", StringComparison.OrdinalIgnoreCase)) return false;
 			return null;
@@ -365,28 +365,28 @@ namespace JDP {
 			return true;
 		}
 
-		public static string GetAbsoluteURL(Uri baseURI, string relativeURL) {
+		public static string GetAbsoluteUrl(Uri baseUri, string relativeUrl) {
 			// AbsoluteUri can throw undocumented Exception (e.g. for "mailto:+")
 			try {
-				return Uri.TryCreate(baseURI, relativeURL, out Uri uri) ? uri.AbsoluteUri : null;
+				return Uri.TryCreate(baseUri, relativeUrl, out Uri uri) ? uri.AbsoluteUri : null;
 			}
 			catch { return null; }
 		}
 
-		public static string[] GetURLPathComponents(Uri uri) {
+		public static string[] GetUrlPathComponents(Uri uri) {
 			string path = uri.AbsolutePath;
 			if (!path.StartsWith("/", StringComparison.Ordinal)) return new string[0];
 			return path.Substring(1).Split('/');
 		}
 
-		public static string StripFragmentFromURL(string url) {
+		public static string StripFragmentFromUrl(string url) {
 			int pos = url.IndexOf('#');
 			return pos != -1 ? url.Substring(0, pos) : url;
 		}
 
-		public static string CleanPageURL(string url) {
+		public static string CleanPageUrl(string url) {
 			url = url.Trim();
-			url = StripFragmentFromURL(url);
+			url = StripFragmentFromUrl(url);
 			if (url.Length == 0) return null;
 			if (!url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
 				!url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
@@ -539,7 +539,7 @@ namespace JDP {
 			}
 		}
 
-		public static void AddOtherReplaces(HTMLParser htmlParser, string pageURL, List<ReplaceInfo> replaceList) {
+		public static void AddOtherReplaces(HtmlParser htmlParser, string pageUrl, List<ReplaceInfo> replaceList) {
 			HashSet<int> existingOffsets = new HashSet<int>();
 
 			foreach (ReplaceInfo replace in replaceList) {
@@ -548,7 +548,7 @@ namespace JDP {
 
 			if (Environment.NewLine != "\n") {
 				int offset = 0;
-				while ((offset = htmlParser.PreprocessedHTML.IndexOf('\n', offset)) != -1) {
+				while ((offset = htmlParser.PreprocessedHtml.IndexOf('\n', offset)) != -1) {
 					replaceList.Add(new ReplaceInfo {
 						Offset = offset,
 						Length = 1,
@@ -559,7 +559,7 @@ namespace JDP {
 				}
 			}
 
-			foreach (HTMLTag tag in htmlParser.FindStartTags("base")) {
+			foreach (HtmlTag tag in htmlParser.FindStartTags("base")) {
 				replaceList.Add(
 					new ReplaceInfo {
 						Offset = tag.Offset,
@@ -569,7 +569,7 @@ namespace JDP {
 					});
 			}
 
-			foreach (HTMLTag tag in htmlParser.FindStartTags("a", "img", "script", "link")) {
+			foreach (HtmlTag tag in htmlParser.FindStartTags("a", "img", "script", "link")) {
 				bool isATag = tag.NameEquals("a");
 				bool isImgTag = tag.NameEquals("img");
 				bool isScriptTag = tag.NameEquals("script");
@@ -577,23 +577,23 @@ namespace JDP {
 				bool usesHRefAttr = isATag || isLinkTag;
 				bool usesSrcAttr = isImgTag || isScriptTag;
 				if (usesHRefAttr || usesSrcAttr) {
-					HTMLAttribute attribute = tag.GetAttribute(usesHRefAttr ? "href" : usesSrcAttr ? "src" : null);
+					HtmlAttribute attribute = tag.GetAttribute(usesHRefAttr ? "href" : usesSrcAttr ? "src" : null);
 					if (attribute != null && !existingOffsets.Contains(attribute.Offset)) {
 						// Make attribute's URL absolute
-						string newURL = GetAbsoluteURL(new Uri(pageURL), HttpUtility.HtmlDecode(attribute.Value));
+						string newUrl = GetAbsoluteUrl(new Uri(pageUrl), HttpUtility.HtmlDecode(attribute.Value));
 						// For links to anchors on the current page, use just the fragment
-						if (isATag && newURL != null && newURL.Length > pageURL.Length &&
-							newURL.StartsWith(pageURL, StringComparison.Ordinal) && newURL[pageURL.Length] == '#')
+						if (isATag && newUrl != null && newUrl.Length > pageUrl.Length &&
+							newUrl.StartsWith(pageUrl, StringComparison.Ordinal) && newUrl[pageUrl.Length] == '#')
 						{
-							newURL = newURL.Substring(pageURL.Length);
+							newUrl = newUrl.Substring(pageUrl.Length);
 						}
-						if (newURL != null) {
+						if (newUrl != null) {
 							replaceList.Add(
 								new ReplaceInfo {
 									Offset = attribute.Offset,
 									Length = attribute.Length,
 									Type = ReplaceType.Other,
-									Value = attribute.Name + "=\"" + HttpUtility.HtmlAttributeEncode(newURL) + "\""
+									Value = attribute.Name + "=\"" + HttpUtility.HtmlAttributeEncode(newUrl) + "\""
 								});
 						}
 					}
@@ -601,7 +601,7 @@ namespace JDP {
 			}
 		}
 
-		public static string URLFileName(string url) {
+		public static string UrlFileName(string url) {
 			return url.SubstringAfterLast("/", StringComparison.Ordinal);
 		}
 

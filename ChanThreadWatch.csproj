@@ -10,10 +10,11 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>JDP</RootNamespace>
     <AssemblyName>ChanThreadWatch</AssemblyName>
-    <TargetFrameworkVersion>v4.6</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <ApplicationIcon>ChanThreadWatch.ico</ApplicationIcon>
     <TargetFrameworkProfile />
+    <LangVersion>8.0</LangVersion>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -51,15 +52,19 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Classes\ExtensionMethods.cs" />
-    <Compile Include="Classes\GUI.cs" />
-    <Compile Include="Classes\HTMLParser.cs" />
+    <Compile Include="Classes\Gui.cs" />
+    <Compile Include="Classes\HtmlParser.cs" />
     <Compile Include="Classes\Other.cs" />
-    <Compile Include="Classes\SiteHelpers.cs" />
+    <Compile Include="Classes\SiteHelper.cs" />
     <Compile Include="Classes\General.cs" />
+    <Compile Include="Classes\SiteHelpers\4chan.cs" />
+    <Compile Include="Classes\SiteHelpers\TwitchVod.cs" />
     <Compile Include="Classes\ThreadList.cs" />
     <Compile Include="Classes\ThreadWatcher.cs" />
     <Compile Include="Classes\TwitchUserWatcher.cs" />
-    <Compile Include="Classes\URLTransformers.cs" />
+    <Compile Include="Classes\UrlTransformer.cs" />
+    <Compile Include="Classes\UrlTransformers\4chan.cs" />
+    <Compile Include="Classes\UrlTransformers\TwitchVod.cs" />
     <Compile Include="frmChanThreadWatch.cs">
       <SubType>Form</SubType>
     </Compile>

@@ -62,7 +62,7 @@ namespace JDP {
 				FileVersion = _currentFileVersion,
 				Threads = _watchers
 					.Select(w => new ThreadWatcherConfig {
-						PageURL = w.PageURL,
+						PageUrl = w.PageUrl,
 						GlobalThreadID = w.GlobalThreadID,
 						AddedOn = w.AddedOn,
 						PageAuth = w.PageAuth,
@@ -99,7 +99,7 @@ namespace JDP {
 	}
 
 	public class ThreadWatcherConfig {
-		public string PageURL { get; set; }
+		public string PageUrl { get; set; }
 		public string GlobalThreadID { get; set; }
 		public DateTime AddedOn { get; set; }
 		public string PageAuth { get; set; }
