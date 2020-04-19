@@ -6,7 +6,7 @@ using System.Text;
 
 namespace JDP {
 	public class SiteHelper_Playlist : SiteHelper, IFilePostprocessor {
-		private const string _playlistFilename = "_playlist.m3u8";
+		private const string _indexFileName = "_index.txt";
 
 		private static readonly string[] _extensions = {
 			".m3u",
@@ -33,50 +33,78 @@ namespace JDP {
 		public override int MinCheckIntervalSeconds =>
 			2;
 
-		public override List<ImageInfo> GetImages(List<ReplaceInfo> replaceList, List<ThumbnailInfo> thumbnailList) {
-			List<ImageInfo> images =
-				(from line in Parser.PreprocessedHtml.Split('\n').Select(l => l.Trim())
-				 where line.Length != 0 &&
-					   !line.StartsWith("#", StringComparison.Ordinal)
-				 let url = General.GetAbsoluteUrl(Uri, line)
-				 select new ImageInfo {
-					 Url = url,
-					 UnsanitizedFileNameCustom = General.CalculateSha1(Encoding.UTF8.GetBytes(General.UrlFileName(url))).ToHexString(false) + ".ts"
-				 }).ToList();
+		public override GetFilesResult GetFiles(List<ReplaceInfo> replaceList) {
+			GetFilesResult result = new GetFilesResult();
 
-			if (images.Count != 0) {
-				string playlistPath = Path.Combine(ThreadDir, _playlistFilename);
-				_seenFileNames ??= File.Exists(playlistPath) ? File.ReadAllLines(playlistPath).ToHashSet() : new HashSet<string>();
-				List<string> newFileNames = images.Select(n => n.FileName).Where(n => !_seenFileNames.Contains(n)).ToList();
-				if (newFileNames.Count != 0) {
-					File.AppendAllLines(playlistPath, newFileNames);
-					_seenFileNames.UnionWith(newFileNames);
+			result.Images.AddRange(
+				from line in Parser.PreprocessedHtml.Split('\n').Select(l => l.Trim())
+				where line.Length != 0 &&
+					  !line.StartsWith("#", StringComparison.Ordinal)
+				let url = General.GetAbsoluteUrl(Uri, line)
+				select new ImageInfo {
+					Url = url,
+					UnsanitizedFileNameCustom = General.CalculateSha1(Encoding.UTF8.GetBytes(line)).ToHexString(false) + ".ts",
+					UnsanitizedOriginalFileName = General.UrlFileName(url)
+				}
+			);
+
+			if (result.Images.Count != 0) {
+				string indexPath = Path.Combine(Watcher.ThreadDownloadDirectory, _indexFileName);
+				_seenFileNames ??= ReadIndexFile(indexPath).Select(f => f.FileName).ToHashSet(StringComparer.OrdinalIgnoreCase);
+				var newFiles = new List<ImageInfo>();
+				foreach (ImageInfo image in result.Images) {
+					if (!_seenFileNames.Add(image.FileName)) continue;
+					newFiles.Add(image);
+				}
+				if (newFiles.Count != 0) {
+					File.AppendAllLines(indexPath, newFiles.Select(f => $"{f.FileName}\t{f.OriginalFileName}"));
 				}
 			}
 
-			return images;
+			return result;
 		}
 
-		public void PostprocessFiles(string downloadDirectory, ProgressReporter onProgress) {
-			string playlistPath = Path.Combine(downloadDirectory, _playlistFilename);
-			if (!File.Exists(playlistPath)) return;
-			List<string> files = File.ReadAllLines(playlistPath).Select(l => Path.Combine(downloadDirectory, l)).ToList();
-			if (files.Count == 0) return;
-			using (FileStream dst = File.Create(Path.Combine(downloadDirectory, "stream.ts"))) {
-				for (int iFile = 0; iFile < files.Count; iFile++) {
-					onProgress((double)iFile / files.Count);
-					using (FileStream src = File.OpenRead(files[iFile])) {
+		public void PostprocessFiles(ThreadWatcher watcher, ProgressReporter onProgress) {
+			string indexPath = Path.Combine(watcher.ThreadDownloadDirectory, _indexFileName);
+			IndexEntry[] files = ReadIndexFile(indexPath);
+			if (files.Length == 0) return;
+			string imageDir = watcher.ImageDownloadDirectory;
+			bool useOriginalName = watcher.UseOriginalFileNames;
+			int fileNameLengthLimit = ThreadWatcher.GetFileNameLengthLimit(imageDir);
+			HashSet<string> processedFileNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+			using (FileStream dst = File.Create(Path.Combine(imageDir, "stream.ts"))) {
+				for (int iFile = 0; iFile < files.Length; iFile++) {
+					onProgress((double)iFile / files.Length);
+					IndexEntry file = files[iFile];
+					string fileName = ThreadWatcher.GetUniqueFileName(ImageInfo.GetEffectiveFileName(
+						file.FileName, file.OriginalFileName, useOriginalName, fileNameLengthLimit), processedFileNames);
+					using (FileStream src = File.OpenRead(Path.Combine(imageDir, fileName))) {
 						src.CopyTo(dst);
 					}
 				}
 			}
-			foreach (string path in files) {
+			foreach (string fileName in processedFileNames) {
+				string path = Path.Combine(imageDir, fileName);
 				try { File.Delete(path); } catch { }
 			}
 		}
-	}
 
-	public interface IFilePostprocessor {
-		void PostprocessFiles(string downloadDirectory, ProgressReporter onProgress);
+		private static IndexEntry[] ReadIndexFile(string path) {
+			if (!File.Exists(path)) {
+				return Array.Empty<IndexEntry>();
+			}
+			return
+				(from line in File.ReadAllLines(path)
+				 let split = line.Split('\t')
+				 select new IndexEntry {
+					 FileName = split[0],
+					 OriginalFileName = split[1]
+				 }).ToArray();
+		}
+
+		private class IndexEntry {
+			public string FileName { get; set; }
+			public string OriginalFileName { get; set; }
+		}
 	}
 }

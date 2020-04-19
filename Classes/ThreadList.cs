@@ -6,7 +6,7 @@ using Newtonsoft.Json;
 
 namespace JDP {
 	public static class ThreadList {
-		private const int _currentFileVersion = 1;
+		private const int _currentFileVersion = 2;
 
 		private static List<ThreadWatcher> _watchers;
 
@@ -41,6 +41,10 @@ namespace JDP {
 			if (data.FileVersion > _currentFileVersion) {
 				throw new Exception("Threads file was created with a newer version of this program.");
 			}
+			else if (data.FileVersion <= 1) {
+				// Skip loading if not backwards compatible
+				return;
+			}
 
 			foreach (ThreadWatcherConfig config in data.Threads) {
 				ThreadWatcher watcher = ThreadWatcher.Create(config);
@@ -60,21 +64,7 @@ namespace JDP {
 
 			ThreadListData data = new ThreadListData {
 				FileVersion = _currentFileVersion,
-				Threads = _watchers
-					.Select(w => new ThreadWatcherConfig {
-						PageUrl = w.PageUrl,
-						GlobalThreadID = w.GlobalThreadID,
-						AddedOn = w.AddedOn,
-						PageAuth = w.PageAuth,
-						ImageAuth = w.ImageAuth,
-						OneTimeDownload = w.OneTimeDownload,
-						CheckIntervalSeconds = w.CheckIntervalSeconds,
-						RelativeDownloadDirectory = General.GetRelativeDirectoryPath(w.ThreadDownloadDirectory, w.BaseDownloadDirectory),
-						PageBaseFileName = w.PageBaseFileName,
-						Description = w.Description,
-						LastImageOn = w.LastImageOn,
-						StopReason = w.IsStopping && w.StopReason != StopReason.Exiting ? w.StopReason : (StopReason?)null
-					}).ToArray()
+				Threads = _watchers.Select(w => w.GetConfig()).ToArray()
 			};
 
 			string path = Path.Combine(Settings.GetSettingsDirectory(), Settings.ThreadsFileName);
@@ -104,6 +94,7 @@ namespace JDP {
 		public DateTime AddedOn { get; set; }
 		public string PageAuth { get; set; }
 		public string ImageAuth { get; set; }
+		public bool UseOriginalFileNames { get; set; }
 		public bool OneTimeDownload { get; set; }
 		public int CheckIntervalSeconds { get; set; }
 		public string RelativeDownloadDirectory { get; set; }

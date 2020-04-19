@@ -7,7 +7,7 @@ using Newtonsoft.Json.Linq;
 
 namespace JDP {
 	public class UrlTransformer_TwitchVod : UrlTransformer {
-		public override string TransformIfRecognized(Uri uri, string auth) {
+		public override UrlTransformResult TransformIfRecognized(Uri uri, string auth) {
 			long videoID = TryParseVideoIDFromUrl(uri) ?? 0;
 			if (videoID == 0) {
 				return null;
@@ -15,7 +15,7 @@ namespace JDP {
 			JsonVodAccessToken accessToken = JObject.Parse(General.DownloadPageToString($"{"https"}://api.twitch.tv/api/vods/{videoID}/access_token", withRequest: AddTwitchApiHeaders)).ToObject<JsonVodAccessToken>();
 			string[] masterPlaylistLines = General.NormalizeNewLines(General.DownloadPageToString($"{"https"}://usher.ttvnw.net/vod/{videoID}?allow_source=true&allow_audio_only=true&allow_spectre=true&player=twitchweb&nauth={Uri.EscapeUriString(accessToken.Token)}&nauthsig={Uri.EscapeUriString(accessToken.Sig)}")).Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
 			Uri playlistUri = new Uri(GetPreferredPlaylistFromMasterPlaylist(masterPlaylistLines));
-			return playlistUri.ToString();
+			return new UrlTransformResult(playlistUri.ToString()) { DefaultDescription = $"Twitch VOD {videoID}" };
 		}
 
 		private static string GetPreferredPlaylistFromMasterPlaylist(string[] lines) {

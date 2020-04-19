@@ -51,36 +51,35 @@ namespace JDP {
 		// new thread and the UI is blocked with a modal dialog.
 		public static void RunWork(Form owner, Action<ProgressReporter> action) {
 			object workSync = new object();
-			using (var waitForm = new frmWait(workSync)) {
-				ExceptionDispatchInfo exception = null;
-				bool triggered = false;
-				Thread thread = new Thread(() => {
-					try {
-						action(waitForm.OnProgress);
-					}
-					catch (Exception ex) {
-						exception = ExceptionDispatchInfo.Capture(ex);
-					}
-					lock (workSync) {
-						if (triggered) {
-							waitForm.OnWorkComplete();
-						}
-						triggered = true;
-					}
-				});
-				thread.Start();
-				if (thread.Join(2)) return;
-				Monitor.Enter(workSync);
-				if (triggered) {
-					Monitor.Exit(workSync);
+			using var waitForm = new frmWait(workSync);
+			ExceptionDispatchInfo exception = null;
+			bool triggered = false;
+			Thread thread = new Thread(() => {
+				try {
+					action(waitForm.OnProgress);
 				}
-				else {
+				catch (Exception ex) {
+					exception = ExceptionDispatchInfo.Capture(ex);
+				}
+				lock (workSync) {
+					if (triggered) {
+						waitForm.OnWorkComplete();
+					}
 					triggered = true;
-					waitForm.ShowDialog(owner);
 				}
-				thread.Join();
-				exception?.Throw();
+			});
+			thread.Start();
+			if (thread.Join(2)) return;
+			Monitor.Enter(workSync);
+			if (triggered) {
+				Monitor.Exit(workSync);
 			}
+			else {
+				triggered = true;
+				waitForm.ShowDialog(owner);
+			}
+			thread.Join();
+			exception?.Throw();
 		}
 	}
 }

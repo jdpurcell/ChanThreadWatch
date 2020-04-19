@@ -22,7 +22,6 @@ namespace JDP {
 
 	public class PageInfo {
 		public string Url { get; }
-		public SiteHelper SiteHelper { get; }
 
 		public DateTime? CacheTime { get; set; }
 		public bool IsFresh { get; set; }
@@ -32,7 +31,6 @@ namespace JDP {
 
 		public PageInfo(string url) {
 			Url = url;
-			SiteHelper = SiteHelper.CreateByUrl(url);
 		}
 	}
 
@@ -49,27 +47,40 @@ namespace JDP {
 		public string FileName => General.CleanFileName(UnsanitizedFileName);
 
 		public string OriginalFileName => General.CleanFileName(UnsanitizedOriginalFileName);
-	}
 
-	public class DownloadInfo {
-		public string FileName { get; set; }
-		public bool Skipped { get; set; }
+		public string GetEffectiveFileName(bool useOriginalFileName, int lengthLimit) {
+			return GetEffectiveFileName(FileName, OriginalFileName, useOriginalFileName, lengthLimit);
+		}
+
+		public static string GetEffectiveFileName(string fileName, string originalFileName, bool useOriginalFileName, int lengthLimit) {
+			if (lengthLimit <= 0) {
+				throw new ArgumentException();
+			}
+			string value = useOriginalFileName ? originalFileName.NullIfEmpty() ?? fileName : fileName;
+			if (value.Length > lengthLimit) {
+				string nameNoExtension = Path.GetFileNameWithoutExtension(value);
+				string extension = Path.GetExtension(value);
+				value = extension.Length <= lengthLimit ? nameNoExtension.Substring(0, lengthLimit - extension.Length) + extension : value.Substring(0, lengthLimit);
+			}
+			return value;
+		}
 	}
 
 	public class ThumbnailInfo {
 		public string Url { get; set; }
 		public string Referer { get; set; }
 
-		public string FileName {
-			get {
-				return General.CleanFileName(General.UrlFileName(Url));
-			}
-		}
+		public string FileName => General.CleanFileName(General.UrlFileName(Url));
 	}
 
-	public class FilePostprocessingTask {
-		public IFilePostprocessor SiteHelper { get; set; }
-		public string DownloadDirectory { get; set; }
+	public class GetFilesResult {
+		public List<ImageInfo> Images { get; } = new List<ImageInfo>();
+		public List<ThumbnailInfo> Thumbnails { get; } = new List<ThumbnailInfo>();
+	}
+
+	public class DownloadInfo {
+		public string FileName { get; set; }
+		public bool Skipped { get; set; }
 	}
 
 	public class Http404Exception : Exception {

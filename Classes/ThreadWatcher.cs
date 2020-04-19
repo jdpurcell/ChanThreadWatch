@@ -13,13 +13,13 @@ using System.Web;
 namespace JDP {
 	public class ThreadWatcher {
 		private const int _maxDownloadTries = 3;
+		private const int _fileNameSuffixPlaceholderLength = 4;
 
 		private static readonly WorkScheduler _workScheduler = new WorkScheduler();
 
 		private readonly object _settingsSync = new object();
 		private readonly Dictionary<long, Action> _downloadAborters = new Dictionary<long, Action>();
 		private readonly ManualResetEvent _checkFinishedEvent = new ManualResetEvent(true);
-		private readonly int _minCheckIntervalSeconds;
 		private WorkScheduler.WorkItem _nextCheckWorkItem;
 		private bool _isStopping;
 		private StopReason _stopReason;
@@ -36,19 +36,20 @@ namespace JDP {
 		private DateTime? _lastImageOn;
 		private object _tag;
 
-		private ThreadWatcher(ThreadWatcherConfig config) {
-			SiteHelper siteHelper = SiteHelper.CreateByUrl(config.PageUrl);
+		private ThreadWatcher(SiteHelper siteHelper, ThreadWatcherConfig config) {
+			SiteHelper = siteHelper;
 			PageUrl = config.PageUrl;
 			PageHost = new Uri(PageUrl).Host;
 			GlobalThreadID = config.GlobalThreadID;
 			AddedOn = config.AddedOn;
 			BaseDownloadDirectory = Settings.AbsoluteDownloadDirectory;
 			PageBaseFileName = config.PageBaseFileName;
+			UseOriginalFileNames = config.UseOriginalFileNames;
+			MinCheckIntervalSeconds = siteHelper.MinCheckIntervalSeconds;
 			_pageAuth = config.PageAuth;
 			_imageAuth = config.ImageAuth;
 			_oneTimeDownload = config.OneTimeDownload;
-			_minCheckIntervalSeconds = siteHelper.MinCheckIntervalSeconds;
-			_checkIntervalSeconds = Math.Max(config.CheckIntervalSeconds, _minCheckIntervalSeconds);
+			_checkIntervalSeconds = Math.Max(config.CheckIntervalSeconds, MinCheckIntervalSeconds);
 			_description = config.Description;
 			_lastImageOn = config.LastImageOn;
 			_threadDownloadDirectory = config.RelativeDownloadDirectory != null ?
@@ -59,37 +60,45 @@ namespace JDP {
 			}
 		}
 
-		public static ThreadWatcher Create(string pageUrl, string pageAuth, string imageAuth, bool oneTimeDownload, int checkIntervalSeconds, string description = null) {
-			SiteHelper siteHelper = SiteHelper.CreateByUrl(pageUrl);
+		public static ThreadWatcher Create(SiteHelper siteHelper, string pageUrl, string pageAuth, string imageAuth, bool oneTimeDownload, int checkIntervalSeconds, string description = null) {
 			string globalThreadID = siteHelper.GetGlobalThreadID();
-			return new ThreadWatcher(new ThreadWatcherConfig {
+			ThreadWatcherConfig config = new ThreadWatcherConfig {
 				PageUrl = pageUrl,
 				GlobalThreadID = globalThreadID,
 				AddedOn = DateTime.UtcNow,
 				PageAuth = pageAuth,
 				ImageAuth = imageAuth,
+				UseOriginalFileNames = Settings.UseOriginalFileNames,
 				OneTimeDownload = oneTimeDownload,
 				CheckIntervalSeconds = checkIntervalSeconds,
 				PageBaseFileName = General.CleanFileName(siteHelper.GetThreadName()),
 				Description = description ?? globalThreadID
-			});
+			};
+			return new ThreadWatcher(siteHelper, config);
 		}
 
 		public static ThreadWatcher Create(ThreadWatcherConfig config) {
-			return new ThreadWatcher(config);
+			SiteHelper siteHelper = SiteHelper.CreateByUrl(config.PageUrl);
+			return new ThreadWatcher(siteHelper, config);
 		}
+
+		public SiteHelper SiteHelper { get; }
 
 		public string PageUrl { get; }
 
-		public string PageHost { get; }
+		private string PageHost { get; }
 
 		public string GlobalThreadID { get; }
 
-		public string BaseDownloadDirectory { get; }
+		private string BaseDownloadDirectory { get; }
 
-		public string PageBaseFileName { get; }
+		private string PageBaseFileName { get; }
 
 		public DateTime AddedOn { get; }
+
+		public bool UseOriginalFileNames { get; }
+
+		private int MinCheckIntervalSeconds { get; }
 
 		public string PageAuth {
 			get { lock (_settingsSync) { return _pageAuth; } }
@@ -110,7 +119,7 @@ namespace JDP {
 			get { lock (_settingsSync) { return _checkIntervalSeconds; } }
 			set {
 				lock (_settingsSync) {
-					value = Math.Max(value, _minCheckIntervalSeconds);
+					value = Math.Max(value, MinCheckIntervalSeconds);
 					int changeAmount = value - _checkIntervalSeconds;
 					_checkIntervalSeconds = value;
 					NextCheckTicks += changeAmount * 1000;
@@ -121,6 +130,12 @@ namespace JDP {
 		public string ThreadDownloadDirectory {
 			get { lock (_settingsSync) { return _threadDownloadDirectory; } }
 		}
+
+		public string ImageDownloadDirectory =>
+			ThreadDownloadDirectory;
+
+		public string ThumbnailDownloadDirectory =>
+			Path.Combine(ThreadDownloadDirectory, "thumbs");
 
 		private bool IsThreadDownloadDirectoryPendingRename {
 			get {
@@ -178,6 +193,26 @@ namespace JDP {
 					throw new Exception("This setting cannot be changed while the watcher is running.");
 				}
 				field = value;
+			}
+		}
+
+		public ThreadWatcherConfig GetConfig() {
+			lock (_settingsSync) {
+				return new ThreadWatcherConfig {
+					PageUrl = PageUrl,
+					GlobalThreadID = GlobalThreadID,
+					AddedOn = AddedOn,
+					PageAuth = PageAuth,
+					ImageAuth = ImageAuth,
+					UseOriginalFileNames = UseOriginalFileNames,
+					OneTimeDownload = OneTimeDownload,
+					CheckIntervalSeconds = CheckIntervalSeconds,
+					RelativeDownloadDirectory = General.GetRelativeDirectoryPath(ThreadDownloadDirectory, BaseDownloadDirectory),
+					PageBaseFileName = PageBaseFileName,
+					Description = Description,
+					LastImageOn = LastImageOn,
+					StopReason = IsStopping && StopReason != StopReason.Exiting ? StopReason : (StopReason?)null
+				};
 			}
 		}
 
@@ -313,40 +348,45 @@ namespace JDP {
 		private Dictionary<string, DownloadInfo> _completedThumbs;
 		private bool _anyPendingRetries;
 		private string _previousImageDir;
-		private int _maxImageFileNameLength;
+		private int? _imageFileNameLengthLimit;
 
 		private void Check() {
 			try {
-				try {
-					lock (_settingsSync) {
-						_nextCheckWorkItem = null;
-						_checkFinishedEvent.Reset();
-						_isWaiting = false;
+				lock (_settingsSync) {
+					_nextCheckWorkItem = null;
+					_checkFinishedEvent.Reset();
+					_isWaiting = false;
 
-						if (!_hasInitialized) {
-							_pageList = new List<PageInfo> {
-								new PageInfo(PageUrl)
-							};
-							_imageDiskFileNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-							_completedImages = new Dictionary<string, DownloadInfo>(StringComparer.OrdinalIgnoreCase);
-							_completedThumbs = new Dictionary<string, DownloadInfo>(StringComparer.OrdinalIgnoreCase);
+					if (!_hasInitialized) {
+						_pageList = new List<PageInfo> {
+							new PageInfo(PageUrl)
+						};
+						_imageDiskFileNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+						_completedImages = new Dictionary<string, DownloadInfo>(StringComparer.OrdinalIgnoreCase);
+						_completedThumbs = new Dictionary<string, DownloadInfo>(StringComparer.OrdinalIgnoreCase);
 
-							Directory.CreateDirectory(_threadDownloadDirectory);
+						CreateDirectory(_threadDownloadDirectory);
 
-							_hasInitialized = true;
-						}
+						_hasInitialized = true;
 					}
-				}
-				catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) {
-					Stop(StopReason.IOError);
 				}
 
 				string threadDir = ThreadDownloadDirectory;
-				string imageDir = ThreadDownloadDirectory;
-				string thumbDir = Path.Combine(ThreadDownloadDirectory, "thumbs");
+				string imageDir = ImageDownloadDirectory;
+				string thumbDir = ThumbnailDownloadDirectory;
 
 				Queue<ImageInfo> pendingImages = new Queue<ImageInfo>();
 				Queue<ThumbnailInfo> pendingThumbs = new Queue<ThumbnailInfo>();
+
+				if (imageDir != _previousImageDir) {
+					// If the image directory changed, recalculate the maximum filename length. This
+					// affects the generated filenames, so rescan the files as well.
+					_imageFileNameLengthLimit = null;
+					_previousImageDir = imageDir;
+					_imageDiskFileNames.Clear();
+					_completedImages.Clear();
+					_completedThumbs.Clear();
+				}
 
 				foreach (PageInfo pageInfo in _pageList) {
 					// Reset the fresh flag on all of the pages before downloading starts so that
@@ -365,7 +405,7 @@ namespace JDP {
 					pageInfo.Path = Path.Combine(threadDir, saveFileName);
 
 					ManualResetEvent downloadEndEvent = new ManualResetEvent(false);
-					DownloadPageEndCallback downloadEnd = (result, content, lastModifiedTime, encoding) => {
+					void DownloadEndCallback(DownloadResult result, string content, DateTime? lastModifiedTime, Encoding encoding) {
 						if (result == DownloadResult.Completed) {
 							pageInfo.IsFresh = true;
 							pageParser = new HtmlParser(content);
@@ -374,8 +414,8 @@ namespace JDP {
 							pageInfo.ReplaceList = Settings.SaveThumbnails ? new List<ReplaceInfo>() : null;
 						}
 						downloadEndEvent.Set();
-					};
-					DownloadPageAsync(pageInfo.Path, pageInfo.Url, PageAuth, _anyPendingRetries ? null : pageInfo.CacheTime, downloadEnd);
+					}
+					DownloadPageAsync(pageInfo.Path, pageInfo.Url, PageAuth, _anyPendingRetries ? null : pageInfo.CacheTime, DownloadEndCallback);
 					downloadEndEvent.WaitOne();
 					downloadEndEvent.Close();
 
@@ -383,37 +423,31 @@ namespace JDP {
 						anyPageSkipped = true;
 					}
 					else {
-						SiteHelper siteHelper = pageInfo.SiteHelper;
+						SiteHelper.SetParameters(this, pageParser);
 
-						siteHelper.SetParameters(pageParser, threadDir);
+						GetFilesResult getFilesResult = SiteHelper.GetFiles(pageInfo.ReplaceList);
 
-						List<ThumbnailInfo> thumbs = new List<ThumbnailInfo>();
-						List<ImageInfo> images = siteHelper.GetImages(pageInfo.ReplaceList, thumbs);
 						if (_completedImages.Count == 0) {
-							foreach (ImageInfo image in images) {
-								for (int iName = 0; iName < 2; iName++) {
-									string baseFileName = (iName == 0) ? image.OriginalFileName : image.FileName;
-									string baseFileNameNoExtension = Path.GetFileNameWithoutExtension(baseFileName);
-									string baseExtension = Path.GetExtension(baseFileName);
-									int iSuffix = 1;
-									string fileName;
-									do {
-										fileName = baseFileNameNoExtension + (iSuffix == 1 ? "" : $"_{iSuffix}") + baseExtension;
-										iSuffix++;
-									}
-									while (_imageDiskFileNames.Contains(fileName));
-									string path = Path.Combine(imageDir, fileName);
-									if (File.Exists(path)) {
-										_imageDiskFileNames.Add(fileName);
-										_completedImages[image.FileName] = new DownloadInfo {
-											FileName = fileName,
-											Skipped = false
-										};
-										break;
-									}
+							if (getFilesResult.Images.Count != 0) {
+								CreateDirectory(imageDir);
+								_imageFileNameLengthLimit ??= GetFileNameLengthLimit(imageDir);
+							}
+							if (getFilesResult.Thumbnails.Count != 0) {
+								CreateDirectory(thumbDir);
+							}
+							foreach (ImageInfo image in getFilesResult.Images) {
+								string fileName = GetUniqueFileName(image.GetEffectiveFileName(UseOriginalFileNames, _imageFileNameLengthLimit.Value), _imageDiskFileNames, true);
+								string path = Path.Combine(imageDir, fileName);
+								if (File.Exists(path)) {
+									_imageDiskFileNames.Add(fileName);
+									_completedImages[image.FileName] = new DownloadInfo {
+										FileName = fileName,
+										Skipped = false
+									};
+									break;
 								}
 							}
-							foreach (ThumbnailInfo thumb in thumbs) {
+							foreach (ThumbnailInfo thumb in getFilesResult.Thumbnails) {
 								string path = Path.Combine(thumbDir, thumb.FileName);
 								if (File.Exists(path)) {
 									_completedThumbs[thumb.FileName] = new DownloadInfo {
@@ -423,18 +457,20 @@ namespace JDP {
 								}
 							}
 						}
-						foreach (ImageInfo image in images) {
-							if (!_completedImages.ContainsKey(image.FileName)) {
-								pendingImages.Enqueue(image);
-							}
+						HashSet<string> pendingImageFileNames = new HashSet<string>(_completedImages.Comparer);
+						foreach (ImageInfo image in getFilesResult.Images) {
+							if (_completedImages.ContainsKey(image.FileName)) continue;
+							if (!pendingImageFileNames.Add(image.FileName)) continue;
+							pendingImages.Enqueue(image);
 						}
-						foreach (ThumbnailInfo thumb in thumbs) {
-							if (!_completedThumbs.ContainsKey(thumb.FileName)) {
-								pendingThumbs.Enqueue(thumb);
-							}
+						HashSet<string> pendingThumbFileNames = new HashSet<string>(_completedThumbs.Comparer);
+						foreach (ThumbnailInfo thumb in getFilesResult.Thumbnails) {
+							if (_completedThumbs.ContainsKey(thumb.FileName)) continue;
+							if (!pendingThumbFileNames.Add(thumb.FileName)) continue;
+							pendingThumbs.Enqueue(thumb);
 						}
 
-						string nextPageUrl = siteHelper.GetNextPageUrl();
+						string nextPageUrl = SiteHelper.GetNextPageUrl();
 						if (!String.IsNullOrEmpty(nextPageUrl)) {
 							PageInfo nextPageInfo = new PageInfo(nextPageUrl);
 							if (pageIndex == _pageList.Count - 1) {
@@ -462,11 +498,6 @@ namespace JDP {
 					LastImageOn = DateTime.UtcNow;
 					OnFoundNewImage(EventArgs.Empty);
 
-					if (imageDir != _previousImageDir) {
-						_maxImageFileNameLength = General.GetMaximumFileNameLength(imageDir);
-						_previousImageDir = imageDir;
-					}
-
 					List<ManualResetEvent> downloadEndEvents = new List<ManualResetEvent>();
 					int completedImageCount = 0;
 					foreach (KeyValuePair<string, DownloadInfo> item in _completedImages) {
@@ -475,49 +506,17 @@ namespace JDP {
 					int totalImageCount = completedImageCount + pendingImages.Count;
 					OnDownloadStatus(new DownloadStatusEventArgs(DownloadType.Image, completedImageCount, totalImageCount));
 					while (pendingImages.Count != 0 && !IsStopping) {
-						string saveFileNameNoExtension;
-						string saveExtension;
-						string savePath;
 						ImageInfo image = pendingImages.Dequeue();
-						bool pathTooLong = false;
-
-						void ConfigureSaveFileName(string fileName) {
-							saveFileNameNoExtension = Path.GetFileNameWithoutExtension(fileName);
-							saveExtension = Path.GetExtension(fileName);
-						}
-
-					MakeImagePath:
-						if (!String.IsNullOrEmpty(image.OriginalFileName) && Settings.UseOriginalFileNames && !pathTooLong) {
-							ConfigureSaveFileName(image.OriginalFileName);
-						}
-						else {
-							ConfigureSaveFileName(image.FileName);
-						}
-
-						int iSuffix = 1;
-						bool fileNameTaken;
-						string saveFileName;
-						do {
-							saveFileName = saveFileNameNoExtension + (iSuffix == 1 ? "" : $"_{iSuffix}") + saveExtension;
-							savePath = Path.Combine(imageDir, saveFileName);
-							fileNameTaken = _imageDiskFileNames.Contains(saveFileName);
-							iSuffix++;
-						}
-						while (fileNameTaken);
-
-						if (saveFileName.Length > _maxImageFileNameLength && !pathTooLong) {
-							pathTooLong = true;
-							goto MakeImagePath;
-						}
-						_imageDiskFileNames.Add(saveFileName);
+						string fileName = GetUniqueFileName(image.GetEffectiveFileName(UseOriginalFileNames, _imageFileNameLengthLimit.Value), _imageDiskFileNames);
+						string path = Path.Combine(imageDir, fileName);
 
 						HashType hashType = Settings.VerifyImageHashes ? image.HashType : HashType.None;
 						ManualResetEvent downloadEndEvent = new ManualResetEvent(false);
-						DownloadFileEndCallback onDownloadEnd = (result) => {
+						void DownloadEndCallback(DownloadResult result) {
 							if (result == DownloadResult.Completed || result == DownloadResult.Skipped) {
 								lock (_completedImages) {
 									_completedImages[image.FileName] = new DownloadInfo {
-										FileName = saveFileName,
+										FileName = fileName,
 										Skipped = (result == DownloadResult.Skipped)
 									};
 									if (result == DownloadResult.Completed) {
@@ -531,16 +530,16 @@ namespace JDP {
 							}
 							if (result == DownloadResult.Skipped || result == DownloadResult.RetryLater) {
 								lock (_imageDiskFileNames) {
-									_imageDiskFileNames.Remove(saveFileName);
+									_imageDiskFileNames.Remove(fileName);
 									if (result == DownloadResult.RetryLater) {
 										_anyPendingRetries = true;
 									}
 								}
 							}
 							downloadEndEvent.Set();
-						};
+						}
 						downloadEndEvents.Add(downloadEndEvent);
-						DownloadFileAsync(savePath, image.Url, ImageAuth, image.Referer, hashType, image.Hash, onDownloadEnd);
+						DownloadFileAsync(path, image.Url, ImageAuth, image.Referer, hashType, image.Hash, DownloadEndCallback);
 					}
 					foreach (ManualResetEvent downloadEndEvent in downloadEndEvents) {
 						downloadEndEvent.WaitOne();
@@ -550,13 +549,6 @@ namespace JDP {
 
 				if (Settings.SaveThumbnails) {
 					if (pendingThumbs.Count != 0 && !IsStopping) {
-						try {
-							Directory.CreateDirectory(thumbDir);
-						}
-						catch {
-							Stop(StopReason.IOError);
-						}
-
 						List<ManualResetEvent> downloadEndEvents = new List<ManualResetEvent>();
 						int completedThumbCount = 0;
 						foreach (KeyValuePair<string, DownloadInfo> item in _completedThumbs) {
@@ -566,10 +558,10 @@ namespace JDP {
 						OnDownloadStatus(new DownloadStatusEventArgs(DownloadType.Thumbnail, completedThumbCount, totalThumbCount));
 						while (pendingThumbs.Count != 0 && !IsStopping) {
 							ThumbnailInfo thumb = pendingThumbs.Dequeue();
-							string savePath = Path.Combine(thumbDir, thumb.FileName);
+							string path = Path.Combine(thumbDir, thumb.FileName);
 
 							ManualResetEvent downloadEndEvent = new ManualResetEvent(false);
-							DownloadFileEndCallback onDownloadEnd = (result) => {
+							void DownloadEndCallback(DownloadResult result) {
 								if (result == DownloadResult.Completed || result == DownloadResult.Skipped) {
 									lock (_completedThumbs) {
 										_completedThumbs[thumb.FileName] = new DownloadInfo {
@@ -586,9 +578,9 @@ namespace JDP {
 									}
 								}
 								downloadEndEvent.Set();
-							};
+							}
 							downloadEndEvents.Add(downloadEndEvent);
-							DownloadFileAsync(savePath, thumb.Url, PageAuth, thumb.Referer, HashType.None, null, onDownloadEnd);
+							DownloadFileAsync(path, thumb.Url, PageAuth, thumb.Referer, HashType.None, null, DownloadEndCallback);
 						}
 						foreach (ManualResetEvent downloadEndEvent in downloadEndEvents) {
 							downloadEndEvent.WaitOne();
@@ -603,15 +595,13 @@ namespace JDP {
 							for (int i = 0; i < pageInfo.ReplaceList.Count; i++) {
 								ReplaceInfo replace = pageInfo.ReplaceList[i];
 								DownloadInfo downloadInfo = null;
-								Func<string, string> getRelativeDownloadPath = (fileDownloadDir) => {
-									return General.GetRelativeFilePath(Path.Combine(fileDownloadDir, downloadInfo.FileName),
-										threadDir).Replace(Path.DirectorySeparatorChar, '/');
-								};
+								string GetRelativeDownloadPath(string fileDownloadDir) =>
+									General.GetRelativeFilePath(Path.Combine(fileDownloadDir, downloadInfo.FileName), threadDir).Replace(Path.DirectorySeparatorChar, '/');
 								if (replace.Type == ReplaceType.ImageLinkHref && _completedImages.TryGetValue(replace.Tag, out downloadInfo)) {
-									replace.Value = "href=\"" + HttpUtility.HtmlAttributeEncode(getRelativeDownloadPath(imageDir)) + "\"";
+									replace.Value = "href=\"" + HttpUtility.HtmlAttributeEncode(GetRelativeDownloadPath(imageDir)) + "\"";
 								}
 								if (replace.Type == ReplaceType.ImageSrc && _completedThumbs.TryGetValue(replace.Tag, out downloadInfo)) {
-									replace.Value = "src=\"" + HttpUtility.HtmlAttributeEncode(getRelativeDownloadPath(thumbDir)) + "\"";
+									replace.Value = "src=\"" + HttpUtility.HtmlAttributeEncode(GetRelativeDownloadPath(thumbDir)) + "\"";
 								}
 							}
 							General.AddOtherReplaces(htmlParser, pageInfo.Url, pageInfo.ReplaceList);
@@ -649,6 +639,15 @@ namespace JDP {
 			}
 			else if (IsWaiting) {
 				OnWaitStatus(EventArgs.Empty);
+			}
+		}
+
+		private void CreateDirectory(string directory) {
+			try {
+				Directory.CreateDirectory(directory);
+			}
+			catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) {
+				Stop(StopReason.IOError);
 			}
 		}
 
@@ -692,7 +691,7 @@ namespace JDP {
 			}
 		}
 
-		private void DownloadPageAsync(string path, string url, string auth, DateTime? cacheLastModifiedTime, DownloadPageEndCallback onDownloadEnd) {
+		private void DownloadPageAsync(string path, string url, string auth, DateTime? cacheLastModifiedTime, DownloadPageEndCallback downloadEndCallback) {
 			ConnectionManager connectionManager = ConnectionManager.GetInstance(url);
 			string connectionGroupName = connectionManager.ObtainConnectionGroupName();
 
@@ -700,21 +699,20 @@ namespace JDP {
 			int tryNumber = 0;
 			long? prevDownloadedFileSize = null;
 
-			Action tryDownload = null;
-			tryDownload = () => {
+			void TryDownload() {
 				string httpContentType = null;
 				DateTime? lastModifiedTime = null;
 				Encoding encoding = null;
 				string content = null;
 
-				Action<DownloadResult> endTryDownload = (result) => {
+				void EndTryDownload(DownloadResult result) {
 					connectionManager.ReleaseConnectionGroupName(connectionGroupName);
-					onDownloadEnd(result, content, lastModifiedTime, encoding);
-				};
+					downloadEndCallback(result, content, lastModifiedTime, encoding);
+				}
 
 				tryNumber++;
 				if (IsStopping || tryNumber > _maxDownloadTries) {
-					endTryDownload(DownloadResult.RetryLater);
+					EndTryDownload(DownloadResult.RetryLater);
 					return;
 				}
 
@@ -725,7 +723,7 @@ namespace JDP {
 				bool createdFile = false;
 				MemoryStream memoryStream = null;
 				bool removedDownloadAborter = false;
-				Action<bool> cleanup = (successful) => {
+				void Cleanup(bool successful) {
 					if (fileStream != null) try { fileStream.Close(); } catch { }
 					if (memoryStream != null) try { memoryStream.Close(); } catch { }
 					if (!successful && createdFile) {
@@ -738,7 +736,7 @@ namespace JDP {
 						_downloadAborters.Remove(downloadID);
 						removedDownloadAborter = true;
 					}
-				};
+				}
 
 				Action abortDownload = General.DownloadAsync(url, auth, null, connectionGroupName, cacheLastModifiedTime,
 					(response) => {
@@ -777,33 +775,33 @@ namespace JDP {
 							prevDownloadedFileSize = downloadedFileSize;
 							throw new Exception("Download is corrupt.");
 						}
-						cleanup(true);
+						Cleanup(true);
 						OnDownloadEnd(new DownloadEndEventArgs(downloadID, downloadedFileSize, true));
 						encoding = General.DetectHtmlEncoding(pageBytes, httpContentType);
 						content = encoding.GetString(pageBytes);
-						endTryDownload(DownloadResult.Completed);
+						EndTryDownload(DownloadResult.Completed);
 					},
 					(ex) => {
-						cleanup(false);
+						Cleanup(false);
 						OnDownloadEnd(new DownloadEndEventArgs(downloadID, downloadedFileSize, false));
 						if (ex is Http304Exception) {
 							// Page not modified, skip
-							endTryDownload(DownloadResult.Skipped);
+							EndTryDownload(DownloadResult.Skipped);
 						}
 						else if (ex is Http404Exception) {
 							// Page not found, stop
 							Stop(StopReason.PageNotFound);
-							endTryDownload(DownloadResult.Skipped);
+							EndTryDownload(DownloadResult.Skipped);
 						}
 						else if (ex is IOException || ex is UnauthorizedAccessException) {
 							// Fatal IO error, stop
 							Stop(StopReason.IOError);
-							endTryDownload(DownloadResult.Skipped);
+							EndTryDownload(DownloadResult.Skipped);
 						}
 						else {
 							// Other error, retry
 							connectionGroupName = connectionManager.SwapForFreshConnection(connectionGroupName, url);
-							tryDownload();
+							TryDownload();
 						}
 					});
 
@@ -812,12 +810,12 @@ namespace JDP {
 						_downloadAborters[downloadID] = abortDownload;
 					}
 				}
-			};
+			}
 
-			tryDownload();
+			TryDownload();
 		}
 
-		private void DownloadFileAsync(string path, string url, string auth, string referer, HashType hashType, byte[] correctHash, DownloadFileEndCallback onDownloadEnd) {
+		private void DownloadFileAsync(string path, string url, string auth, string referer, HashType hashType, byte[] correctHash, DownloadFileEndCallback downloadEndCallback) {
 			ConnectionManager connectionManager = ConnectionManager.GetInstance(url);
 			string connectionGroupName = connectionManager.ObtainConnectionGroupName();
 
@@ -825,16 +823,15 @@ namespace JDP {
 			byte[] prevHash = null;
 			long? prevDownloadedFileSize = null;
 
-			Action tryDownload = null;
-			tryDownload = () => {
-				Action<DownloadResult> endTryDownload = (result) => {
+			void TryDownload() {
+				void EndTryDownload(DownloadResult result) {
 					connectionManager.ReleaseConnectionGroupName(connectionGroupName);
-					onDownloadEnd(result);
-				};
+					downloadEndCallback(result);
+				}
 
 				tryNumber++;
 				if (IsStopping || tryNumber > _maxDownloadTries) {
-					endTryDownload(DownloadResult.RetryLater);
+					EndTryDownload(DownloadResult.RetryLater);
 					return;
 				}
 
@@ -845,7 +842,7 @@ namespace JDP {
 				bool createdFile = false;
 				HashGeneratorStream hashStream = null;
 				bool removedDownloadAborter = false;
-				Action<bool> cleanup = (successful) => {
+				void Cleanup(bool successful) {
 					if (fileStream != null) try { fileStream.Close(); } catch { }
 					if (hashStream != null) try { hashStream.Close(); } catch { }
 					if (!successful && createdFile) {
@@ -855,7 +852,7 @@ namespace JDP {
 						_downloadAborters.Remove(downloadID);
 						removedDownloadAborter = true;
 					}
-				};
+				}
 
 				Action abortDownload = General.DownloadAsync(url, auth, referer, connectionGroupName, null,
 					(response) => {
@@ -891,26 +888,26 @@ namespace JDP {
 							prevDownloadedFileSize = downloadedFileSize;
 							throw new Exception("Download is corrupt.");
 						}
-						cleanup(true);
+						Cleanup(true);
 						OnDownloadEnd(new DownloadEndEventArgs(downloadID, downloadedFileSize, true));
-						endTryDownload(DownloadResult.Completed);
+						EndTryDownload(DownloadResult.Completed);
 					},
 					(ex) => {
-						cleanup(false);
+						Cleanup(false);
 						OnDownloadEnd(new DownloadEndEventArgs(downloadID, downloadedFileSize, false));
 						if (ex is DirectoryNotFoundException || ex is UnauthorizedAccessException) {
 							// Fatal IO error, stop
 							Stop(StopReason.IOError);
-							endTryDownload(DownloadResult.Skipped);
+							EndTryDownload(DownloadResult.Skipped);
 						}
 						else if (ex is Http404Exception) {
 							// Fatal problem with this file, skip
-							endTryDownload(DownloadResult.Skipped);
+							EndTryDownload(DownloadResult.Skipped);
 						}
 						else {
 							// Other error, retry
 							connectionGroupName = connectionManager.SwapForFreshConnection(connectionGroupName, url);
-							tryDownload();
+							TryDownload();
 						}
 					});
 
@@ -919,9 +916,29 @@ namespace JDP {
 						_downloadAborters[downloadID] = abortDownload;
 					}
 				}
-			};
+			}
 
-			tryDownload();
+			TryDownload();
+		}
+
+		public static int GetFileNameLengthLimit(string directory) {
+			return General.GetMaximumFileNameLength(directory) - _fileNameSuffixPlaceholderLength;
+		}
+
+		public static string GetUniqueFileName(string fileName, ISet<string> takenFileNames, bool isPeeking = false) {
+			string nameNoExtension = Path.GetFileNameWithoutExtension(fileName);
+			string extension = Path.GetExtension(fileName);
+			int iSuffix = 1;
+			string uniqueFileName;
+			do {
+				uniqueFileName = nameNoExtension + (iSuffix == 1 ? "" : $"_{iSuffix}") + extension;
+				iSuffix++;
+			}
+			while (takenFileNames.Contains(uniqueFileName));
+			if (!isPeeking) {
+				takenFileNames.Add(uniqueFileName);
+			}
+			return uniqueFileName;
 		}
 	}
 }

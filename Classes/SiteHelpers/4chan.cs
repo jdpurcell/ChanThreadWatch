@@ -20,8 +20,8 @@ namespace JDP {
 			return base.GetThreadName();
 		}
 
-		public override List<ImageInfo> GetImages(List<ReplaceInfo> replaceList, List<ThumbnailInfo> thumbnailList) {
-			List<ImageInfo> imageList = new List<ImageInfo>();
+		public override GetFilesResult GetFiles(List<ReplaceInfo> replaceList) {
+			GetFilesResult result = new GetFilesResult();
 			bool seenSpoiler = false;
 
 			foreach (HtmlTagRange postTagRange in Parser.FindStartTags("div").Where(t => HtmlParser.ClassAttributeValueHas(t, "post"))
@@ -120,15 +120,15 @@ namespace JDP {
 					}
 				}
 
-				imageList.Add(image);
+				result.Images.Add(image);
 
 				if (!isSpoiler || !seenSpoiler) {
-					thumbnailList.Add(thumb);
+					result.Thumbnails.Add(thumb);
 					if (isSpoiler) seenSpoiler = true;
 				}
 			}
 
-			return imageList;
+			return result;
 		}
 	}
 }

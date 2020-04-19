@@ -14,9 +14,9 @@ namespace JDP {
 
 		protected string[] UrlPathComponents { get; private set; }
 
-		protected HtmlParser Parser { get; private set; }
+		protected ThreadWatcher Watcher { get; private set; }
 
-		protected string ThreadDir { get; private set; }
+		protected HtmlParser Parser { get; private set; }
 
 		static SiteHelper() {
 			_siteHelpers =
@@ -52,9 +52,9 @@ namespace JDP {
 			UrlPathComponents = General.GetUrlPathComponents(Uri);
 		}
 
-		public void SetParameters(HtmlParser htmlParser, string threadDir) {
+		public void SetParameters(ThreadWatcher watcher, HtmlParser htmlParser) {
+			Watcher = watcher;
 			Parser = htmlParser;
-			ThreadDir = threadDir;
 		}
 
 		public virtual string GetSiteName() {
@@ -83,16 +83,20 @@ namespace JDP {
 			return !String.IsNullOrEmpty(boardName) ? $"{siteName}_{boardName}_{threadName}" : $"{siteName}_{threadName}";
 		}
 
+		public virtual string GetDefaultDescription() {
+			return null;
+		}
+
 		public virtual int MinCheckIntervalSeconds =>
 			30;
 
 		protected virtual string ImageUrlKeyword =>
 			"/src/";
 
-		public virtual List<ImageInfo> GetImages(List<ReplaceInfo> replaceList, List<ThumbnailInfo> thumbnailList) {
+		public virtual GetFilesResult GetFiles(List<ReplaceInfo> replaceList) {
+			GetFilesResult result = new GetFilesResult();
 			HashSet<string> imageFileNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 			HashSet<string> thumbnailFileNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-			List<ImageInfo> imageList = new List<ImageInfo>();
 			HtmlAttribute attribute;
 			string url;
 			int pos;
@@ -150,20 +154,24 @@ namespace JDP {
 				}
 
 				if (!imageFileNames.Contains(image.FileName)) {
-					imageList.Add(image);
+					result.Images.Add(image);
 					imageFileNames.Add(image.FileName);
 				}
 				if (thumb != null && !thumbnailFileNames.Contains(thumb.FileName)) {
-					thumbnailList.Add(thumb);
+					result.Thumbnails.Add(thumb);
 					thumbnailFileNames.Add(thumb.FileName);
 				}
 			}
 
-			return imageList;
+			return result;
 		}
 
 		public virtual string GetNextPageUrl() {
 			return null;
 		}
+	}
+
+	public interface IFilePostprocessor {
+		void PostprocessFiles(ThreadWatcher watcher, ProgressReporter onProgress);
 	}
 }

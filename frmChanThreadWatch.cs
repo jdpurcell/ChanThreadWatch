@@ -286,7 +286,7 @@ namespace JDP {
 				(watcher) => {
 					string dir = watcher.ThreadDownloadDirectory;
 					if (dir == null) return;
-					Directory.Delete(watcher.ThreadDownloadDirectory, true);
+					Directory.Delete(dir, true);
 				});
 		}
 
@@ -309,25 +309,18 @@ namespace JDP {
 		}
 
 		private void miPostprocessFiles_Click(object sender, EventArgs e) {
-			var tasks = new List<FilePostprocessingTask>();
+			var items = new List<ThreadWatcher>();
 
 			foreach (ThreadWatcher watcher in SelectedThreadWatchers) {
-				if (watcher.IsRunning) continue;
-				IFilePostprocessor siteHelper = SiteHelper.CreateByUrl(watcher.PageUrl) as IFilePostprocessor;
-				if (siteHelper == null) continue;
-				string downloadDirectory = watcher.ThreadDownloadDirectory;
-				if (downloadDirectory == null) continue;
-				tasks.Add(new FilePostprocessingTask {
-					SiteHelper = siteHelper,
-					DownloadDirectory = downloadDirectory
-				});
+				if (watcher.IsRunning || watcher.ThreadDownloadDirectory == null || !(watcher.SiteHelper is IFilePostprocessor)) continue;
+				items.Add(watcher);
 			}
 
 			bool anyFailed = false;
 			frmWait.RunWork(this, (onProgress) => {
-				foreach (FilePostprocessingTask task in tasks) {
+				foreach (ThreadWatcher watcher in items) {
 					try {
-						task.SiteHelper.PostprocessFiles(task.DownloadDirectory, onProgress);
+						((IFilePostprocessor)watcher.SiteHelper).PostprocessFiles(watcher, onProgress);
 					}
 					catch {
 						anyFailed = true;
@@ -359,7 +352,7 @@ namespace JDP {
 
 		private void btnAbout_Click(object sender, EventArgs e) {
 			MessageBox.Show(this, String.Format("Chan Thread Watch{0}Build: {1}{0}Author: J.D. Purcell",
-				Environment.NewLine, General.Build), "About", MessageBoxButtons.OK, MessageBoxIcon.Information);
+				Environment.NewLine, General.BuildDate), "About", MessageBoxButtons.OK, MessageBoxIcon.Information);
 		}
 
 		private void lvThreads_KeyDown(object sender, KeyEventArgs e) {
@@ -544,25 +537,30 @@ namespace JDP {
 			MessageBox.Show(this, message, title, MessageBoxButtons.OK, MessageBoxIcon.Error);
 		}
 
+		private UrlTransformResult TransformUrlIfRecognized(string pageUrl, string pageAuth) {
+			UrlTransformResult urlTransformResult = null;
+			frmWait.RunWork(this, (onProgress) => {
+				urlTransformResult = UrlTransformer.TransformIfRecognized(pageUrl, pageAuth);
+			});
+			return urlTransformResult;
+		}
+
 		private bool AddThread(string pageUrl, bool silent = false, string description = null) {
 			string pageAuth = chkPageAuth.Checked && txtPageAuth.Text.IndexOf(':') != -1 ? txtPageAuth.Text : "";
 			string imageAuth = chkImageAuth.Checked && txtImageAuth.Text.IndexOf(':') != -1 ? txtImageAuth.Text : "";
 			int checkIntervalSeconds = (int)cboCheckEvery.SelectedValue * 60;
+			bool oneTimeDownload = chkOneTime.Checked;
 
-			bool wasTransformSuccessful = false;
-			frmWait.RunWork(this, (onProgress) => {
-				try {
-					pageUrl = UrlTransformer.Transform(pageUrl, pageAuth);
-					wasTransformSuccessful = true;
-				}
-				catch { }
-			});
-			if (!wasTransformSuccessful) {
+			UrlTransformResult urlTransformResult;
+			try {
+				urlTransformResult = TransformUrlIfRecognized(pageUrl, pageAuth);
+			}
+			catch {
 				if (!silent) ShowErrorMessage("Unable to transform the URL.", "Error");
 				return false;
 			}
 
-			bool wasAdded = AddThread(pageUrl, pageAuth, imageAuth, checkIntervalSeconds, chkOneTime.Checked, description);
+			bool wasAdded = AddThread(pageUrl, pageAuth, imageAuth, checkIntervalSeconds, oneTimeDownload, description, urlTransformResult);
 			if (!wasAdded) {
 				if (!silent) ShowErrorMessage("The same thread is already being watched or downloaded.", "Duplicate Thread");
 				return false;
@@ -571,12 +569,17 @@ namespace JDP {
 			return true;
 		}
 
-		private bool AddThread(string pageUrl, string pageAuth, string imageAuth, int checkIntervalSeconds, bool oneTimeDownload, string description = null) {
-			string globalThreadID = SiteHelper.CreateByUrl(pageUrl).GetGlobalThreadID();
+		private bool AddThread(string pageUrl, string pageAuth, string imageAuth, int checkIntervalSeconds, bool oneTimeDownload, string description, UrlTransformResult urlTransformResult) {
+			if (urlTransformResult != null) {
+				pageUrl = urlTransformResult.TransformedUrl;
+			}
+			SiteHelper siteHelper = SiteHelper.CreateByUrl(pageUrl);
+			string globalThreadID = siteHelper.GetGlobalThreadID();
 			ThreadWatcher watcher = ThreadList.Items.FirstOrDefault(w => w.GlobalThreadID.Equals(globalThreadID, StringComparison.OrdinalIgnoreCase));
 
 			if (watcher == null) {
-				watcher = ThreadWatcher.Create(pageUrl, pageAuth, imageAuth, oneTimeDownload, checkIntervalSeconds, description);
+				description ??= urlTransformResult?.DefaultDescription ?? siteHelper.GetDefaultDescription();
+				watcher = ThreadWatcher.Create(siteHelper, pageUrl, pageAuth, imageAuth, oneTimeDownload, checkIntervalSeconds, description);
 
 				AttachWatcherToUI(watcher);
 				DisplayDescription(watcher);
@@ -827,7 +830,7 @@ namespace JDP {
 		private void LoadTwitchUserWatchList() {
 			void TwitchUserWatcher_NewVod(TwitchUserWatcher s, TwitchNewVodEventArgs e) {
 				this.TryInvoke(() => {
-					AddThread(e.Url, silent: true, description: $"Twitch VOD {e.VideoID}");
+					AddThread(e.Url, silent: true);
 				});
 			}
 			void AddTwitchUserWatcher(string userName, TimeSpan interval) {

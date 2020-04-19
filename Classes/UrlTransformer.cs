@@ -14,11 +14,20 @@ namespace JDP {
 				 select (UrlTransformer)Activator.CreateInstance(t)).ToList();
 		}
 
-		public static string Transform(string url, string auth) {
-			Uri uri = new Uri(url);
-			return _urlTransformers.Select(n => n.TransformIfRecognized(uri, auth)).FirstOrDefault(n => n != null) ?? url;
-		}
+		public abstract UrlTransformResult TransformIfRecognized(Uri uri, string auth);
 
-		public abstract string TransformIfRecognized(Uri uri, string auth);
+		public static UrlTransformResult TransformIfRecognized(string url, string auth) {
+			Uri uri = new Uri(url);
+			return _urlTransformers.Select(n => n.TransformIfRecognized(uri, auth)).FirstOrDefault(n => n != null);
+		}
+	}
+
+	public class UrlTransformResult {
+		public string TransformedUrl { get; }
+		public string DefaultDescription { get; set; }
+
+		public UrlTransformResult(string transformedUrl) {
+			TransformedUrl = transformedUrl;
+		}
 	}
 }

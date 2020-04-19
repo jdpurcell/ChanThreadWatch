@@ -15,8 +15,8 @@ using System.Web;
 
 namespace JDP {
 	public static class General {
-		public const string Version = "1.7.0.6";
-		public const string Build = "20181121";
+		public const string BuildDate = "20200419";
+		public const string Version = "1.7.0.6"; // Frozen
 
 		static General() {
 			// HttpWebRequest uses ThreadPool for asynchronous calls
@@ -29,15 +29,8 @@ namespace JDP {
 			ServicePointManager.ServerCertificateValidationCallback = (s, cert, chain, errors) => true;
 		}
 
-		public static string DisplayVersion {
-			get {
-				Version ver = new Version(Version);
-				return $"{ver.Major}.{ver.Minor}.{ver.Revision}";
-			}
-		}
-
 		public static string UserAgent {
-			get => Settings.UseCustomUserAgent ? Settings.CustomUserAgent : $"Chan Thread Watch {DisplayVersion}";
+			get => Settings.UseCustomUserAgent ? Settings.CustomUserAgent : $"Chan Thread Watch {BuildDate}";
 		}
 
 		public static string NormalizeNewLines(string str) {
@@ -70,7 +63,7 @@ namespace JDP {
 			HttpWebRequest request = null;
 			HttpWebResponse response = null;
 			Stream responseStream = null;
-			Action cleanup = () => {
+			void Cleanup() {
 				if (request != null) {
 					request.Abort();
 					request = null;
@@ -83,20 +76,20 @@ namespace JDP {
 					try { response.Close(); } catch { }
 					response = null;
 				}
-			};
-			Action<Exception> abortDownloadInternal = (ex) => {
+			}
+			void AbortDownloadInternal(Exception ex) {
 				lock (sync) {
 					if (aborting) return;
 					aborting = true;
-					cleanup();
+					Cleanup();
 					onException(ex);
 				}
-			};
-			Action abortDownload = () => {
+			}
+			void AbortDownload() {
 				ThreadPool.QueueUserWorkItem((s) => {
-					abortDownloadInternal(new Exception("Download has been aborted."));
+					AbortDownloadInternal(new Exception("Download has been aborted."));
 				});
-			};
+			}
 			lock (sync) {
 				try {
 					request = (HttpWebRequest)WebRequest.Create(url);
@@ -121,8 +114,7 @@ namespace JDP {
 								responseStream = response.GetResponseStream();
 								onResponse(response);
 								byte[] buff = new byte[readBufferSize];
-								AsyncCallback readCallback = null;
-								readCallback = (readResultParam) => {
+								void ReadCallback(IAsyncResult readResultParam) {
 									lock (sync) {
 										try {
 											if (aborting) return;
@@ -132,24 +124,24 @@ namespace JDP {
 													request = null;
 													onComplete();
 													aborting = true;
-													cleanup();
+													Cleanup();
 													return;
 												}
 												onDownloadChunk(buff, bytesRead);
 											}
-											IAsyncResult readResult = responseStream.BeginRead(buff, 0, buff.Length, readCallback, null);
+											IAsyncResult readResult = responseStream.BeginRead(buff, 0, buff.Length, ReadCallback, null);
 											ThreadPool.RegisterWaitForSingleObject(readResult.AsyncWaitHandle,
 												(state, timedOut) => {
 													if (!timedOut) return;
-													abortDownloadInternal(new Exception("Timed out while reading response."));
+													AbortDownloadInternal(new Exception("Timed out while reading response."));
 												}, null, readTimeoutMS, true);
 										}
 										catch (Exception ex) {
-											abortDownloadInternal(ex);
+											AbortDownloadInternal(ex);
 										}
 									}
 								};
-								readCallback(null);
+								ReadCallback(null);
 							}
 							catch (Exception ex) {
 								if (ex is WebException) {
@@ -164,21 +156,21 @@ namespace JDP {
 										}
 									}
 								}
-								abortDownloadInternal(ex);
+								AbortDownloadInternal(ex);
 							}
 						}
 					}, null);
 					ThreadPool.RegisterWaitForSingleObject(requestResult.AsyncWaitHandle,
 						(state, timedOut) => {
 							if (!timedOut) return;
-							abortDownloadInternal(new Exception("Timed out while waiting for response."));
+							AbortDownloadInternal(new Exception("Timed out while waiting for response."));
 						}, null, requestTimeoutMS, true);
 				}
 				catch (Exception ex) {
-					abortDownloadInternal(ex);
+					AbortDownloadInternal(ex);
 				}
 			}
-			return abortDownload;
+			return AbortDownload;
 		}
 
 		public static string DownloadPageToString(string url, Action<HttpWebRequest> withRequest = null) {
