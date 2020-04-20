@@ -444,7 +444,6 @@ namespace JDP {
 										FileName = fileName,
 										Skipped = false
 									};
-									break;
 								}
 							}
 							foreach (ThumbnailInfo thumb in getFilesResult.Thumbnails) {

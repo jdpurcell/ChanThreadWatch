@@ -15,7 +15,7 @@ using System.Web;
 
 namespace JDP {
 	public static class General {
-		public const string BuildDate = "20200419";
+		public const string BuildDate = "20200420";
 		public const string Version = "1.7.0.6"; // Frozen
 
 		static General() {
